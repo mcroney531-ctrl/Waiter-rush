@@ -302,6 +302,13 @@
   // one number that decides whether the floor breathes or clogs: a dirty table
   // cannot take a new order, so eating time plus your bussing speed sets how
   // many of the eight tables are actually in service at any moment.
+  // 220 was a walk. Rone asked for 2-3x; this is 2.5x, which crosses the floor
+  // in about a second and reads as a server in the weeds rather than strolling.
+  // Note this invalidates any measured traversal time — see HANDOFF.md, and
+  // re-fit the tip thresholds below if it changes again, since they are set
+  // against how fast a delivery can physically be made.
+  const PLAYER_SPEED = 550;
+
   const EAT_MS = 22000;
   const BUS_SCORE = 40;
 
@@ -316,18 +323,21 @@
   // part of the shift where players spend most of their time. Absolute wait is
   // independent of the ramp and is also what a guest actually experiences.
   //
-  // These thresholds were fitted to measured play, not guessed. A bot playing
-  // near-optimally delivers in 1.7-5.4s, and that barely changes at full rush
-  // because bussing caps how fast orders can arrive, so the queue rarely
-  // builds. Earlier 6s/40s and 3s/25s pairs both put every one of those
-  // deliveries at the maximum — a flat top with nothing left to chase. At
-  // 2s/18s good play spans 79-100 and splits across the top two tiers, while a
-  // slower player sees the whole range down to nothing.
+  // These thresholds are fitted to measured play, not guessed, and they are
+  // tied to PLAYER_SPEED — change that and they must be refitted or the whole
+  // scale collapses to its maximum. That has now happened twice: at 220px/s a
+  // near-optimal bot delivered in 1.7-5.4s and 2s/18s was right; at 550px/s the
+  // same bot delivers in 0.85-3.3s, which 2s/18s scored 92-100 across the board.
+  //
+  // A flat maximum is the failure mode to watch for. It also rules out the
+  // obvious 6s/40s and 3s/25s pairs tried earlier. At 900ms/8s good play spans
+  // 66-100 and splits across the top two tiers, while a slower player still
+  // sees the whole range down to nothing.
   //
   // Clearing tables is deliberately outside this; bussing keeps its flat
   // BUS_SCORE, so tips are purely about how long the guest waited to be fed.
-  const TIP_FULL_MS = 2000;    // at or under this, the whole tip
-  const TIP_NONE_MS = 18000;   // at or over this, nothing
+  const TIP_FULL_MS = 900;     // at or under this, the whole tip
+  const TIP_NONE_MS = 8000;    // at or over this, nothing
   const TIP_MAX = 100;         // on top of the flat 100 for the delivery itself
   const TIP_BIG = 0.85;        // fraction at which it reads as a big tip
   const TIP_GOOD = 0.5;
@@ -358,7 +368,7 @@
       patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0
     }));
     tickets = [];
-    player = { x: W/2, y: H - 90, size: 26, speed: 220 };
+    player = { x: W/2, y: H - 90, size: 26, speed: PLAYER_SPEED };
     keys = {};
     touchDir = {x:0, y:0};
     carrying = null;
@@ -594,20 +604,26 @@
   }, {passive:false});
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-  function bindHold(id, dx, dy){
+  // Each button owns one axis only. It used to set both — pressing Up ran
+  // touchDir.x = 0 — which silently wiped the other axis and made the d-pad
+  // strictly four-directional while the keyboard got all eight. A diagonal trip
+  // then cost about 34% more distance on touch than on desktop, so the d-pad
+  // felt sluggish for a reason that had nothing to do with speed.
+  function bindHold(id, axis, val){
     const el = document.getElementById(id);
-    const start = (e) => { e.preventDefault(); touchDir.x = dx; touchDir.y = dy; };
-    const end = (e) => { e.preventDefault(); if (touchDir.x===dx) touchDir.x = 0; if (touchDir.y===dy) touchDir.y = 0; };
+    const start = (e) => { e.preventDefault(); touchDir[axis] = val; };
+    const end = (e) => { e.preventDefault(); if (touchDir[axis] === val) touchDir[axis] = 0; };
     el.addEventListener('touchstart', start, {passive:false});
     el.addEventListener('touchend', end, {passive:false});
+    el.addEventListener('touchcancel', end, {passive:false});
     el.addEventListener('mousedown', start);
     el.addEventListener('mouseup', end);
     el.addEventListener('mouseleave', end);
   }
-  bindHold('btn-up', 0, -1);
-  bindHold('btn-down', 0, 1);
-  bindHold('btn-left', -1, 0);
-  bindHold('btn-right', 1, 0);
+  bindHold('btn-up', 'y', -1);
+  bindHold('btn-down', 'y', 1);
+  bindHold('btn-left', 'x', -1);
+  bindHold('btn-right', 'x', 1);
 
   function getMoveVector(){
     let dx = 0, dy = 0;
@@ -616,6 +632,10 @@
     if (keys['arrowleft'] || keys['a']) dx -= 1;
     if (keys['arrowright'] || keys['d']) dx += 1;
     dx += touchDir.x; dy += touchDir.y;
+    // Keyboard and d-pad both feed this, so holding the same direction on both
+    // could otherwise reach 2 and outrun the diagonal correction below.
+    dx = Math.max(-1, Math.min(1, dx));
+    dy = Math.max(-1, Math.min(1, dy));
     if (dx !== 0 && dy !== 0){ dx *= 0.7071; dy *= 0.7071; }
     return {dx, dy};
   }

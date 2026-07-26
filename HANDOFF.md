@@ -43,7 +43,7 @@ One file, `index.html`, about 1150 lines: styles, then markup, then the whole ga
 - Drawing functions, then `render()`
 - `loop` / `beginRun` / `startGame` / `startTutorial`, then event wiring
 
-Canvas is a fixed 960×600 internal resolution scaled by CSS. Eight tables in two rows of four, at x = 120/320/520/720 and y = 200/400. Player is a circle of radius 26 moving at 220 px/s. The counter occupies the top 90px and holds at most 5 queued tickets. The dish return (`BUS`) sits against the right wall at x = 886, y = 300.
+Canvas is a fixed 960×600 internal resolution scaled by CSS. Eight tables in two rows of four, at x = 120/320/520/720 and y = 200/400. Player is a circle of radius 26 moving at `PLAYER_SPEED` (550 px/s). The counter occupies the top 90px and holds at most 5 queued tickets. The dish return (`BUS`) sits against the right wall at x = 886, y = 300.
 
 ## The core hook, and the rule that protects it
 
@@ -63,16 +63,23 @@ Do not re-derive these. They come from instrumented runs in headless Chromium, r
 
 | elapsed | patience window | spawn gap | orders/min | max deliverable/min |
 | ------: | --------------: | --------: | ---------: | ------------------: |
-|      0s |          2:00   |     7.00s |        8.6 |                21.9 |
-|     60s |          1:50   |     6.64s |        9.0 |                21.9 |
-|    120s |          1:40   |     6.28s |        9.6 |                21.9 |
-|    240s |          1:19   |     5.56s |       10.8 |                21.9 |
-|    420s |            49s  |     4.48s |       13.4 |                21.9 |
-|    600s |            18s  |     3.40s |       17.6 |                21.9 |
+|      0s |          2:00   |     7.00s |        8.6 |                  54 |
+|     60s |          1:50   |     6.64s |        9.0 |                  54 |
+|    120s |          1:40   |     6.28s |        9.6 |                  54 |
+|    240s |          1:19   |     5.56s |       10.8 |                  54 |
+|    420s |            49s  |     4.48s |       13.4 |                  54 |
+|    600s |            18s  |     3.40s |       17.6 |                  54 |
 
 Verified live rather than derived: at shift open a fresh table reads 119.7s and the spawn gap is 6.99s; with the clock pushed to 600000 they read 18.0s and 3.40s. The on-screen countdown is true elapsed time.
 
-**Traversal.** Average one-way trip from counter to a table is **1.37s**; round trip **2.74s**, which is where the 21.9/min ceiling comes from. That ceiling assumes flawless play with zero hesitation, so treat it as a hard wall rather than a target.
+**Movement.** `PLAYER_SPEED` is **550 px/s** (it was 220 — Rone asked for 2-3x and this is 2.5x). One-way counter-to-table is now roughly **0.55s**, round trip **1.10s**, down from 1.37s and 2.74s.
+
+That invalidates two things that were derived from the old speed, so treat `PLAYER_SPEED` as a number with dependents:
+
+- The **21.9 orders/min ceiling** in the table above was `60 / 2.74s`. It is now about **54/min**, so the shift no longer comes anywhere near outrunning the player. `SPAWN_FLOOR_MS` was originally set above the 2.74s round trip for exactly that reason; that constraint is now slack, and the practical ceiling is bussing rather than legs (see below).
+- The **tip thresholds**, which had to be refitted. See Scoring.
+
+**The d-pad could not move diagonally.** `bindHold` set both axes per button, so pressing Up ran `touchDir.x = 0` and wiped the horizontal. Touch players got four directions where the keyboard got eight, which costs about 34% extra distance on a diagonal trip — the d-pad felt sluggish for a reason unrelated to speed. Each button now owns one axis. Verified with two-finger input on the real on-screen buttons in an emulated touch device: holding Up+Right yields `{dx: 0.7071, dy: -0.7071}` and the player actually moves on both axes. The combined vector is also clamped to ±1 now, since keyboard and d-pad both feed it and could otherwise sum to 2 and defeat the diagonal correction.
 
 **Scoring.** A delivery scores `100 + tip`, where the tip is up to another 100 and scales with **how long the guest waited from their order appearing at the counter to it landing on their table**. Clearing a table is a separate flat `BUS_SCORE` (40) and deliberately does not affect the tip.
 
@@ -80,15 +87,18 @@ The old bug is fixed: `speedBonus` used to read `table.patience` on the line *af
 
 **Measuring absolute wait rather than patience remaining is the load-bearing decision.** Patience-remaining is the obvious version and it does not work: at the two-minute opening a leisurely 10s delivery still leaves 92% of the meter, so everything reads as fast, while the identical delivery at full rush (an 18s window) leaves 44% and reads as mediocre. Same play, opposite verdict, and no gradient at all in the part of the shift where players spend most of their time. Absolute wait is independent of the ramp and is also what a guest actually experiences.
 
-`TIP_FULL_MS` (2000) and `TIP_NONE_MS` (18000) were **fitted to measured play, not guessed**, and this took three attempts:
+`TIP_FULL_MS` (900) and `TIP_NONE_MS` (8000) are **fitted to measured play, and they depend on `PLAYER_SPEED`**. They have now been refitted twice, which is the thing to remember:
 
-| curve | good play | slower player |
+| speed | good play delivers in | curve that works |
 | --- | --- | --- |
-| 6s / 40s | all maximum | some gradient |
-| 3s / 25s | all maximum, 89-100 | 14-86 |
-| **2s / 18s** | **79-100, splits BIG/GOOD** | **0-75, full range** |
+| 220 px/s | 1.7-5.4s | 2s / 18s |
+| **550 px/s** | **0.85-3.3s** | **900ms / 8s** |
 
-The reason the first two failed is worth remembering: **a bot playing near-optimally delivers in 1.7-5.4s, and that barely changes at full rush**, because bussing caps how fast orders can arrive so the queue rarely builds. Any curve whose top threshold sits above ~6s therefore gives a competent player a flat maximum with nothing left to chase. Verified in play at 2s/18s: 12 BIG and 2 GOOD over 14 deliveries, and score reconciles exactly against `sum(100 + tip) + cleared*40`.
+Curves that were tried and failed, all for the same reason — every delivery a competent player makes lands at the maximum, giving a flat top with nothing to chase: 6s/40s, 3s/25s, and (after the speed change) the previously-correct 2s/18s, which scored the new distribution 92-100 across the board.
+
+The underlying cause is worth knowing: **a near-optimal bot's delivery time barely changes between the shift opening and full rush**, because bussing caps how fast orders can arrive so the queue rarely builds. Speed of legs, not queue pressure, sets the distribution — which is exactly why `PLAYER_SPEED` and these thresholds are coupled. If you change the speed again, re-run the bot and refit.
+
+At 900ms/8s good play spans 66-100 and splits across the top two tiers — measured 15 big / 1 good over 16 deliveries at the opening, and 17 big / 9 good over 26 at full rush, the spread widening as the queue builds. A slower player still sees the whole range down to nothing. Score reconciles exactly against `sum(100 + tip) + cleared*40` in both runs.
 
 Tiers are `TIP_BIG` (0.85) and `TIP_GOOD` (0.5) of the tip fraction, shown as a floater rising off the table — label, total, and the wait in seconds, so the player can connect the reward to the cause without reading a manual. Tips are mentioned in the deliver lesson's success line and in the pre-shift blurb; a scoring rule nobody is told about teaches nothing.
 
