@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Rush Hour — The Waiter Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  @font-face {
+    font-family: 'DinerDisplay';
+    src: local('Alfa Slab One');
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #1c1712;
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
+    touch-action: none;
+  }
+  #wrap {
+    position: relative;
+    width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas {
+    background: #E8E2D5;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    image-rendering: pixelated;
+    max-width: 100vw; max-height: 100vh;
+  }
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 14px 18px;
+    pointer-events: none;
+    font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
+    color: #F4EEDB;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+    z-index: 5;
+  }
+  #hud .stat { font-size: 20px; letter-spacing: 0.5px; }
+  #hud .stat span.label { font-family: 'DM Sans', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; font-weight: 700;}
+  #lives { display: flex; gap: 6px; margin-top: 2px; }
+  .life-dot { width: 14px; height: 14px; border-radius: 50%; background: #C1443A; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
+  .life-dot.lost { background: rgba(255,255,255,0.15); }
+
+  #controls-mobile {
+    position: absolute; bottom: 22px; left: 0; right: 0;
+    display: none;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 10;
+  }
+  .dpad { position: relative; width: 148px; height: 148px; }
+  .dbtn {
+    position: absolute; width: 50px; height: 50px;
+    background: rgba(244,238,219,0.85);
+    border: 3px solid #2B2620;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #2B2620; font-weight: 900;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+  }
+  .dbtn:active { transform: translateY(3px); box-shadow: none; }
+  #btn-up { top: 0; left: 49px; }
+  #btn-down { bottom: 0; left: 49px; }
+  #btn-left { top: 49px; left: 0; }
+  #btn-right { top: 49px; right: 0; }
+
+  #overlay {
+    position: absolute; inset: 0;
+    background: rgba(28,23,18,0.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; z-index: 20; color: #F4EEDB; padding: 24px;
+  }
+  #overlay h1 {
+    font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
+    font-size: clamp(32px, 7vw, 56px);
+    color: #E0A72E;
+    text-shadow: 3px 3px 0 #C1443A;
+    margin: 0 0 8px;
+    letter-spacing: 1px;
+  }
+  #overlay p { max-width: 440px; line-height: 1.5; font-size: 15px; opacity: 0.9; margin: 6px 0 20px; }
+  #overlay .big-stat { font-family: 'Alfa Slab One', sans-serif; font-size: 40px; color: #2F6F6B; margin: 4px 0 18px; }
+  button.cta {
+    font-family: 'Alfa Slab One', sans-serif;
+    background: #C1443A; color: #F4EEDB;
+    border: none; padding: 16px 36px; font-size: 18px;
+    border-radius: 10px; cursor: pointer;
+    box-shadow: 0 5px 0 #7a2b25;
+    letter-spacing: 1px;
+  }
+  button.cta:active { box-shadow: 0 2px 0 #7a2b25; transform: translateY(3px); }
+  .hidden { display: none !important; }
+
+  @media (pointer: coarse) {
+    #controls-mobile { display: flex; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="600"></canvas>
+
+  <div id="hud">
+    <div class="stat">
+      <span class="label">Score</span>
+      <span id="score">0</span>
+    </div>
+    <div class="stat" style="text-align:right;">
+      <span class="label">Tables lost</span>
+      <div id="lives"></div>
+    </div>
+  </div>
+
+  <div id="controls-mobile">
+    <div class="dpad">
+      <div class="dbtn" id="btn-up">▲</div>
+      <div class="dbtn" id="btn-left">◀</div>
+      <div class="dbtn" id="btn-right">▶</div>
+      <div class="dbtn" id="btn-down">▼</div>
+    </div>
+    <div style="width:1px;"></div>
+  </div>
+
+  <div id="overlay">
+    <h1>Rush Hour</h1>
+    <p>Grab the order ticket from the counter, remember which table it's for, and deliver it before the ticket board goes blank on your walk. Miss too many tables and the shift is over.</p>
+    <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
+    <button class="cta" id="startBtn">Start Shift</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const COLORS = {
+    floorA: '#E8E2D5',
+    floorB: '#DCD4C2',
+    counter: '#2F6F6B',
+    counterTop: '#3d8783',
+    tableWood: '#8a5a3b',
+    tableTop: '#c99a6b',
+    player: '#C1443A',
+    playerDark: '#8f2e26',
+    text: '#2B2620',
+    angry: '#B33A3A',
+    happy: '#4C8C5C',
+    mustard: '#E0A72E'
+  };
+
+  // ---------- Layout ----------
+  const counterRect = { x: 0, y: 0, w: W, h: 90 };
+
+  const tableDefs = [
+    {x: 120, y: 200}, {x: 320, y: 200}, {x: 520, y: 200}, {x: 720, y: 200},
+    {x: 120, y: 400}, {x: 320, y: 400}, {x: 520, y: 400}, {x: 720, y: 400},
+  ];
+
+  const FOOD_ICONS = ['🍔','🍕','🥗','🍝','🍟','🌮','🍜','🥪'];
+
+  let tables = [];
+  let tickets = []; // waiting at the counter: {id, tableId, icon, spawnTime}
+  let player, keys, touchDir;
+  let carrying = null; // {tableId, icon, pickedAt}
+  let carryCapacity = 1;
+  let deliveries = 0;
+  let score = 0;
+  let lives = 3;
+  let lastTime = 0;
+  let spawnTimer = 0;
+  let spawnInterval = 4200; // ms, shrinks over time
+  let elapsed = 0;
+  let running = false;
+  let ticketIdCounter = 1;
+
+  function resetGame(){
+    tables = tableDefs.map((t, i) => ({
+      id: i+1, x: t.x, y: t.y,
+      state: 'idle', // idle -> waiting (has ticket at counter) -> served briefly happy -> idle
+      patience: 1, ticketId: null, happyTimer: 0
+    }));
+    tickets = [];
+    player = { x: W/2, y: H - 90, size: 26, speed: 220 };
+    keys = {};
+    touchDir = {x:0, y:0};
+    carrying = null;
+    carryCapacity = 1;
+    deliveries = 0;
+    score = 0;
+    lives = 3;
+    spawnTimer = 900;
+    spawnInterval = 4200;
+    elapsed = 0;
+    ticketIdCounter = 1;
+    updateHUD();
+  }
+
+  function updateHUD(){
+    document.getElementById('score').textContent = score;
+    const livesEl = document.getElementById('lives');
+    livesEl.innerHTML = '';
+    for (let i=0;i<3;i++){
+      const d = document.createElement('div');
+      d.className = 'life-dot' + (i < lives ? '' : ' lost');
+      livesEl.appendChild(d);
+    }
+  }
+
+  // ---------- Spawning ----------
+  function spawnTicket(){
+    const idleTables = tables.filter(t => t.state === 'idle');
+    if (idleTables.length === 0) return;
+    const t = idleTables[Math.floor(Math.random()*idleTables.length)];
+    const icon = FOOD_ICONS[Math.floor(Math.random()*FOOD_ICONS.length)];
+    const ticket = { id: ticketIdCounter++, tableId: t.id, icon, spawnTime: performance.now() };
+    // cap queue size visible at counter
+    const activeAtCounter = tickets.length;
+    if (activeAtCounter >= 5) return;
+    tickets.push(ticket);
+    t.state = 'waiting';
+    t.ticketId = ticket.id;
+    t.patience = 1;
+  }
+
+  // ---------- Input ----------
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
+  }, {passive:false});
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  function bindHold(id, dx, dy){
+    const el = document.getElementById(id);
+    const start = (e) => { e.preventDefault(); touchDir.x = dx; touchDir.y = dy; };
+    const end = (e) => { e.preventDefault(); if (touchDir.x===dx) touchDir.x = 0; if (touchDir.y===dy) touchDir.y = 0; };
+    el.addEventListener('touchstart', start, {passive:false});
+    el.addEventListener('touchend', end, {passive:false});
+    el.addEventListener('mousedown', start);
+    el.addEventListener('mouseup', end);
+    el.addEventListener('mouseleave', end);
+  }
+  bindHold('btn-up', 0, -1);
+  bindHold('btn-down', 0, 1);
+  bindHold('btn-left', -1, 0);
+  bindHold('btn-right', 1, 0);
+
+  function getMoveVector(){
+    let dx = 0, dy = 0;
+    if (keys['arrowup'] || keys['w']) dy -= 1;
+    if (keys['arrowdown'] || keys['s']) dy += 1;
+    if (keys['arrowleft'] || keys['a']) dx -= 1;
+    if (keys['arrowright'] || keys['d']) dx += 1;
+    dx += touchDir.x; dy += touchDir.y;
+    if (dx !== 0 && dy !== 0){ dx *= 0.7071; dy *= 0.7071; }
+    return {dx, dy};
+  }
+
+  // ---------- Game logic ----------
+  function distTo(a, bx, by){ return Math.hypot(a.x-bx, a.y-by); }
+
+  function tryPickup(){
+    if (carrying) return; // already holding max? we only support 1 slot visually, capacity affects nothing beyond flavor for now
+    // near counter?
+    if (player.y - player.size/2 > counterRect.h + 10) return;
+    if (tickets.length === 0) return;
+    const t = tickets[0];
+    tickets.shift();
+    carrying = { tableId: t.tableId, icon: t.icon, pickedAt: performance.now() };
+  }
+
+  function tryDeliver(){
+    if (!carrying) return;
+    const table = tables.find(t => t.id === carrying.tableId);
+    if (!table) { carrying = null; return; }
+    const d = distTo(player, table.x, table.y);
+    if (d < 55) {
+      // Check if this is actually a table (any table close counts as attempt)
+      table.state = 'happy';
+      table.happyTimer = 1200;
+      table.ticketId = null;
+      table.patience = 1;
+      const speedBonus = Math.max(0, Math.round((table.patience) * 20));
+      score += 100 + speedBonus;
+      deliveries++;
+      carrying = null;
+      updateHUD();
+      if (deliveries === 6 && carryCapacity === 1){
+        carryCapacity = 2;
+      }
+    } else {
+      // check wrong table bump for feedback only
+      for (const other of tables){
+        if (other.id !== carrying.tableId && distTo(player, other.x, other.y) < 50){
+          other.bump = 300;
+        }
+      }
+    }
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key === ' ') { tryPickup(); tryDeliver(); }
+  });
+
+  // Auto pickup/deliver on proximity for mobile ease, plus spacebar on desktop
+  function checkAutoInteract(){
+    if (!carrying && player.y - player.size/2 <= counterRect.h + 6 && tickets.length > 0){
+      tryPickup();
+    }
+    if (carrying){
+      const table = tables.find(t => t.id === carrying.tableId);
+      if (table && distTo(player, table.x, table.y) < 42){
+        tryDeliver();
+      }
+    }
+  }
+
+  // ---------- Update ----------
+  function update(dt){
+    elapsed += dt;
+    spawnInterval = Math.max(1100, 4200 - elapsed/1000 * 45);
+    spawnTimer -= dt;
+    if (spawnTimer <= 0){
+      spawnTicket();
+      spawnTimer = spawnInterval * (0.7 + Math.random()*0.5);
+    }
+
+    const {dx, dy} = getMoveVector();
+    player.x += dx * player.speed * dt/1000;
+    player.y += dy * player.speed * dt/1000;
+    player.x = Math.max(player.size/2, Math.min(W - player.size/2, player.x));
+    player.y = Math.max(counterRect.h + player.size/2, Math.min(H - player.size/2, player.y));
+
+    checkAutoInteract();
+
+    // patience drain
+    const drainRate = 0.00011 + Math.min(0.00009, elapsed/1000/9000);
+    for (const t of tables){
+      if (t.state === 'waiting'){
+        t.patience -= drainRate * dt;
+        if (t.patience <= 0){
+          t.patience = 0;
+          t.state = 'angry';
+          t.angryTimer = 1500;
+          // remove its ticket from queue if still there
+          tickets = tickets.filter(tk => tk.tableId !== t.id || tk.tableId !== t.id);
+          tickets = tickets.filter(tk => !(tk.tableId === t.id));
+          if (carrying && carrying.tableId === t.id) carrying = null;
+          lives -= 1;
+          updateHUD();
+          if (lives <= 0){
+            endGame();
+          }
+        }
+      }
+      if (t.state === 'happy'){
+        t.happyTimer -= dt;
+        if (t.happyTimer <= 0) t.state = 'idle';
+      }
+      if (t.state === 'angry'){
+        t.angryTimer -= dt;
+        if (t.angryTimer <= 0) t.state = 'idle';
+      }
+      if (t.bump){ t.bump -= dt; if (t.bump < 0) t.bump = 0; }
+    }
+  }
+
+  function endGame(){
+    running = false;
+    const overlay = document.getElementById('overlay');
+    overlay.innerHTML = `
+      <h1>Shift Over</h1>
+      <div class="big-stat">${score} pts</div>
+      <p>${deliveries} orders delivered before the floor got the better of you. Rush hour only gets faster from here — want another go?</p>
+      <button class="cta" id="startBtn">Run It Back</button>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('startBtn').addEventListener('click', startGame);
+  }
+
+  // ---------- Draw ----------
+  function drawFloor(){
+    const tile = 60;
+    for (let y = counterRect.h; y < H; y += tile){
+      for (let x = 0; x < W; x += tile){
+        const idx = Math.floor(x/tile) + Math.floor(y/tile);
+        ctx.fillStyle = idx % 2 === 0 ? COLORS.floorA : COLORS.floorB;
+        ctx.fillRect(x, y, tile, tile);
+      }
+    }
+  }
+
+  function drawCounter(){
+    ctx.fillStyle = COLORS.counter;
+    ctx.fillRect(0, 0, W, counterRect.h);
+    ctx.fillStyle = COLORS.counterTop;
+    ctx.fillRect(0, counterRect.h - 12, W, 12);
+    ctx.fillStyle = '#F4EEDB';
+    ctx.font = '700 13px DM Sans, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('PICKUP COUNTER', 16, 24);
+
+    // tickets
+    const startX = 20;
+    tickets.forEach((tk, i) => {
+      const tx = startX + i * 82;
+      const ty = 38;
+      ctx.save();
+      ctx.translate(tx, ty);
+      ctx.fillStyle = '#F4EEDB';
+      ctx.strokeStyle = '#2B2620';
+      ctx.lineWidth = 2;
+      roundRect(ctx, 0, 0, 72, 46, 6);
+      ctx.fill(); ctx.stroke();
+      ctx.font = '26px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(tk.icon, 36, 30);
+      ctx.fillStyle = COLORS.text;
+      ctx.font = '900 11px DM Sans, sans-serif';
+      ctx.fillText('T' + tk.tableId, 36, 42);
+      ctx.restore();
+    });
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function drawTable(t){
+    ctx.save();
+    ctx.translate(t.x, t.y);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath();
+    ctx.ellipse(0, 34, 34, 10, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // legs
+    ctx.fillStyle = COLORS.tableWood;
+    ctx.fillRect(-26, -6, 8, 34);
+    ctx.fillRect(18, -6, 8, 34);
+
+    // top
+    ctx.fillStyle = COLORS.tableTop;
+    roundRect(ctx, -32, -30, 64, 34, 8);
+    ctx.fill();
+    ctx.strokeStyle = COLORS.tableWood;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // table number
+    ctx.fillStyle = COLORS.text;
+    ctx.font = '900 13px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t.id, 0, -9);
+
+    // state indicator
+    if (t.state === 'waiting'){
+      // patience bar
+      const barW = 52;
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.fillRect(-barW/2, -46, barW, 8);
+      const col = t.patience > 0.5 ? COLORS.happy : (t.patience > 0.25 ? COLORS.mustard : COLORS.angry);
+      ctx.fillStyle = col;
+      ctx.fillRect(-barW/2, -46, barW * t.patience, 8);
+      ctx.font = '18px serif';
+      ctx.fillText('⏳', 0, -54);
+    } else if (t.state === 'happy'){
+      ctx.font = '22px serif';
+      ctx.fillStyle = COLORS.happy;
+      ctx.fillText('✓', 0, -46);
+    } else if (t.state === 'angry'){
+      ctx.font = '20px serif';
+      ctx.fillText('😠', 0, -50);
+    }
+    if (t.bump && t.bump > 0){
+      ctx.fillStyle = 'rgba(193,68,58,0.5)';
+      ctx.beginPath();
+      ctx.arc(0, -8, 40, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function drawPlayer(){
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(0, player.size*0.6, player.size*0.55, player.size*0.2, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = COLORS.player;
+    ctx.beginPath();
+    ctx.arc(0, 0, player.size, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = COLORS.playerDark;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // apron highlight
+    ctx.fillStyle = '#F4EEDB';
+    ctx.beginPath();
+    ctx.arc(0, 6, player.size*0.55, 0, Math.PI);
+    ctx.fill();
+
+    ctx.restore();
+
+    // carried order — visible near counter, fades after leaving
+    if (carrying){
+      const nearCounter = player.y - player.size/2 <= counterRect.h + 70;
+      const timeSince = performance.now() - carrying.pickedAt;
+      const fadeWindow = 1600; // ms of grace visibility after leaving counter
+      let alpha = 1;
+      if (!nearCounter){
+        alpha = Math.max(0, 1 - (timeSince - 0) / fadeWindow);
+      }
+      if (alpha > 0){
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = '24px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(carrying.icon, player.x, player.y - player.size - 10);
+        ctx.font = '900 11px DM Sans, sans-serif';
+        ctx.fillStyle = COLORS.text;
+        ctx.fillText('T' + carrying.tableId, player.x, player.y - player.size - 26);
+        ctx.restore();
+      } else {
+        // small neutral dot to show still carrying *something*, without revealing table
+        ctx.save();
+        ctx.fillStyle = COLORS.mustard;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y - player.size - 14, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    drawFloor();
+    tables.forEach(drawTable);
+    drawPlayer();
+    drawCounter();
+  }
+
+  // ---------- Loop ----------
+  function loop(t){
+    if (!running) return;
+    if (!lastTime) lastTime = t;
+    const dt = Math.min(50, t - lastTime);
+    lastTime = t;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function startGame(){
+    resetGame();
+    document.getElementById('overlay').classList.add('hidden');
+    running = true;
+    lastTime = 0;
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+
+  // initial static preview render
+  resetGame();
+  render();
+})();
+</script>
+</body>
+</html>
