@@ -185,6 +185,12 @@
 
   const FOOD_ICONS = ['🍔','🍕','🥗','🍝','🍟','🌮','🍜','🥪'];
 
+  // The pad in front of each table where orders get set down. Delivery keys
+  // off this zone rather than the table body, so the player never has to walk
+  // through the furniture. Pads look identical on every table on purpose —
+  // highlighting the one you are carrying for would give away the answer.
+  const DROP = { dy: 52, w: 78, h: 38 };
+
   let tables = [];
   let tickets = []; // waiting at the counter: {id, tableId, icon, spawnTime}
   let player, keys, touchDir;
@@ -294,6 +300,12 @@
   // ---------- Game logic ----------
   function distTo(a, bx, by){ return Math.hypot(a.x-bx, a.y-by); }
 
+  function inDropZone(t){
+    const pad = player.size * 0.4;
+    return Math.abs(player.x - t.x) <= DROP.w/2 + pad &&
+           Math.abs(player.y - (t.y + DROP.dy)) <= DROP.h/2 + pad;
+  }
+
   function tryPickup(){
     if (carrying) return; // already holding max? we only support 1 slot visually, capacity affects nothing beyond flavor for now
     // near counter?
@@ -308,9 +320,7 @@
     if (!carrying) return;
     const table = tables.find(t => t.id === carrying.tableId);
     if (!table) { carrying = null; return; }
-    const d = distTo(player, table.x, table.y);
-    if (d < 55) {
-      // Check if this is actually a table (any table close counts as attempt)
+    if (inDropZone(table)) {
       table.state = 'happy';
       table.happyTimer = 1200;
       table.ticketId = null;
@@ -326,7 +336,7 @@
     } else {
       // check wrong table bump for feedback only
       for (const other of tables){
-        if (other.id !== carrying.tableId && distTo(player, other.x, other.y) < 50){
+        if (other.id !== carrying.tableId && inDropZone(other)){
           other.bump = 300;
         }
       }
@@ -344,7 +354,7 @@
     }
     if (carrying){
       const table = tables.find(t => t.id === carrying.tableId);
-      if (table && distTo(player, table.x, table.y) < 42){
+      if (table && inDropZone(table)){
         tryDeliver();
       }
     }
@@ -375,8 +385,8 @@
     {
       hint: 'Deliver it',
       text: () => carrying
-        ? 'Take it to table ' + carrying.tableId + '. Watch the ticket fade as you walk off — you have to hold the number in your head. Drift back toward the counter any time to peek.'
-        : 'Walk into the table to hand the order over.',
+        ? 'Take it to table ' + carrying.tableId + ' and step onto the dashed pad in front of it — no need to walk through the table. Watch the ticket fade as you go; you have to hold the number in your head. Drift back toward the counter any time to peek.'
+        : 'Step onto the dashed pad in front of the table to hand the order over.',
       enter(){ drainEnabled = false; },
       done(){ return !carrying; },
       success: () => 'Delivered. That is a full loop.'
@@ -557,6 +567,33 @@
         ctx.fillStyle = idx % 2 === 0 ? COLORS.floorA : COLORS.floorB;
         ctx.fillRect(x, y, tile, tile);
       }
+    }
+  }
+
+  // Drawn on the floor beneath the tables so the player walks over them.
+  function drawDropZones(){
+    for (const t of tables){
+      const standing = inDropZone(t);
+      const zy = t.y + DROP.dy;
+      ctx.save();
+      ctx.translate(t.x, zy);
+
+      ctx.fillStyle = standing ? 'rgba(47,111,107,0.30)' : 'rgba(43,38,32,0.06)';
+      roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 9);
+      ctx.fill();
+
+      ctx.strokeStyle = standing ? COLORS.counter : 'rgba(43,38,32,0.30)';
+      ctx.lineWidth = standing ? 3 : 2;
+      ctx.setLineDash(standing ? [] : [7, 5]);
+      roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 9);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = standing ? COLORS.counter : 'rgba(43,38,32,0.30)';
+      ctx.font = '900 9px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('SET DOWN', 0, 3);
+      ctx.restore();
     }
   }
 
@@ -772,6 +809,7 @@
   function render(){
     ctx.clearRect(0,0,W,H);
     drawFloor();
+    drawDropZones();
     tables.forEach(drawTable);
     drawPlayer();
     drawCounter();
