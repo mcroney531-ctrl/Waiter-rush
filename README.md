@@ -8,7 +8,7 @@ Instead of a branching scenario, it trains the "in the weeds" skill of a server'
 
 Order tickets stack up on the pickup counter across the top of the screen, each showing a dish and a table number. Walk into the counter to grab the top ticket. Once you carry it away, the ticket fades after a short grace window — so you actually have to remember which table it was for. Walk back toward the counter to re-reveal what you're holding if you blank on it.
 
-Every table with an open order drains patience. Let one run out and the table goes angry, you lose one of three lives, and the order is gone. Deliver by walking into the right table. Bumping the wrong table is harmless.
+Every table with an open order drains patience, shown as a meter with a live countdown of the seconds left beside it. Let one run out and the table goes angry, you lose one of three lives, and the order is gone. To deliver, step onto the dashed "set down" pad in front of the table — you never have to walk through the furniture. Every pad looks the same whether or not it is the one you want, since marking the right one would give away the table number you are supposed to be remembering. Setting an order down at the wrong table is harmless.
 
 Controls are arrow keys or WASD on desktop, and an on-screen d-pad on touch devices. Spacebar also forces a pickup/deliver attempt as a backup.
 

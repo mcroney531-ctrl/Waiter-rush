@@ -210,6 +210,7 @@
   let mode = 'game';        // 'tutorial' | 'game'
   let tut = null;           // tutorial runtime state, see TUTORIAL_STEPS
   let drainEnabled = true;  // tutorial switches patience off until it teaches it
+  let drainRate = 0.00011;  // recomputed every frame; drawTable reads it for the countdown
 
   function resetGame(){
     tables = tableDefs.map((t, i) => ({
@@ -510,7 +511,7 @@
     // long that squeeze takes to arrive — turn it down for a meaner shift.
     const RUSH_PEAK_MS = 240000;
     const rush = Math.min(1, elapsed / RUSH_PEAK_MS);
-    const drainRate = 0.00011 + 0.00009 * rush;
+    drainRate = 0.00011 + 0.00009 * rush;
     for (const t of tables){
       if (t.state === 'waiting' && drainEnabled){
         t.patience -= drainRate * dt;
@@ -677,8 +678,17 @@
       const col = t.patience > 0.5 ? COLORS.happy : (t.patience > 0.25 ? COLORS.mustard : COLORS.angry);
       ctx.fillStyle = col;
       ctx.fillRect(-barW/2, -46, barW * t.patience, 8);
-      ctx.font = '18px serif';
-      ctx.fillText('⏳', 0, -54);
+
+      // Seconds left, riding alongside the meter. Hidden while the tutorial
+      // has drain switched off, where a frozen number would just mislead.
+      if (drainEnabled){
+        const secs = Math.max(0, t.patience / (drainRate * 1000));
+        ctx.textAlign = 'left';
+        ctx.font = '900 15px DM Sans, sans-serif';
+        ctx.fillStyle = col;
+        ctx.fillText(secs.toFixed(1), barW/2 + 7, -38);
+        ctx.textAlign = 'center';
+      }
     } else if (t.state === 'happy'){
       ctx.font = '22px serif';
       ctx.fillStyle = COLORS.happy;
