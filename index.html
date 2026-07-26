@@ -94,6 +94,23 @@
     letter-spacing: 1px;
   }
   button.cta:active { box-shadow: 0 2px 0 #7a2b25; transform: translateY(3px); }
+  button.cta.ghost {
+    background: transparent; color: #F4EEDB;
+    border: 2px solid rgba(244,238,219,0.38);
+    box-shadow: none; font-size: 14px; padding: 11px 24px; margin-top: 14px;
+  }
+  button.cta.ghost:hover { border-color: rgba(244,238,219,0.7); }
+  button.cta.ghost:active { transform: translateY(2px); box-shadow: none; }
+
+  #skipBtn {
+    position: absolute; bottom: 22px; right: 20px; z-index: 12;
+    font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    background: rgba(244,238,219,0.12); color: #F4EEDB;
+    border: 2px solid rgba(244,238,219,0.3);
+    padding: 10px 15px; border-radius: 8px; cursor: pointer;
+  }
+  #skipBtn:hover { background: rgba(244,238,219,0.22); border-color: rgba(244,238,219,0.55); }
   .hidden { display: none !important; }
 
   @media (pointer: coarse) {
@@ -130,8 +147,11 @@
     <h1>Rush Hour</h1>
     <p>Grab the order ticket from the counter, remember which table it's for, and deliver it before the ticket board goes blank on your walk. Miss too many tables and the shift is over.</p>
     <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
-    <button class="cta" id="startBtn">Start Shift</button>
+    <button class="cta" id="trainBtn">Start Training</button>
+    <button class="cta ghost" id="startBtn">Skip to the shift</button>
   </div>
+
+  <button id="skipBtn" class="hidden">Skip tutorial</button>
 </div>
 
 <script>
@@ -180,6 +200,11 @@
   let running = false;
   let ticketIdCounter = 1;
 
+  const TOUCH = window.matchMedia('(pointer: coarse)').matches;
+  let mode = 'game';        // 'tutorial' | 'game'
+  let tut = null;           // tutorial runtime state, see TUTORIAL_STEPS
+  let drainEnabled = true;  // tutorial switches patience off until it teaches it
+
   function resetGame(){
     tables = tableDefs.map((t, i) => ({
       id: i+1, x: t.x, y: t.y,
@@ -214,10 +239,14 @@
   }
 
   // ---------- Spawning ----------
-  function spawnTicket(){
+  // forceTableId lets the tutorial stage an order at a known table so its
+  // instructions can name it; falls back to random if that table is busy.
+  function spawnTicket(forceTableId){
     const idleTables = tables.filter(t => t.state === 'idle');
     if (idleTables.length === 0) return;
-    const t = idleTables[Math.floor(Math.random()*idleTables.length)];
+    let t = null;
+    if (forceTableId != null) t = idleTables.find(x => x.id === forceTableId);
+    if (!t) t = idleTables[Math.floor(Math.random()*idleTables.length)];
     const icon = FOOD_ICONS[Math.floor(Math.random()*FOOD_ICONS.length)];
     const ticket = { id: ticketIdCounter++, tableId: t.id, icon, spawnTime: performance.now() };
     // cap queue size visible at counter
@@ -321,14 +350,135 @@
     }
   }
 
+  // ---------- Tutorial ----------
+  // Each step shows one instruction and waits for done() to be satisfied by
+  // the player actually performing the action, so nothing advances on a timer.
+  const PRACTICE_TARGET = 3;
+
+  const TUTORIAL_STEPS = [
+    {
+      hint: 'Find your feet',
+      text: () => TOUCH
+        ? 'Use the pad in the bottom corner to walk around the floor.'
+        : 'Use the arrow keys — or WASD — to walk around the floor.',
+      enter(){ drainEnabled = false; },
+      done(){ return tut.moved > 300; },
+      success: () => 'That is the job, physically speaking. Now the hard part.'
+    },
+    {
+      hint: 'Pick up an order',
+      text: () => 'An order just landed on the pickup counter. Walk up into the counter to grab it — no button needed.',
+      enter(){ drainEnabled = false; spawnTicket(6); },
+      done(){ return !!carrying; },
+      success: () => 'You are carrying table ' + carrying.tableId + '.'
+    },
+    {
+      hint: 'Deliver it',
+      text: () => carrying
+        ? 'Take it to table ' + carrying.tableId + '. Watch the ticket fade as you walk off — you have to hold the number in your head. Drift back toward the counter any time to peek.'
+        : 'Walk into the table to hand the order over.',
+      enter(){ drainEnabled = false; },
+      done(){ return !carrying; },
+      success: () => 'Delivered. That is a full loop.'
+    },
+    {
+      hint: 'Watch their patience',
+      text: () => 'This one is on the clock. The bar above the table drains while they wait — empty it and they walk out, costing you one of three lives. Get this order out.',
+      enter(){ drainEnabled = true; spawnTicket(3); },
+      done(){ return !carrying && !tables.some(t => t.state === 'waiting'); },
+      onMiss(){
+        tut.note = 'They walked. On a real shift that costs a life — here we just run it again.';
+        tut.noteTimer = 2600;
+        spawnTicket(3);
+      },
+      success: () => 'Out before the bar emptied. That is the whole game.'
+    },
+    {
+      hint: 'Practice round',
+      text: () => 'Three orders, back to back, nothing at stake. Delivered ' +
+                  (deliveries - tut.baseDeliveries) + ' of ' + PRACTICE_TARGET + '.',
+      enter(){
+        drainEnabled = true;
+        tut.practice = true;
+        tut.baseDeliveries = deliveries;
+        elapsed = 0;          // keep practice at the gentle end of the ramp
+        spawnTimer = 900;
+      },
+      done(){ return deliveries - tut.baseDeliveries >= PRACTICE_TARGET; },
+      onMiss(){
+        tut.note = 'Lost one. It costs you nothing here — keep going.';
+        tut.noteTimer = 2200;
+      },
+      success: () => 'Service. You are ready for the floor.'
+    }
+  ];
+
+  function enterStep(i){
+    tut.index = i;
+    tut.successMsg = null;
+    tut.successTimer = 0;
+    tut.moved = 0;
+    tut.missed = false;
+    const step = TUTORIAL_STEPS[i];
+    if (step && step.enter) step.enter();
+  }
+
+  function updateTutorial(dt){
+    if (!tut) return;
+    if (tut.noteTimer > 0) tut.noteTimer -= dt;
+
+    // Holding on a success message before advancing to the next step.
+    if (tut.successTimer > 0){
+      tut.successTimer -= dt;
+      if (tut.successTimer <= 0){
+        const next = tut.index + 1;
+        if (next >= TUTORIAL_STEPS.length) finishTutorial();
+        else enterStep(next);
+      }
+      return;
+    }
+
+    const step = TUTORIAL_STEPS[tut.index];
+    if (!step) return;
+
+    if (tut.missed){
+      tut.missed = false;
+      if (step.onMiss) step.onMiss();
+    }
+
+    if (step.done()){
+      tut.successMsg = step.success();
+      tut.successTimer = 1700;
+    }
+  }
+
+  function finishTutorial(){
+    running = false;
+    mode = 'game';
+    document.getElementById('skipBtn').classList.add('hidden');
+    const overlay = document.getElementById('overlay');
+    overlay.innerHTML = `
+      <h1>Training Done</h1>
+      <p>You know the floor now. The real shift ramps up — orders arrive faster the longer you last, tables lose patience quicker, and every table that walks costs one of three lives.</p>
+      <button class="cta" id="startBtn">Start the Shift</button>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('startBtn').addEventListener('click', startGame);
+  }
+
   // ---------- Update ----------
   function update(dt){
     elapsed += dt;
     spawnInterval = Math.max(1100, 4200 - elapsed/1000 * 45);
-    spawnTimer -= dt;
-    if (spawnTimer <= 0){
-      spawnTicket();
-      spawnTimer = spawnInterval * (0.7 + Math.random()*0.5);
+
+    // Tutorial steps stage their own orders; only the real shift and the
+    // practice round spawn on the timer.
+    if (mode === 'game' || (tut && tut.practice)){
+      spawnTimer -= dt;
+      if (spawnTimer <= 0){
+        spawnTicket();
+        spawnTimer = spawnInterval * (0.7 + Math.random()*0.5);
+      }
     }
 
     const {dx, dy} = getMoveVector();
@@ -336,6 +486,12 @@
     player.y += dy * player.speed * dt/1000;
     player.x = Math.max(player.size/2, Math.min(W - player.size/2, player.x));
     player.y = Math.max(counterRect.h + player.size/2, Math.min(H - player.size/2, player.y));
+
+    if (mode === 'tutorial' && tut){
+      tut.moved += Math.hypot(dx, dy) * player.speed * dt/1000;
+      // the instruction panel owns the bottom strip while it is on screen
+      player.y = Math.min(player.y, tut.bannerTop - player.size/2 - 8);
+    }
 
     checkAutoInteract();
 
@@ -346,7 +502,7 @@
     const rush = Math.min(1, elapsed / RUSH_PEAK_MS);
     const drainRate = 0.00011 + 0.00009 * rush;
     for (const t of tables){
-      if (t.state === 'waiting'){
+      if (t.state === 'waiting' && drainEnabled){
         t.patience -= drainRate * dt;
         if (t.patience <= 0){
           t.patience = 0;
@@ -356,10 +512,14 @@
           tickets = tickets.filter(tk => tk.tableId !== t.id || tk.tableId !== t.id);
           tickets = tickets.filter(tk => !(tk.tableId === t.id));
           if (carrying && carrying.tableId === t.id) carrying = null;
-          lives -= 1;
-          updateHUD();
-          if (lives <= 0){
-            endGame();
+          if (mode === 'tutorial'){
+            tut.missed = true;   // teach the lesson, do not charge for it
+          } else {
+            lives -= 1;
+            updateHUD();
+            if (lives <= 0){
+              endGame();
+            }
           }
         }
       }
@@ -555,12 +715,67 @@
     }
   }
 
+  function wrapText(text, maxWidth){
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (const w of words){
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function drawTutorialBanner(){
+    if (mode !== 'tutorial' || !tut) return;
+    const step = TUTORIAL_STEPS[tut.index];
+    if (!step) return;
+
+    const showNote = tut.noteTimer > 0;
+    const showSuccess = !showNote && tut.successTimer > 0;
+    const label = showNote ? 'Heads up' : (showSuccess ? 'Nice' : step.hint);
+    const body  = showNote ? tut.note : (showSuccess ? tut.successMsg : step.text());
+    const accent = showNote ? COLORS.mustard : (showSuccess ? COLORS.happy : COLORS.counterTop);
+
+    ctx.save();
+    ctx.font = '500 16px DM Sans, sans-serif';
+    const padX = 22, panelW = W - 48;
+    const lines = wrapText(body, panelW - padX*2 - 110);
+    const panelH = 48 + lines.length * 22;
+    const px = 24, py = H - panelH - 16;
+    tut.bannerTop = py;   // update() keeps the player out from under it
+
+    ctx.fillStyle = 'rgba(28,23,18,0.94)';
+    roundRect(ctx, px, py, panelW, panelH, 12); ctx.fill();
+    ctx.strokeStyle = accent; ctx.lineWidth = 3;
+    roundRect(ctx, px, py, panelW, panelH, 12); ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = accent;
+    ctx.font = '900 11px DM Sans, sans-serif';
+    ctx.fillText(label.toUpperCase(), px + padX, py + 25);
+
+    ctx.fillStyle = '#F4EEDB';
+    ctx.font = '500 16px DM Sans, sans-serif';
+    lines.forEach((ln, i) => ctx.fillText(ln, px + padX, py + 48 + i*22));
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(244,238,219,0.45)';
+    ctx.font = '900 11px DM Sans, sans-serif';
+    ctx.fillText('STEP ' + (tut.index + 1) + ' OF ' + TUTORIAL_STEPS.length,
+                 px + panelW - padX, py + 25);
+    ctx.restore();
+  }
+
   function render(){
     ctx.clearRect(0,0,W,H);
     drawFloor();
     tables.forEach(drawTable);
     drawPlayer();
     drawCounter();
+    drawTutorialBanner();
   }
 
   // ---------- Loop ----------
@@ -570,19 +785,36 @@
     const dt = Math.min(50, t - lastTime);
     lastTime = t;
     update(dt);
+    if (mode === 'tutorial') updateTutorial(dt);
     render();
     requestAnimationFrame(loop);
   }
 
-  function startGame(){
+  function beginRun(nextMode){
     resetGame();
+    mode = nextMode;
+    drainEnabled = true;
+    tut = null;
+    if (nextMode === 'tutorial'){
+      tut = { index: 0, moved: 0, practice: false, baseDeliveries: 0,
+              note: null, noteTimer: 0, successMsg: null, successTimer: 0,
+              missed: false, bannerTop: H - 120 };
+      player.y = H - 135;   // the open lane between the back tables and the panel
+      enterStep(0);
+    }
     document.getElementById('overlay').classList.add('hidden');
+    document.getElementById('skipBtn').classList.toggle('hidden', nextMode !== 'tutorial');
     running = true;
     lastTime = 0;
     requestAnimationFrame(loop);
   }
 
+  function startGame(){ beginRun('game'); }
+  function startTutorial(){ beginRun('tutorial'); }
+
   document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('trainBtn').addEventListener('click', startTutorial);
+  document.getElementById('skipBtn').addEventListener('click', startGame);
 
   // initial static preview render
   resetGame();

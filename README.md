@@ -12,6 +12,12 @@ Every table with an open order drains patience. Let one run out and the table go
 
 Controls are arrow keys or WASD on desktop, and an on-screen d-pad on touch devices. Spacebar also forces a pickup/deliver attempt as a backup.
 
+## Training mode
+
+The title screen opens on a five-step tutorial that introduces one mechanic at a time and waits for you to actually perform each one before moving on — walking, picking up an order, delivering it, and then meeting the patience bar. Nothing advances on a timer. It ends in a three-order practice round where missed tables cost you nothing, then hands you to the real shift.
+
+Steps live in the `TUTORIAL_STEPS` array in `index.html`. Each entry is a `hint` label, a `text()` instruction, an optional `enter()` to stage the floor, a `done()` predicate that gates advancement, and an optional `onMiss()` for when a table times out mid-lesson. Adding or reordering a lesson means editing that array and nothing else. A "Skip to the shift" button on the title screen and a "Skip tutorial" button during it both drop straight into the real game.
+
 ## Running it
 
 It is a single self-contained HTML file with no build step and no dependencies, so opening `index.html` in a browser is enough. To serve it locally over HTTP:
