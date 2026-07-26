@@ -268,8 +268,32 @@
   let score = 0;
   let lives = 3;
   let lastTime = 0;
+  // ---------- Difficulty ----------
+  // The whole ramp lives here. Both curves run off the same clock so the
+  // shift tightens as one thing — previously spawn pressure hit its floor at
+  // 69 seconds while patience kept easing off until four minutes, which meant
+  // orders were arriving at their fastest while the meters still looked calm.
+  //
+  // The opening is deliberately generous: two minutes on a fresh table is
+  // long enough that nothing is lost while you learn the floor, and the
+  // squeeze arrives slowly enough to feel like a shift filling up rather than
+  // a difficulty setting.
+  const RUSH_PEAK_MS    = 600000;  // how long the full ramp takes (10 min)
+  const PATIENCE_START_S = 120;    // seconds a fresh table gives you at open
+  const PATIENCE_END_S   = 18;     // ...and once the rush has fully arrived
+  const SPAWN_START_MS  = 7000;    // average gap between orders at open
+  // Floor stays above the 2.74s counter-to-table round trip on purpose. Drop
+  // it below that and orders arrive faster than one carry slot can clear
+  // them no matter how well you play — see the carry-two note in HANDOFF.md.
+  const SPAWN_FLOOR_MS  = 3400;
+  // Tutorial lessons only; see the note where drainRate is computed.
+  const TUTORIAL_PATIENCE_S = 20;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rushProgress = () => Math.min(1, elapsed / RUSH_PEAK_MS);
+
   let spawnTimer = 0;
-  let spawnInterval = 4200; // ms, shrinks over time
+  let spawnInterval = SPAWN_START_MS; // ms, shrinks over time
   let elapsed = 0;
   let running = false;
   let ticketIdCounter = 1;
@@ -278,7 +302,7 @@
   let mode = 'game';        // 'tutorial' | 'game'
   let tut = null;           // tutorial runtime state, see TUTORIAL_STEPS
   let drainEnabled = true;  // tutorial switches patience off until it teaches it
-  let drainRate = 0.00011;  // recomputed every frame; drawTable reads it for the countdown
+  let drainRate = 1 / (PATIENCE_START_S * 1000); // recomputed every frame; drawTable reads it for the countdown
 
   function resetGame(){
     tables = tableDefs.map((t, i) => ({
@@ -296,7 +320,7 @@
     score = 0;
     lives = 3;
     spawnTimer = 900;
-    spawnInterval = 4200;
+    spawnInterval = SPAWN_START_MS;
     elapsed = 0;
     ticketIdCounter = 1;
     updateHUD();
@@ -729,7 +753,7 @@
   // ---------- Update ----------
   function update(dt){
     elapsed += dt;
-    spawnInterval = Math.max(1100, 4200 - elapsed/1000 * 45);
+    spawnInterval = lerp(SPAWN_START_MS, SPAWN_FLOOR_MS, rushProgress());
 
     // Tutorial steps stage their own orders; only the real shift and the
     // practice round spawn on the timer.
@@ -755,12 +779,17 @@
 
     checkAutoInteract();
 
-    // Patience drain. A fresh table gives the player ~9s at the top of the
-    // shift, tightening toward ~5s once the rush peaks. RUSH_PEAK_MS is how
-    // long that squeeze takes to arrive — turn it down for a meaner shift.
-    const RUSH_PEAK_MS = 240000;
-    const rush = Math.min(1, elapsed / RUSH_PEAK_MS);
-    drainRate = 0.00011 + 0.00009 * rush;
+    // Patience drain, expressed as the seconds a fresh table actually gives
+    // you, because that is the number on screen and the number worth arguing
+    // about. drainRate is derived from it rather than tuned directly.
+    // The tutorial keeps a tight window on purpose. Its patience lesson ends
+    // when you deliver, not when the clock runs down, so at the shift's real
+    // two-minute opening the bar would barely twitch during the one step whose
+    // entire job is to show you that it drains. Practice uses the real curve.
+    const inLesson = mode === 'tutorial' && tut && !tut.practice;
+    const patienceS = inLesson ? TUTORIAL_PATIENCE_S
+                               : lerp(PATIENCE_START_S, PATIENCE_END_S, rushProgress());
+    drainRate = 1 / (patienceS * 1000);
     for (const t of tables){
       if (t.state === 'waiting' && drainEnabled){
         t.patience -= drainRate * dt;
@@ -934,10 +963,16 @@
       // has drain switched off, where a frozen number would just mislead.
       if (drainEnabled){
         const secs = Math.max(0, t.patience / (drainRate * 1000));
+        // Windows open at two minutes now, so a bare "118.4" is both too wide
+        // for the table and falsely precise. Count minutes until it actually
+        // matters, then switch to tenths for the part you can act on.
+        const label = secs >= 60 ? Math.floor(secs/60) + ':' + String(Math.floor(secs%60)).padStart(2,'0')
+                    : secs >= 10 ? secs.toFixed(0)
+                    : secs.toFixed(1);
         ctx.textAlign = 'left';
         ctx.font = '900 15px DM Sans, sans-serif';
         ctx.fillStyle = col;
-        ctx.fillText(secs.toFixed(1), barW/2 + 7, -38);
+        ctx.fillText(label, barW/2 + 7, -38);
         ctx.textAlign = 'center';
       }
     } else if (t.state === 'happy'){

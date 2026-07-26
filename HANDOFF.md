@@ -57,41 +57,34 @@ This has already come up once and will come up again, because the obvious polish
 
 ## What has been measured
 
-Do not re-derive these; they were established with instrumented runs in headless Chromium.
+Do not re-derive these. They come from instrumented runs in headless Chromium, re-measured after the difficulty was slowed down.
 
-**Patience.** Drain rate ramps from `0.00011` to `0.0002` per ms over `RUSH_PEAK_MS` (240000). A fresh table gives **9.09s at the top of the shift, tightening to 5.00s at four minutes**, then flat.
+**The ramp lives in one place.** `RUSH_PEAK_MS` (600000, ten minutes) drives both curves, and the four numbers that shape the shift are named constants right above it: `PATIENCE_START_S` (120), `PATIENCE_END_S` (18), `SPAWN_START_MS` (7000), `SPAWN_FLOOR_MS` (3400). Patience is expressed in **seconds a fresh table gives you** and `drainRate` is derived from it, rather than the reverse — the seconds are the number on screen and the number worth arguing about.
 
-The original bug, fixed in `8e20700`: the ramp term was `Math.min(0.00009, elapsed/1000/9000)`, which hit its cap about **810ms** into the shift. Every table gave a flat 5 seconds for the entire game and the intended escalation never happened. If you touch this, keep the ramp explicit.
+| elapsed | patience window | spawn gap | orders/min | max deliverable/min |
+| ------: | --------------: | --------: | ---------: | ------------------: |
+|      0s |          2:00   |     7.00s |        8.6 |                21.9 |
+|     60s |          1:50   |     6.64s |        9.0 |                21.9 |
+|    120s |          1:40   |     6.28s |        9.6 |                21.9 |
+|    240s |          1:19   |     5.56s |       10.8 |                21.9 |
+|    420s |            49s  |     4.48s |       13.4 |                21.9 |
+|    600s |            18s  |     3.40s |       17.6 |                21.9 |
 
-**Spawn rate.** `spawnInterval = Math.max(1100, 4200 - elapsed_seconds * 45)`, multiplied by `0.7 + rand*0.5`. It bottoms out at **69 seconds** into the shift and is flat after.
+Verified live rather than derived: at shift open a fresh table reads 119.7s and the spawn gap is 6.99s; with the clock pushed to 600000 they read 18.0s and 3.40s. The on-screen countdown is true elapsed time.
 
-**Traversal.** Average one-way trip from counter to a table is **1.37s**; round trip **2.74s**.
+**Traversal.** Average one-way trip from counter to a table is **1.37s**; round trip **2.74s**, which is where the 21.9/min ceiling comes from. That ceiling assumes flawless play with zero hesitation, so treat it as a hard wall rather than a target.
 
-**Scoring.** A delivery scores exactly **120** — `100 + speedBonus`, where `speedBonus` reads `table.patience` on the line *after* it has been reset to `1`, so it is always 20. The speed bonus rewards nothing. Untouched so far because it is a design decision, not just a bug: it needs a real definition of what "fast" means before it is worth fixing.
+**Scoring.** A delivery scores exactly **120** — `100 + speedBonus`, where `speedBonus` reads `table.patience` on the line *after* it has been reset to `1`, so it is always 20. The speed bonus rewards nothing. Still untouched because it is a design decision, not just a bug: it needs a real definition of what "fast" means. Note this got *worse* to leave alone now that windows open at two minutes — there is much more room for a meaningful speed bonus than there was at nine seconds.
 
-## The open problem — read before tuning anything
+## Carry-two — unimplemented, no longer load-bearing
 
-**Carry-two is load-bearing, not a bonus feature, and it is unimplemented.**
+`carryCapacity` flips to 2 after six deliveries but nothing in the pickup or carry logic supports holding a second ticket. `carrying` is a single object, not a queue. **The flip is currently dead code**: it changes a number nothing reads, so a player who reaches six deliveries gets no second slot and no error either.
 
-`carryCapacity` flips to 2 after six deliveries but nothing in the pickup or carry logic supports holding a second ticket. `carrying` is a single object, not a queue.
+This used to be the blocker that gated all tuning, because the old spawn floor of 1.04s sat far below the 2.74s round trip — orders arrived at nearly three times the rate one carry slot could clear them, and the game outran the player about thirty seconds in regardless of skill. **That is fixed**, not by building carry-two but by putting the spawn floor above the round trip: `SPAWN_FLOOR_MS` is 3400, so even at full rush the shift tops out at 17.6 orders/min against a 21.9/min ceiling. The game is now winnable end to end on one slot.
 
-Why this blocks everything else:
+So carry-two is a design choice again rather than a structural necessity. It is still worth building — it is the difference between a fetch-quest and actually holding two orders in your head, which is the thing the game is about — but nothing is blocked on it now, and the tuning above is safe to iterate on without it.
 
-| elapsed | spawn interval | patience window |
-| ------: | -------------: | --------------: |
-|      0s |          3.99s |           9.09s |
-|     30s |          2.71s |           8.25s |
-|     60s |          1.43s |           7.55s |
-|     69s |          1.04s |           7.36s |
-|    240s |          1.04s |           5.00s |
-
-Against a 2.74s round trip, orders start arriving faster than one carry slot can clear them at around **30 seconds**, and by 69 seconds they arrive at nearly **three times** the rate you can deliver them. The counter queue caps at 5 which bounds the chaos, but tables then time out faster than you can reach them regardless of skill.
-
-The spawn curve was written assuming two orders per trip. Because that never got built, the game outruns the player about half a minute in no matter what the patience numbers say. It is also why the two curves are wildly out of sync — spawn pressure peaks at 69s while patience does not peak until 240s.
-
-**Consequence:** tuning patience, spawn rate, or the fade window *before* carry-two exists means tuning against a curve that is about to change underneath you. Build carry-two first, then retune. Note that even two slots only reaches about 1.4s per order amortised against a 1.04s spawn floor, so that floor likely needs to come up too.
-
-Implementation sketch: replace `carrying` with a small array, cap it at `carryCapacity`, decide whether delivery is automatic for whichever carried order matches the pad you are standing on (probably yes, it matches the existing auto-deliver feel), and show two floating tickets above the player with the same fade rule applied per ticket.
+If it does get built, the spawn floor should come down with it. Two slots amortises to roughly 1.4s per order, so a floor near 2.0–2.4s would restore comparable pressure. Implementation sketch unchanged: replace `carrying` with a small array, cap it at `carryCapacity`, auto-deliver whichever carried order matches the pad you are standing on, and show two floating tickets above the player with the fade rule applied per ticket.
 
 ## Feature notes
 
@@ -179,7 +172,9 @@ When something is genuinely ambiguous, ask with a recommendation attached rather
 ## Immediate next steps
 
 1. ~~Verify the DiceBear options; confirm the licence and attribute.~~ Done — see items 1 and 2 above.
-2. **Build carry-two, then retune the spawn floor and patience curve together against it.** This is now the top of the list and still gates every other tuning decision; read "The open problem" above before starting.
-3. Smaller things, in rough order of how much they cost to leave: the scoring speed bonus is always 20 and rewards nothing; the HUD label reads "Tables lost" while the dots deplete as lives remaining; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
+2. **Play it and re-tune.** The shift was slowed a long way — two minutes on a fresh table at open, ramping over ten minutes — on Rone's call that it was too hard out of the gate. The numbers are measured but nobody has actually played the new curve, and the four constants at the top of the difficulty block are meant to be moved. The opening may now be too slack; that is a feel question, not an arithmetic one.
+3. **Rone wants to revisit the picker flow** — the picker works and is verified, but where it sits in the title-screen journey is up for change.
+4. Carry-two, whenever it is wanted; see the section above for why it is no longer urgent.
+5. Smaller things, in rough order of how much they cost to leave: the scoring speed bonus is always 20 and rewards nothing (and there is much more room for a real one now that windows open at two minutes); the HUD label reads "Tables lost" while the dots deplete as lives remaining; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
 
 Rone was also about to generate art in DALL·E. The advice given, still standing: with the avatar handled by DiceBear, spend that effort on the room — tables, counter, food icons, floor — where per-asset style consistency matters far less than it does for character parts.
