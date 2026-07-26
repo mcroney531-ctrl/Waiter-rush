@@ -111,6 +111,39 @@
     padding: 10px 15px; border-radius: 8px; cursor: pointer;
   }
   #skipBtn:hover { background: rgba(244,238,219,0.22); border-color: rgba(244,238,219,0.55); }
+
+  #avatarPicker {
+    position: absolute; inset: 0; z-index: 30;
+    background: #1c1712; color: #F4EEDB;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 18px; overflow-y: auto;
+  }
+  #avatarPicker h2 {
+    font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
+    color: #E0A72E; font-size: clamp(22px, 4vw, 32px); margin: 4px 0 12px;
+  }
+  #avatarPreview {
+    width: 96px; height: 96px; border-radius: 50%;
+    background: #E8E2D5; border: 4px solid #C1443A; flex: none;
+  }
+  #avatarOptions { width: 100%; max-width: 620px; margin-top: 10px; }
+  .opt-row { margin-bottom: 9px; }
+  .opt-row .opt-label {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    font-weight: 700; opacity: 0.65; margin-bottom: 5px;
+  }
+  .opt-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opt-swatches img {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: #E8E2D5; border: 3px solid transparent; cursor: pointer;
+  }
+  .opt-swatches img.sel { border-color: #E0A72E; }
+  #avatarWarn {
+    max-width: 460px; text-align: center; font-size: 13px;
+    color: #E0A72E; line-height: 1.45; margin: 12px 0 0;
+  }
+  #avatarActions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 18px 0 4px; }
+  #avatarActions .cta { margin-top: 0; }
   .hidden { display: none !important; }
 
   @media (pointer: coarse) {
@@ -149,9 +182,22 @@
     <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
     <button class="cta" id="trainBtn">Start Training</button>
     <button class="cta ghost" id="startBtn">Skip to the shift</button>
+    <button class="cta ghost" id="avatarBtn">Build your waiter</button>
   </div>
 
   <button id="skipBtn" class="hidden">Skip tutorial</button>
+
+  <div id="avatarPicker" class="hidden">
+    <h2>Build your waiter</h2>
+    <img id="avatarPreview" alt="Your waiter">
+    <div id="avatarOptions"></div>
+    <p id="avatarWarn" class="hidden">Couldn't reach the avatar service — you'll keep the classic waiter. Everything else works as normal.</p>
+    <div id="avatarActions">
+      <button class="cta" id="avatarDone">Use this waiter</button>
+      <button class="cta ghost" id="avatarRandom">Surprise me</button>
+      <button class="cta ghost" id="avatarCancel">Back</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -243,6 +289,126 @@
       d.className = 'life-dot' + (i < lives ? '' : ' lost');
       livesEl.appendChild(d);
     }
+  }
+
+  // ---------- Avatar ----------
+  // Avatars come from DiceBear's HTTP API, which needs no build step. The
+  // chosen one is cached as SVG text in localStorage, so after the first pick
+  // the game never touches the network again. If any of it fails — offline,
+  // blocked, service down — drawPlayer falls back to the classic circle and
+  // nothing else changes.
+  //
+  // AVATAR_STYLE and the option keys/values below map to DiceBear's schema for
+  // that style. If a value stops matching their docs the preview simply shows
+  // the style default, which is visible immediately in the picker.
+  const AVATAR_API = 'https://api.dicebear.com/9.x';
+  const AVATAR_STYLE = 'avataaars';
+  const AVATAR_OPTIONS = [
+    { key: 'skinColor',    label: 'Skin',        values: ['f2d3b1','edb98a','d08b5b','ae5d29','614335'] },
+    { key: 'top',          label: 'Hair',        values: ['shortFlat','shortCurly','theCaesar','longButNotTooLong','bigHair','curly','hijab','turban'] },
+    { key: 'hairColor',    label: 'Hair colour', values: ['2c1b18','724133','a55728','b58143','c93305','e8e1e1'] },
+    { key: 'clothing',     label: 'Uniform',     values: ['blazerAndShirt','shirtCrewNeck','collarAndSweater','shirtVNeck','overall'] },
+    { key: 'clothesColor', label: 'Uniform colour', values: ['2f6f6b','c1443a','e0a72e','3c4f5c','262e33'] },
+    { key: 'facialHair',   label: 'Facial hair', values: ['','beardLight','beardMedium','moustacheFancy'] }
+  ];
+
+  let avatarSel = { seed: 'rush-hour', opts: {} };
+  let avatarImg = null;      // rasterised avatar, drawn each frame
+  let avatarObjUrl = null;
+
+  function avatarUrl(overrides){
+    const p = new URLSearchParams();
+    p.set('seed', avatarSel.seed);
+    const merged = Object.assign({}, avatarSel.opts, overrides || {});
+    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
+    p.set('backgroundColor', 'E8E2D5');
+    p.set('radius', '50');
+    return AVATAR_API + '/' + AVATAR_STYLE + '/svg?' + p.toString();
+  }
+
+  function applyAvatarSvg(svgText){
+    const blob = new Blob([svgText], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      if (avatarObjUrl) URL.revokeObjectURL(avatarObjUrl);
+      avatarImg = img; avatarObjUrl = url;
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  }
+
+  function loadSavedAvatar(){
+    try {
+      const sel = localStorage.getItem('rushhour.avatarSel');
+      if (sel) avatarSel = JSON.parse(sel);
+      const svg = localStorage.getItem('rushhour.avatarSvg');
+      if (svg) applyAvatarSvg(svg);
+    } catch (e) { /* private mode or bad JSON — defaults are fine */ }
+  }
+
+  function renderPicker(){
+    document.getElementById('avatarPreview').src = avatarUrl();
+    const wrap = document.getElementById('avatarOptions');
+    wrap.innerHTML = '';
+    for (const opt of AVATAR_OPTIONS){
+      const row = document.createElement('div');
+      row.className = 'opt-row';
+      const lab = document.createElement('div');
+      lab.className = 'opt-label';
+      lab.textContent = opt.label;
+      row.appendChild(lab);
+      const strip = document.createElement('div');
+      strip.className = 'opt-swatches';
+      for (const v of opt.values){
+        const im = document.createElement('img');
+        im.src = avatarUrl({ [opt.key]: v });
+        im.alt = '';                       // decorative; the row label carries the meaning
+        im.title = opt.label;
+        if ((avatarSel.opts[opt.key] || '') === v) im.className = 'sel';
+        im.addEventListener('click', () => { avatarSel.opts[opt.key] = v; renderPicker(); });
+        strip.appendChild(im);
+      }
+      row.appendChild(strip);
+      wrap.appendChild(row);
+    }
+  }
+
+  function openPicker(){
+    document.getElementById('avatarWarn').classList.add('hidden');
+    document.getElementById('avatarPicker').classList.remove('hidden');
+    renderPicker();
+  }
+  function closePicker(){
+    document.getElementById('avatarPicker').classList.add('hidden');
+  }
+
+  async function commitAvatar(){
+    const btn = document.getElementById('avatarDone');
+    btn.disabled = true;
+    try {
+      const res = await fetch(avatarUrl());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const svg = await res.text();
+      applyAvatarSvg(svg);
+      try {
+        localStorage.setItem('rushhour.avatarSvg', svg);
+        localStorage.setItem('rushhour.avatarSel', JSON.stringify(avatarSel));
+      } catch (e) { /* still usable this session */ }
+      closePicker();
+    } catch (e) {
+      document.getElementById('avatarWarn').classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function randomiseAvatar(){
+    avatarSel.seed = 'rush-' + Math.random().toString(36).slice(2, 9);
+    for (const opt of AVATAR_OPTIONS){
+      avatarSel.opts[opt.key] = opt.values[Math.floor(Math.random()*opt.values.length)];
+    }
+    renderPicker();
   }
 
   // ---------- Spawning ----------
@@ -554,9 +720,11 @@
       <div class="big-stat">${score} pts</div>
       <p>${deliveries} orders delivered before the floor got the better of you. Rush hour only gets faster from here — want another go?</p>
       <button class="cta" id="startBtn">Run It Back</button>
+      <button class="cta ghost" id="avatarBtn2">Change your waiter</button>
     `;
     overlay.classList.remove('hidden');
     document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('avatarBtn2').addEventListener('click', openPicker);
   }
 
   // ---------- Draw ----------
@@ -715,19 +883,36 @@
     ctx.ellipse(0, player.size*0.6, player.size*0.55, player.size*0.2, 0, 0, Math.PI*2);
     ctx.fill();
 
-    ctx.fillStyle = COLORS.player;
-    ctx.beginPath();
-    ctx.arc(0, 0, player.size, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = COLORS.playerDark;
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    if (avatarImg && avatarImg.complete && avatarImg.naturalWidth){
+      // chosen avatar, clipped into the same token shape the circle used
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, player.size, 0, Math.PI*2);
+      ctx.clip();
+      ctx.fillStyle = COLORS.floorA;
+      ctx.fill();
+      ctx.drawImage(avatarImg, -player.size, -player.size, player.size*2, player.size*2);
+      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(0, 0, player.size, 0, Math.PI*2);
+      ctx.strokeStyle = COLORS.playerDark;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = COLORS.player;
+      ctx.beginPath();
+      ctx.arc(0, 0, player.size, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = COLORS.playerDark;
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
-    // apron highlight
-    ctx.fillStyle = '#F4EEDB';
-    ctx.beginPath();
-    ctx.arc(0, 6, player.size*0.55, 0, Math.PI);
-    ctx.fill();
+      // apron highlight
+      ctx.fillStyle = '#F4EEDB';
+      ctx.beginPath();
+      ctx.arc(0, 6, player.size*0.55, 0, Math.PI);
+      ctx.fill();
+    }
 
     ctx.restore();
 
@@ -863,6 +1048,12 @@
   document.getElementById('startBtn').addEventListener('click', startGame);
   document.getElementById('trainBtn').addEventListener('click', startTutorial);
   document.getElementById('skipBtn').addEventListener('click', startGame);
+  document.getElementById('avatarBtn').addEventListener('click', openPicker);
+  document.getElementById('avatarDone').addEventListener('click', commitAvatar);
+  document.getElementById('avatarRandom').addEventListener('click', randomiseAvatar);
+  document.getElementById('avatarCancel').addEventListener('click', closePicker);
+
+  loadSavedAvatar();
 
   // initial static preview render
   resetGame();

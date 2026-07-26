@@ -12,6 +12,16 @@ Every table with an open order drains patience, shown as a meter with a live cou
 
 Controls are arrow keys or WASD on desktop, and an on-screen d-pad on touch devices. Spacebar also forces a pickup/deliver attempt as a backup.
 
+## Your waiter
+
+"Build your waiter" on the title screen opens a character picker backed by [DiceBear](https://www.dicebear.com/)'s HTTP API, which needs no build step or bundler. You pick skin, hair, hair colour, uniform, uniform colour and facial hair from live previews, or hit "Surprise me" to roll the lot. The result is drawn as a circular token in place of the default waiter — which also means the avatar never needs to face a walking direction, so there are no directional sprites to produce.
+
+The chosen avatar is cached as SVG text in `localStorage`, so after the first pick the game never contacts the network again. If the service is unreachable at any point — offline, blocked by a network policy, service down — the picker says so plainly and the game falls back to the original drawn circle with no other change in behaviour. A player who never opens the picker never makes a request at all.
+
+To retune the options, edit `AVATAR_STYLE` and the `AVATAR_OPTIONS` array near the top of the script. Each entry is a DiceBear option key plus the values offered for it, and the picker UI builds itself from that array. If a value ever stops matching DiceBear's schema for the chosen style, that swatch simply falls back to the style default, which is visible immediately in the picker.
+
+One licensing note: DiceBear's core is MIT, but its individual art styles carry their own licences and several are CC BY 4.0, which requires attribution. Confirm the licence for whichever style you settle on and add a credit line before publishing.
+
 ## Training mode
 
 The title screen opens on a five-step tutorial that introduces one mechanic at a time and waits for you to actually perform each one before moving on — walking, picking up an order, delivering it, and then meeting the patience bar. Nothing advances on a timer. It ends in a three-order practice round where missed tables cost you nothing, then hands you to the real shift.
