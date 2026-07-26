@@ -6,7 +6,7 @@ Read this first. It is the working brief for continuing development, written at 
 
 A build for Articulate E-Learning Challenge #561 ("Online Training for Restaurant Servers & Waiters"). Instead of the usual branching scenario, it is a short Overcooked-style arcade game that trains the "in the weeds" skill of a server's job: holding multiple orders in your head while physically running the floor, under escalating pressure.
 
-Vanilla JS and HTML5 canvas in a single file, no build step, no dependencies. `index.html` at the repo root *is* the site.
+Vanilla JS and HTML5 canvas, no build step. `index.html` at the repo root *is* the site; the only other shipped files are `vendor/`, which holds DiceBear's avatar renderer and art set as pre-built static assets (no build step, nothing fetched at runtime).
 
 The person you are working with is Rone. Working style notes are at the bottom — read them, they change how you should respond.
 
@@ -31,12 +31,12 @@ The commit messages are deliberately detailed and carry the reasoning and measur
 
 ## How the code is laid out
 
-One file, `index.html`, about 1060 lines: styles, then markup, then the whole game in a single IIFE. Rough order inside the script:
+One file, `index.html`, about 1150 lines: styles, then markup, then the whole game in a single IIFE. Rough order inside the script:
 
 - Colour palette and layout constants
 - `DROP` — the drop-off pad geometry
 - `resetGame` / `updateHUD`
-- **Avatar section** — DiceBear integration and the picker
+- **Avatar section** — local avatar generation and the picker
 - Spawning, input, game logic (`tryPickup`, `tryDeliver`, `checkAutoInteract`)
 - **Tutorial section** — `TUTORIAL_STEPS` and its step machine
 - `update(dt)` — the single update path for everything
@@ -117,29 +117,35 @@ The zone sits just below table centre, so you enter it as you reach the table's 
 
 Each waiting table shows seconds remaining beside its meter, in the same green/amber/red thresholds as the bar. `drainRate` was lifted from a local in `update()` to module scope so the renderer can convert patience into seconds. Verified as true elapsed time: 7.63s read 5.59s two seconds later. Hidden while the tutorial has drain off, where a frozen number would imply a clock that is not running. Replaced the hourglass glyph.
 
-### Avatar picker (`2427222`) — **this is mid-flight, see below**
+### Avatar picker
 
-"Build your waiter" on the title screen opens a picker backed by DiceBear's HTTP API (`AVATAR_API`, currently `https://api.dicebear.com/9.x`, `AVATAR_STYLE` = `avataaars`). Six option rows built from the `AVATAR_OPTIONS` array, live previews, plus a randomiser. The result is drawn as a circular token clipped into the same shape the plain circle used.
+"Build your waiter" on the title screen opens a picker that generates Open Peeps avatars **in the browser**, from DiceBear's renderer and art set vendored into `vendor/`. Six rows, live previews, a randomiser. The result is drawn as a circular token clipped into the same shape the plain circle used.
 
-Chosen deliberately over Avataaars/Big Heads/Personas because those ship as React components and would have forced a bundler, losing the drop-in static property. A portrait token also sidesteps directional sprites entirely — a portrait has no facing to get wrong, so there is no need for four-way character art.
+A portrait token sidesteps directional sprites entirely — a portrait has no facing to get wrong, so there is no need for four-way character art.
 
-**Degradation was the main design constraint** and should be preserved. The picked avatar is cached as SVG text in `localStorage`, so the network is touched once and never again. A failed fetch shows a message in the picker and leaves the original circle. A player who never opens the picker makes no request at all.
+The rows are **derived from the art set at load**, not hand-written. This is the important property and should be preserved: it makes it impossible to name a variant that does not exist, which is exactly how the previous API-backed version broke three times without anyone noticing. If you add a row, read it out of `def.components` / `def.colors` rather than typing values.
+
+**Degradation still matters, but there is much less that can fail.** The picked avatar is cached as SVG text in `localStorage`, so a returning player never loads `vendor/` at all. A player who never opens the picker loads none of it either — the engine is imported lazily on first open. If `vendor/` cannot load (a partial deploy, or `file://`, where module imports are blocked), the picker says so and the game keeps the classic circle.
 
 ## Unfinished and unverified — start here
 
-**1. DiceBear options — verified and fixed.** Done. `api.dicebear.com` is reachable from the current environment, and the picker was checked against the live API rather than the docs. Three real faults were found and corrected:
+**1. Avatars — rebuilt to run locally. Done.** The picker no longer talks to DiceBear at all. `vendor/dicebear-core.js` (their renderer, MIT) and `vendor/open-peeps.json` (the complete Open Peeps art set, CC0) ship with the game, and avatars are generated in the browser. Output is byte-identical to what their HTTP API returns — verified over 40 random option combinations, all 40 matching once DiceBear's own `<!-- Generated by -->` comment is normalised away.
 
-- **`9.x` was not current.** DiceBear 10 is (`@dicebear/styles@10.2.0`, `@dicebear/core@10.3.0`; the old `@dicebear/collection` package was renamed to `@dicebear/styles` at v10, which is why npm's `collection` still tops out at 9.4.x and looks current). `AVATAR_API` now points at `10.x`.
-- **v10 renamed the component selectors** to `<component>Variant`, so `top`/`clothing`/`facialHair` became `topVariant`/`clothesVariant`/`facialHairVariant`. Colour keys were unchanged.
-- **Optional components are gated by a probability defaulting to 10**, so a chosen beard rendered only one seed in ten. `avatarUrl` now pins `facialHairProbability` to 100 or 0.
+Why this happened rather than a simple option fix: the API failed *silently* three separate times. It answers 200 for an option name it does not recognise and serves the style default, so a stale major version (9.x when 10.x was current), renamed keys (`top`→`topVariant`, `clothing`→`clothesVariant`), and a probability defaulting to 10 (a chosen beard rendering one seed in ten) all shipped looking like working code. **The rows are now built from the art set itself** — `AVATAR_ROWS` is derived from `def.components` and `def.colors` at load — so a variant that does not exist cannot be named. That bug class is structurally gone, which matters more than the offline capability.
 
-Two things worth knowing before touching this again. **v10 does not validate option names** — an unknown one returns 200 and the style default, so a typo is invisible in the network tab and only shows as a row of identical swatches. 9.x returned 400 for the same mistake; that safety net is gone, so changes here need a rendered check, not a status-code check. And **`radius` was dropped in v10**; the swatch CSS and the canvas clip already round the token, so it is simply no longer sent.
+The style changed from `avataaars` to `open-peeps` in the process. Open Peeps has no hair-colour axis (it is painted into each of the 48 head illustrations, which is why `grayBun` and `grayShort` are separate heads), so that row is gone; in exchange the picker gained Expression (30) and Glasses (9), and because generation is local and costs about 1 ms per avatar, **every variant in the art set is offered** rather than a hand-picked handful — 114 swatches across six rows, where the API version could only afford 33. Rows scroll horizontally and open scrolled to the current selection.
 
-Verified by rendering: all six rows now produce fully distinct swatches (5/5, 8/8, 6/6, 5/5, 5/5, 4/4, hashed from the bytes the API returned for each URL the page built). Also confirmed still true: no request is made if the picker is never opened, an unreachable API warns and leaves the game playable on the fallback circle, and a 9.x-era `localStorage` selection migrates to the v10 key names.
+Three probability-gated components must stay pinned in `avatarOptions`: `facialHair` (default 10) and `accessories` (default 20) would otherwise ignore an explicit choice, and `mask` (default 5) would put a surgical mask on roughly one waiter in twenty.
 
-**2. Licensing — done.** `avataaars` is not CC BY. DiceBear's own style definition declares it "Free for personal and commercial use", a remix of [Avataaars](https://avataaars.com/) by Pablo Stanley. A credit line to that effect now sits at the bottom of the picker.
+Weight: 448 KB in `vendor/`, about 120 KB gzipped. If that ever matters, `pixel-art` is the same architecture for 4 KB of art instead of 92 KB — a one-file swap plus new row wiring.
 
-**3. Every swatch click re-requests all 33 previews**, since each shows the current selection with one option swapped. The browser caches identical URLs, but first open will visibly populate on a slow connection.
+Verified end to end with the network blocked: the full pick → commit → play flow makes zero external requests, a returning player renders from the cached SVG without loading `vendor/` at all, an unreachable `vendor/` warns in the picker and leaves the game playable on the fallback circle, and stale avataaars saves are ignored rather than half-applied (the localStorage keys moved to `rushhour.peeps.*`).
+
+One real limitation: ES module imports are blocked on `file://`, so opening `index.html` straight off disk shows the picker warning. Over http — GitHub Pages, or any local server — it is fine. The warning text says so.
+
+**2. Licensing — done.** Open Peeps is CC0, so no attribution is required; the credit line in the picker is provenance, not obligation. DiceBear's renderer is MIT, which *does* require retaining the notice — it is at `vendor/CORE-LICENSE.txt`.
+
+**3. Every swatch click re-renders all 114 previews**, since each shows the current selection with one option swapped. That is ~120 ms of generation plus image decode, local and offline, so it is no longer a network concern — but it is the thing to look at first if the picker ever feels sluggish on a weak machine.
 
 **4. Still open from the original brief:** no audio at all; no difficulty feel-tuning pass has happened (all values are first guesses, and see the carry-two blocker above); the canvas is a fixed 960×600 scaled by CSS rather than a true responsive layout; a wrong delivery costs nothing beyond a visual bump, which is deliberate but unexamined; and the HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
 

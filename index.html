@@ -132,9 +132,21 @@
     font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
     font-weight: 700; opacity: 0.65; margin-bottom: 5px;
   }
-  .opt-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Rows run to 48 entries now that every variant in the art set is offered,
+     so each row is its own horizontal strip rather than wrapping into a wall
+     that pushes the buttons off the bottom of the screen. */
+  .opt-swatches {
+    display: flex; gap: 8px; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    padding-bottom: 6px; scrollbar-width: thin;
+    scrollbar-color: rgba(244,238,219,0.3) transparent;
+  }
+  .opt-swatches::-webkit-scrollbar { height: 6px; }
+  .opt-swatches::-webkit-scrollbar-thumb {
+    background: rgba(244,238,219,0.3); border-radius: 3px;
+  }
   .opt-swatches img {
-    width: 48px; height: 48px; border-radius: 50%;
+    width: 48px; height: 48px; border-radius: 50%; flex: none;
     background: #E8E2D5; border: 3px solid transparent; cursor: pointer;
   }
   .opt-swatches img.sel { border-color: #E0A72E; }
@@ -196,16 +208,16 @@
     <h2>Build your waiter</h2>
     <img id="avatarPreview" alt="Your waiter">
     <div id="avatarOptions"></div>
-    <p id="avatarWarn" class="hidden">Couldn't reach the avatar service — you'll keep the classic waiter. Everything else works as normal.</p>
+    <p id="avatarWarn" class="hidden">Couldn't load the avatar art — you'll keep the classic waiter. Everything else works as normal. (If you opened this file directly from disk rather than over the web, that's why.)</p>
     <div id="avatarActions">
       <button class="cta" id="avatarDone">Use this waiter</button>
       <button class="cta ghost" id="avatarRandom">Surprise me</button>
       <button class="cta ghost" id="avatarCancel">Back</button>
     </div>
     <p id="avatarCredit">
-      Avatars by <a href="https://www.dicebear.com/styles/avataaars/" target="_blank" rel="noopener">DiceBear</a> —
-      a remix of <a href="https://avataaars.com/" target="_blank" rel="noopener">Avataaars</a> by Pablo Stanley,
-      free for personal and commercial use.
+      <a href="https://www.openpeeps.com/" target="_blank" rel="noopener">Open Peeps</a> by Pablo Stanley (CC0),
+      drawn in your browser by <a href="https://www.dicebear.com/" target="_blank" rel="noopener">DiceBear</a> (MIT).
+      Both ship with the game — nothing is loaded from anywhere else.
     </p>
   </div>
 </div>
@@ -302,69 +314,90 @@
   }
 
   // ---------- Avatar ----------
-  // Avatars come from DiceBear's HTTP API, which needs no build step. The
-  // chosen one is cached as SVG text in localStorage, so after the first pick
-  // the game never touches the network again. If any of it fails — offline,
-  // blocked, service down — drawPlayer falls back to the classic circle and
-  // nothing else changes.
+  // Avatars are generated in the browser by DiceBear's renderer, which is
+  // vendored into vendor/ along with the complete Open Peeps art set. Nothing
+  // is fetched from dicebear.com at any point. Output is byte-identical to
+  // what their HTTP API returns for the same options.
   //
-  // AVATAR_STYLE and the option keys/values below map to DiceBear's schema for
-  // that style. Two traps, both verified against the live API rather than the
-  // docs, because DiceBear 10 answers 200 for an option name it does not know
-  // and silently serves the style default — a typo here is invisible in the
-  // network tab and only shows up as a row of identical swatches.
+  // This replaced the API because the API kept failing silently: it answers
+  // 200 for an option name it does not recognise and serves the style default,
+  // so three separate mistakes (a stale major version, renamed keys, and a
+  // probability that defaults to 10) all shipped looking like working code.
+  // The rows below are now built *from the art set itself*, so a value that
+  // does not exist cannot be named — which is the whole bug class, gone.
   //
-  //   1. v10 renamed the component selectors to <component>Variant, so 9.x's
-  //      `top`/`clothing`/`facialHair` are now `topVariant`/`clothesVariant`/
-  //      `facialHairVariant`. The colour keys did not change.
-  //   2. Optional components are gated by a probability that defaults to 10,
-  //      so a chosen beard rendered only one seed in ten. See avatarUrl.
-  //
-  // `radius` was dropped in v10 and is no longer sent; the swatch CSS and the
-  // canvas clip in drawPlayer both round the token already.
-  const AVATAR_API = 'https://api.dicebear.com/10.x';
-  const AVATAR_STYLE = 'avataaars';
-  const AVATAR_OPTIONS = [
-    { key: 'skinColor',         label: 'Skin',        values: ['f2d3b1','edb98a','d08b5b','ae5d29','614335'] },
-    { key: 'topVariant',        label: 'Hair',        values: ['shortFlat','shortCurly','theCaesar','longButNotTooLong','bigHair','curly','hijab','turban'] },
-    { key: 'hairColor',         label: 'Hair colour', values: ['2c1b18','724133','a55728','b58143','c93305','e8e1e1'] },
-    { key: 'clothesVariant',    label: 'Uniform',     values: ['blazerAndShirt','shirtCrewNeck','collarAndSweater','shirtVNeck','overall'] },
-    { key: 'clothesColor',      label: 'Uniform colour', values: ['2f6f6b','c1443a','e0a72e','3c4f5c','262e33'] },
-    { key: 'facialHairVariant', label: 'Facial hair', values: ['','beardLight','beardMedium','moustacheFancy'] }
-  ];
+  // vendor/dicebear-core.js  MIT, see vendor/CORE-LICENSE.txt
+  // vendor/open-peeps.json   Open Peeps by Pablo Stanley, CC0
+  const AVATAR_CORE = './vendor/dicebear-core.js';
+  const AVATAR_ART  = './vendor/open-peeps.json';
 
-  // Opening on an explicit selection rather than "whatever the seed rolled"
-  // keeps every row meaningful: the seed's own top happened to be a covered
-  // one, which left all six Hair colour swatches identical until you picked
-  // a hairstyle first.
-  //
-  // eyes/mouth are pinned for the same reason and are deliberately not picker
-  // rows — the seed rolled xDizzy, and X'd-out eyes read as knocked out
-  // rather than as someone about to take your order.
-  const AVATAR_DEFAULTS = {
-    skinColor: 'edb98a', topVariant: 'shortFlat', hairColor: '2c1b18',
-    clothesVariant: 'blazerAndShirt', clothesColor: '2f6f6b',
-    eyesVariant: 'happy', mouthVariant: 'smile'
-  };
-  // 9.x saves carry the old key names; map them so an existing pick survives.
-  const AVATAR_KEY_ALIASES = { top: 'topVariant', clothing: 'clothesVariant', facialHair: 'facialHairVariant' };
+  // Open Peeps' own clothing palette is pastel and fights the restaurant
+  // palette, so the uniform row uses the game's colours instead. Colours are
+  // free-form hex, so unlike variant names there is nothing here to mistype.
+  const UNIFORM_COLOURS = ['#2f6f6b','#c1443a','#e0a72e','#3c4f5c','#262e33'];
 
-  let avatarSel = { seed: 'rush-hour', opts: Object.assign({}, AVATAR_DEFAULTS) };
-  let avatarImg = null;      // rasterised avatar, drawn each frame
+  // Bumped from avatarSel/avatarSvg: those hold avataaars picks whose option
+  // names mean nothing to this style, so old saves are ignored rather than
+  // migrated into a shape that cannot render.
+  const AVATAR_STORE_SEL = 'rushhour.peeps.sel';
+  const AVATAR_STORE_SVG = 'rushhour.peeps.svg';
+
+  let avatarSel  = { seed: 'rush-hour', opts: {} };
+  let avatarImg  = null;      // rasterised avatar, drawn each frame
   let avatarObjUrl = null;
+  let avatarEngine = null;    // { Avatar, style } once vendor/ has loaded
+  let AVATAR_ROWS = [];       // derived from the art set, never hand-written
 
-  function avatarUrl(overrides){
-    const p = new URLSearchParams();
-    p.set('seed', avatarSel.seed);
-    const merged = Object.assign({}, avatarSel.opts, overrides || {});
-    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
-    // facialHair is an optional component: naming a variant is not enough,
-    // the probability has to be forced or DiceBear rolls it per seed (default
-    // 10%). Pinning it to 100/0 also makes "none" mean clean-shaven rather
-    // than another roll of the dice.
-    p.set('facialHairProbability', merged.facialHairVariant ? '100' : '0');
-    p.set('backgroundColor', 'E8E2D5');
-    return AVATAR_API + '/' + AVATAR_STYLE + '/svg?' + p.toString();
+  // The engine is only loaded when the picker is opened. A player who never
+  // opens it downloads none of it, and a returning player renders from the
+  // cached SVG below without loading it either.
+  async function loadAvatarEngine(){
+    if (avatarEngine) return true;
+    const [mod, def] = await Promise.all([
+      import(AVATAR_CORE),
+      fetch(AVATAR_ART).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    ]);
+    avatarEngine = { Avatar: mod.Avatar, style: new mod.Style(def) };
+    const variants = name => {
+      const v = def.components[name].variants;
+      return Array.isArray(v) ? v.slice() : Object.keys(v);
+    };
+    AVATAR_ROWS = [
+      { key: 'skinColor',          label: 'Skin',           values: def.colors.skin.values },
+      { key: 'headVariant',        label: 'Head & hair',    values: variants('head') },
+      { key: 'clothingColor',      label: 'Uniform colour', values: UNIFORM_COLOURS },
+      { key: 'facialHairVariant',  label: 'Facial hair',    values: [''].concat(variants('facialHair')) },
+      { key: 'accessoriesVariant', label: 'Glasses',        values: [''].concat(variants('accessories')) },
+      { key: 'expressionVariant',  label: 'Expression',     values: variants('expression') }
+    ];
+    if (!Object.keys(avatarSel.opts).length) {
+      avatarSel.opts = {
+        skinColor: def.colors.skin.values[1], headVariant: 'short1',
+        clothingColor: UNIFORM_COLOURS[0], expressionVariant: 'smile'
+      };
+    }
+    return true;
+  }
+
+  // Optional components are probability-gated, so naming one is not enough.
+  // facialHair and accessories default to 10 and 20 — a chosen beard would
+  // appear about one seed in ten. mask defaults to 5 and is pinned off, or
+  // roughly one waiter in twenty turns up in a surgical mask.
+  function avatarOptions(overrides){
+    const o = Object.assign({ seed: avatarSel.seed }, avatarSel.opts, overrides || {});
+    for (const k of Object.keys(o)) if (o[k] === '' || o[k] == null) delete o[k];
+    o.facialHairProbability  = o.facialHairVariant  ? 100 : 0;
+    o.accessoriesProbability = o.accessoriesVariant ? 100 : 0;
+    o.maskProbability = 0;
+    o.backgroundColor = '#E8E2D5';
+    return o;
+  }
+
+  function avatarSvgText(overrides){
+    return new avatarEngine.Avatar(avatarEngine.style, avatarOptions(overrides)).toString();
+  }
+  function avatarDataUri(overrides){
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(avatarSvgText(overrides))));
   }
 
   function applyAvatarSvg(svgText){
@@ -381,23 +414,21 @@
 
   function loadSavedAvatar(){
     try {
-      const sel = localStorage.getItem('rushhour.avatarSel');
+      const sel = localStorage.getItem(AVATAR_STORE_SEL);
       if (sel) {
         const saved = JSON.parse(sel);
-        const opts = {};
-        for (const [k, v] of Object.entries(saved.opts || {})) opts[AVATAR_KEY_ALIASES[k] || k] = v;
-        avatarSel = { seed: saved.seed || 'rush-hour', opts: Object.assign({}, AVATAR_DEFAULTS, opts) };
+        avatarSel = { seed: saved.seed || 'rush-hour', opts: saved.opts || {} };
       }
-      const svg = localStorage.getItem('rushhour.avatarSvg');
+      const svg = localStorage.getItem(AVATAR_STORE_SVG);
       if (svg) applyAvatarSvg(svg);
     } catch (e) { /* private mode or bad JSON — defaults are fine */ }
   }
 
   function renderPicker(){
-    document.getElementById('avatarPreview').src = avatarUrl();
+    document.getElementById('avatarPreview').src = avatarDataUri();
     const wrap = document.getElementById('avatarOptions');
     wrap.innerHTML = '';
-    for (const opt of AVATAR_OPTIONS){
+    for (const opt of AVATAR_ROWS){
       const row = document.createElement('div');
       row.className = 'opt-row';
       const lab = document.createElement('div');
@@ -406,52 +437,58 @@
       row.appendChild(lab);
       const strip = document.createElement('div');
       strip.className = 'opt-swatches';
+      let selected = null;
       for (const v of opt.values){
         const im = document.createElement('img');
-        im.src = avatarUrl({ [opt.key]: v });
+        im.src = avatarDataUri({ [opt.key]: v });
         im.alt = '';                       // decorative; the row label carries the meaning
         im.title = opt.label;
-        if ((avatarSel.opts[opt.key] || '') === v) im.className = 'sel';
+        if ((avatarSel.opts[opt.key] || '') === v) { im.className = 'sel'; selected = im; }
         im.addEventListener('click', () => { avatarSel.opts[opt.key] = v; renderPicker(); });
         strip.appendChild(im);
       }
       row.appendChild(strip);
       wrap.appendChild(row);
+      // Rows are long enough to scroll, and the current choice is often well
+      // off to the right — without this the row looks like nothing is picked.
+      if (selected) strip.scrollLeft = selected.offsetLeft - strip.clientWidth/2 + selected.offsetWidth/2;
     }
   }
 
-  function openPicker(){
-    document.getElementById('avatarWarn').classList.add('hidden');
+  // The only thing that can still fail is loading vendor/ itself — a partial
+  // deploy, or opening index.html straight off disk, where module imports are
+  // blocked by the browser. The picker says so and the game keeps the circle.
+  async function openPicker(){
+    const warn = document.getElementById('avatarWarn');
+    warn.classList.add('hidden');
     document.getElementById('avatarPicker').classList.remove('hidden');
-    renderPicker();
+    document.getElementById('avatarOptions').innerHTML = '';
+    try {
+      await loadAvatarEngine();
+      renderPicker();
+    } catch (e) {
+      warn.classList.remove('hidden');
+    }
   }
   function closePicker(){
     document.getElementById('avatarPicker').classList.add('hidden');
   }
 
-  async function commitAvatar(){
-    const btn = document.getElementById('avatarDone');
-    btn.disabled = true;
+  function commitAvatar(){
+    if (!avatarEngine) return;
+    const svg = avatarSvgText();
+    applyAvatarSvg(svg);
     try {
-      const res = await fetch(avatarUrl());
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const svg = await res.text();
-      applyAvatarSvg(svg);
-      try {
-        localStorage.setItem('rushhour.avatarSvg', svg);
-        localStorage.setItem('rushhour.avatarSel', JSON.stringify(avatarSel));
-      } catch (e) { /* still usable this session */ }
-      closePicker();
-    } catch (e) {
-      document.getElementById('avatarWarn').classList.remove('hidden');
-    } finally {
-      btn.disabled = false;
-    }
+      localStorage.setItem(AVATAR_STORE_SVG, svg);
+      localStorage.setItem(AVATAR_STORE_SEL, JSON.stringify(avatarSel));
+    } catch (e) { /* private mode — still usable this session */ }
+    closePicker();
   }
 
   function randomiseAvatar(){
+    if (!avatarEngine) return;
     avatarSel.seed = 'rush-' + Math.random().toString(36).slice(2, 9);
-    for (const opt of AVATAR_OPTIONS){
+    for (const opt of AVATAR_ROWS){
       avatarSel.opts[opt.key] = opt.values[Math.floor(Math.random()*opt.values.length)];
     }
     renderPicker();
