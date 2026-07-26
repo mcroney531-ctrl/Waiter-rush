@@ -259,12 +259,21 @@
   // highlighting the one you are carrying for would give away the answer.
   const DROP = { dy: 52, w: 78, h: 38 };
 
+  // The dish return, deliberately off on its own against the right wall rather
+  // than tucked into the counter. Clearing a table is meant to be a real trip
+  // you choose to make, not something you do in passing while grabbing the
+  // next order. Sits in the corridor between the two table rows, which keeps
+  // it clear of the furniture and reachable during the tutorial (the
+  // instruction panel owns the bottom strip, so it cannot live down there).
+  const BUS = { x: 886, y: 300, w: 58, h: 104 };
+
   let tables = [];
   let tickets = []; // waiting at the counter: {id, tableId, icon, spawnTime}
   let player, keys, touchDir;
   let carrying = null; // {tableId, icon, pickedAt}
   let carryCapacity = 1;
   let deliveries = 0;
+  let cleared = 0;      // tables bussed; not shown in the HUD, used by the tutorial
   let score = 0;
   let lives = 3;
   let lastTime = 0;
@@ -289,6 +298,13 @@
   // Tutorial lessons only; see the note where drainRate is computed.
   const TUTORIAL_PATIENCE_S = 20;
 
+  // How long guests spend eating before the table needs clearing. This is the
+  // one number that decides whether the floor breathes or clogs: a dirty table
+  // cannot take a new order, so eating time plus your bussing speed sets how
+  // many of the eight tables are actually in service at any moment.
+  const EAT_MS = 22000;
+  const BUS_SCORE = 40;
+
   const lerp = (a, b, t) => a + (b - a) * t;
   const rushProgress = () => Math.min(1, elapsed / RUSH_PEAK_MS);
 
@@ -302,13 +318,17 @@
   let mode = 'game';        // 'tutorial' | 'game'
   let tut = null;           // tutorial runtime state, see TUTORIAL_STEPS
   let drainEnabled = true;  // tutorial switches patience off until it teaches it
+  let bussingEnabled = true; // ...same for the eat/clear cycle, see TUTORIAL_STEPS
   let drainRate = 1 / (PATIENCE_START_S * 1000); // recomputed every frame; drawTable reads it for the countdown
 
   function resetGame(){
     tables = tableDefs.map((t, i) => ({
       id: i+1, x: t.x, y: t.y,
-      state: 'idle', // idle -> waiting (has ticket at counter) -> served briefly happy -> idle
-      patience: 1, ticketId: null, happyTimer: 0
+      // idle -> waiting (ticket at counter) -> happy (brief tick) -> eating
+      // -> dirty -> idle again once the player clears it. A table that is not
+      // idle cannot take a new order, so dirty tables shrink the usable floor.
+      state: 'idle',
+      patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0
     }));
     tickets = [];
     player = { x: W/2, y: H - 90, size: 26, speed: 220 };
@@ -317,6 +337,7 @@
     carrying = null;
     carryCapacity = 1;
     deliveries = 0;
+    cleared = 0;
     score = 0;
     lives = 3;
     spawnTimer = 900;
@@ -580,6 +601,12 @@
            Math.abs(player.y - (t.y + DROP.dy)) <= DROP.h/2 + pad;
   }
 
+  function inBusZone(){
+    const pad = player.size * 0.4;
+    return Math.abs(player.x - BUS.x) <= BUS.w/2 + pad &&
+           Math.abs(player.y - BUS.y) <= BUS.h/2 + pad;
+  }
+
   function tryPickup(){
     if (carrying) return; // already holding max? we only support 1 slot visually, capacity affects nothing beyond flavor for now
     // near counter?
@@ -587,11 +614,35 @@
     if (tickets.length === 0) return;
     const t = tickets[0];
     tickets.shift();
-    carrying = { tableId: t.tableId, icon: t.icon, pickedAt: performance.now() };
+    carrying = { type: 'order', tableId: t.tableId, icon: t.icon, pickedAt: performance.now() };
+  }
+
+  // Dishes share the single carry slot with orders on purpose: every trip is a
+  // choice about what is most urgent, which is the whole point of the mechanic.
+  function tryBusPickup(){
+    if (carrying) return;
+    for (const t of tables){
+      if (t.state === 'dirty' && inDropZone(t)){
+        t.state = 'clearing';
+        carrying = { type: 'dishes', tableId: t.id, pickedAt: performance.now() };
+        return;
+      }
+    }
+  }
+
+  function tryBusDrop(){
+    if (!carrying || carrying.type !== 'dishes') return;
+    if (!inBusZone()) return;
+    const table = tables.find(t => t.id === carrying.tableId);
+    if (table) { table.state = 'idle'; table.patience = 1; }
+    score += BUS_SCORE;
+    cleared++;
+    carrying = null;
+    updateHUD();
   }
 
   function tryDeliver(){
-    if (!carrying) return;
+    if (!carrying || carrying.type !== 'order') return;
     const table = tables.find(t => t.id === carrying.tableId);
     if (!table) { carrying = null; return; }
     if (inDropZone(table)) {
@@ -618,7 +669,7 @@
   }
 
   window.addEventListener('keydown', e => {
-    if (e.key === ' ') { tryPickup(); tryDeliver(); }
+    if (e.key === ' ') { tryPickup(); tryBusPickup(); tryDeliver(); tryBusDrop(); }
   });
 
   // Auto pickup/deliver on proximity for mobile ease, plus spacebar on desktop
@@ -626,12 +677,14 @@
     if (!carrying && player.y - player.size/2 <= counterRect.h + 6 && tickets.length > 0){
       tryPickup();
     }
-    if (carrying){
+    if (!carrying) tryBusPickup();
+    if (carrying && carrying.type === 'order'){
       const table = tables.find(t => t.id === carrying.tableId);
       if (table && inDropZone(table)){
         tryDeliver();
       }
     }
+    if (carrying && carrying.type === 'dishes') tryBusDrop();
   }
 
   // ---------- Tutorial ----------
@@ -645,14 +698,14 @@
       text: () => TOUCH
         ? 'Use the pad in the bottom corner to walk around the floor.'
         : 'Use the arrow keys — or WASD — to walk around the floor.',
-      enter(){ drainEnabled = false; },
+      enter(){ drainEnabled = false; bussingEnabled = false; },
       done(){ return tut.moved > 300; },
       success: () => 'That is the job, physically speaking. Now the hard part.'
     },
     {
       hint: 'Pick up an order',
       text: () => 'An order just landed on the pickup counter. Walk up into the counter to grab it — no button needed.',
-      enter(){ drainEnabled = false; spawnTicket(6); },
+      enter(){ drainEnabled = false; bussingEnabled = false; spawnTicket(6); },
       done(){ return !!carrying; },
       success: () => 'You are carrying table ' + carrying.tableId + '.'
     },
@@ -661,14 +714,14 @@
       text: () => carrying
         ? 'Take it to table ' + carrying.tableId + ' and step onto the dashed pad in front of it — no need to walk through the table. Watch the ticket fade as you go; you have to hold the number in your head. Drift back toward the counter any time to peek.'
         : 'Step onto the dashed pad in front of the table to hand the order over.',
-      enter(){ drainEnabled = false; },
+      enter(){ drainEnabled = false; bussingEnabled = false; },
       done(){ return !carrying; },
       success: () => 'Delivered. That is a full loop.'
     },
     {
       hint: 'Watch their patience',
       text: () => 'This one is on the clock. The bar above the table drains while they wait — empty it and they walk out, costing you one of three lives. Get this order out.',
-      enter(){ drainEnabled = true; spawnTicket(3); },
+      enter(){ drainEnabled = true; bussingEnabled = false; spawnTicket(3); },
       done(){ return !carrying && !tables.some(t => t.state === 'waiting'); },
       onMiss(){
         tut.note = 'They walked. On a real shift that costs a life — here we just run it again.';
@@ -678,11 +731,32 @@
       success: () => 'Out before the bar emptied. That is the whole game.'
     },
     {
+      hint: 'Clear the table',
+      text: () => cleared > tut.baseCleared
+        ? 'That table is back in service.'
+        : (tables.some(t => t.state === 'dirty')
+            ? 'They have finished. Step onto that table\'s pad to stack the plates, then carry them to the DISH RETURN on the right wall.'
+            : 'They are eating now — the teal bar is their meal, not a warning. When it empties the table needs clearing before anyone new can sit there.'),
+      enter(){
+        // The one lesson that needs the eat/clear cycle. Served straight away
+        // and the meal shortened, because the point is the clearing, not the
+        // twenty-two seconds of waiting for it.
+        drainEnabled = false; bussingEnabled = true;
+        tut.baseCleared = cleared;
+        const t = tables.find(x => x.state === 'idle') || tables[0];
+        t.state = 'eating';
+        t.eatTimer = 3200;
+      },
+      done(){ return cleared > tut.baseCleared; },
+      success: () => 'Cleared. A dirty table cannot take a new order, so that is one of your eight back.'
+    },
+    {
       hint: 'Practice round',
       text: () => 'Three orders, back to back, nothing at stake. Delivered ' +
                   (deliveries - tut.baseDeliveries) + ' of ' + PRACTICE_TARGET + '.',
       enter(){
         drainEnabled = true;
+        bussingEnabled = true;
         tut.practice = true;
         tut.baseDeliveries = deliveries;
         elapsed = 0;          // keep practice at the gentle end of the ramp
@@ -812,9 +886,19 @@
           }
         }
       }
+      // Served, then eating, then waiting to be cleared. bussingEnabled keeps
+      // the early tutorial steps on the old straight-back-to-idle path so they
+      // can re-stage an order at the table they name in their instructions.
       if (t.state === 'happy'){
         t.happyTimer -= dt;
-        if (t.happyTimer <= 0) t.state = 'idle';
+        if (t.happyTimer <= 0){
+          if (bussingEnabled){ t.state = 'eating'; t.eatTimer = EAT_MS; }
+          else t.state = 'idle';
+        }
+      }
+      if (t.state === 'eating'){
+        t.eatTimer -= dt;
+        if (t.eatTimer <= 0){ t.eatTimer = 0; t.state = 'dirty'; }
       }
       if (t.state === 'angry'){
         t.angryTimer -= dt;
@@ -873,9 +957,50 @@
       ctx.fillStyle = standing ? COLORS.counter : 'rgba(43,38,32,0.30)';
       ctx.font = '900 9px DM Sans, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('SET DOWN', 0, 3);
+      // The pad is the same on every table so it cannot give away which order
+      // you are carrying — but a dirty table is public knowledge, so relabelling
+      // that one costs the memory mechanic nothing.
+      ctx.fillText(t.state === 'dirty' ? 'CLEAR' : 'SET DOWN', 0, 3);
       ctx.restore();
     }
+  }
+
+  // The dish return. Highlights when you are standing in it, same as the pads.
+  function drawBusStation(){
+    const standing = inBusZone();
+    const holding = carrying && carrying.type === 'dishes';
+    ctx.save();
+    ctx.translate(BUS.x, BUS.y);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';
+    ctx.beginPath();
+    ctx.ellipse(0, BUS.h/2 - 2, BUS.w/2, 8, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // a bus tub against the wall
+    ctx.fillStyle = standing ? '#3d8783' : '#4a5560';
+    roundRect(ctx, -BUS.w/2, -BUS.h/2, BUS.w, BUS.h, 10);
+    ctx.fill();
+    ctx.strokeStyle = holding ? COLORS.mustard : 'rgba(43,38,32,0.45)';
+    ctx.lineWidth = holding ? 4 : 2;
+    ctx.setLineDash(holding && !standing ? [7,5] : []);
+    roundRect(ctx, -BUS.w/2, -BUS.h/2, BUS.w, BUS.h, 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // stacked plates inside
+    ctx.fillStyle = 'rgba(244,238,219,0.85)';
+    for (let i = 0; i < 3; i++){
+      roundRect(ctx, -BUS.w/2 + 11, BUS.h/2 - 20 - i*7, BUS.w - 22, 5, 2.5);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = '#F4EEDB';
+    ctx.font = '900 9px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('DISH', 0, -BUS.h/2 + 18);
+    ctx.fillText('RETURN', 0, -BUS.h/2 + 29);
+    ctx.restore();
   }
 
   function drawCounter(){
@@ -918,6 +1043,38 @@
     ctx.arcTo(x, y+h, x, y, r);
     ctx.arcTo(x, y, x+w, y, r);
     ctx.closePath();
+  }
+
+  // Plates are drawn rather than set as emoji. The food icons are emoji and
+  // render fine, but 🍽️ is missing from enough font stacks to be a real risk,
+  // and vector plates match the rest of the furniture anyway.
+  function drawPlate(cx, cy, r, filled){
+    ctx.fillStyle = '#F4EEDB';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r*0.42, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(43,38,32,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (filled){
+      ctx.fillStyle = 'rgba(193,68,58,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r*0.52, r*0.22, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawDirtyDishes(cx, cy, s){
+    s = s || 1;
+    drawPlate(cx - 2*s, cy + 3*s, 11*s, false);
+    drawPlate(cx + 1*s, cy - 2*s, 10*s, false);
+    // a used glass beside the stack
+    ctx.fillStyle = 'rgba(180,205,210,0.75)';
+    roundRect(ctx, cx + 9*s, cy - 11*s, 6*s, 11*s, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(43,38,32,0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
   }
 
   function drawTable(t){
@@ -979,6 +1136,29 @@
       ctx.font = '22px serif';
       ctx.fillStyle = COLORS.happy;
       ctx.fillText('✓', 0, -46);
+    } else if (t.state === 'eating'){
+      // Deliberately a different shape and colour from the patience meter:
+      // this clock running down is a good thing, and the two must never be
+      // mistaken for each other at a glance.
+      const barW = 52, frac = Math.max(0, t.eatTimer / EAT_MS);
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      roundRect(ctx, -barW/2, -46, barW, 6, 3);
+      ctx.fill();
+      ctx.fillStyle = COLORS.counter;
+      roundRect(ctx, -barW/2, -46, barW * frac, 6, 3);
+      ctx.fill();
+      // Offset right so the table number stays readable — it is how the
+      // player identifies the table, and it must not be covered on the
+      // states that most need attention.
+      drawPlate(15, -13, 9, true);
+    } else if (t.state === 'dirty'){
+      // Dirty plates sit on the table and the pad reads CLEAR instead of SET
+      // DOWN. No timer: the cost of ignoring it is that the table cannot take
+      // another order, not a countdown.
+      drawDirtyDishes(14, -13, 0.78);
+      ctx.fillStyle = COLORS.mustard;
+      ctx.font = '900 9px DM Sans, sans-serif';
+      ctx.fillText('NEEDS CLEARING', 0, -44);
     } else if (t.state === 'angry'){
       ctx.font = '20px serif';
       ctx.fillText('😠', 0, -50);
@@ -1033,6 +1213,16 @@
     }
 
     ctx.restore();
+
+    // Carried dishes never fade. The fade exists to make you remember a table
+    // number; dishes have a fixed destination, so hiding them would be noise
+    // rather than difficulty.
+    if (carrying && carrying.type === 'dishes'){
+      ctx.save();
+      drawDirtyDishes(player.x - 4, player.y - player.size - 12, 1);
+      ctx.restore();
+      return;
+    }
 
     // carried order — visible near counter, fades after leaving
     if (carrying){
@@ -1123,6 +1313,7 @@
     ctx.clearRect(0,0,W,H);
     drawFloor();
     drawDropZones();
+    drawBusStation();
     tables.forEach(drawTable);
     drawPlayer();
     drawCounter();
@@ -1145,9 +1336,10 @@
     resetGame();
     mode = nextMode;
     drainEnabled = true;
+    bussingEnabled = true;
     tut = null;
     if (nextMode === 'tutorial'){
-      tut = { index: 0, moved: 0, practice: false, baseDeliveries: 0,
+      tut = { index: 0, moved: 0, practice: false, baseDeliveries: 0, baseCleared: 0,
               note: null, noteTimer: 0, successMsg: null, successTimer: 0,
               missed: false, bannerTop: H - 120 };
       player.y = H - 135;   // the open lane between the back tables and the panel

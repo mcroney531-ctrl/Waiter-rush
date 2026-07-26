@@ -43,7 +43,7 @@ One file, `index.html`, about 1150 lines: styles, then markup, then the whole ga
 - Drawing functions, then `render()`
 - `loop` / `beginRun` / `startGame` / `startTutorial`, then event wiring
 
-Canvas is a fixed 960×600 internal resolution scaled by CSS. Eight tables in two rows of four, at x = 120/320/520/720 and y = 200/400. Player is a circle of radius 26 moving at 220 px/s. The counter occupies the top 90px and holds at most 5 queued tickets.
+Canvas is a fixed 960×600 internal resolution scaled by CSS. Eight tables in two rows of four, at x = 120/320/520/720 and y = 200/400. Player is a circle of radius 26 moving at 220 px/s. The counter occupies the top 90px and holds at most 5 queued tickets. The dish return (`BUS`) sits against the right wall at x = 886, y = 300.
 
 ## The core hook, and the rule that protects it
 
@@ -75,6 +75,22 @@ Verified live rather than derived: at shift open a fresh table reads 119.7s and 
 **Traversal.** Average one-way trip from counter to a table is **1.37s**; round trip **2.74s**, which is where the 21.9/min ceiling comes from. That ceiling assumes flawless play with zero hesitation, so treat it as a hard wall rather than a target.
 
 **Scoring.** A delivery scores exactly **120** — `100 + speedBonus`, where `speedBonus` reads `table.patience` on the line *after* it has been reset to `1`, so it is always 20. The speed bonus rewards nothing. Still untouched because it is a design decision, not just a bug: it needs a real definition of what "fast" means. Note this got *worse* to leave alone now that windows open at two minutes — there is much more room for a meaningful speed bonus than there was at nine seconds.
+
+## Bussing (eat / clear cycle)
+
+Serving is no longer the end of a table. The full cycle is `idle → waiting → happy → eating → dirty → clearing → idle`, and **a table that is not `idle` cannot take a new order** — `spawnTicket` filters on `idle`, so this falls out of the state machine rather than needing a special case.
+
+That blocking is the whole point. There is deliberately **no penalty timer** on a dirty table: the cost of ignoring it is that your usable floor shrinks, which throttles your own order flow. It mirrors why real restaurants track table turnover, and it avoids stacking a second failure state on top of walked-out guests.
+
+Dishes share the single carry slot with orders, so every trip is a triage decision. They go to the **dish return** (`BUS`), a station against the right wall in the corridor between the table rows — deliberately not part of the counter, so clearing is a trip you choose to make rather than something you do in passing. It cannot live along the bottom, because the tutorial's instruction panel owns that strip.
+
+Two rendering notes. Plates are **drawn as vectors, not emoji** — the food icons are emoji and render fine, but `🍽️` is missing from enough font stacks that it showed up as a blank box in testing. And the dishes sit **offset to the right** on the table top: centred, they covered the table number, which is the one thing the player needs to read on exactly the tables that want attention.
+
+Carried dishes never fade. The fade exists to force you to remember a table number; the dish return is a fixed destination, so hiding them would be noise rather than difficulty. The `CLEAR` pad label is likewise safe — a dirty table is public knowledge, so relabelling it gives nothing away about the order you are carrying.
+
+`EAT_MS` (22000) is the lever that decides whether the floor breathes or clogs. Measured with a bot playing 100 seconds of the real shift: the floor settles at **3–4 tables in service with 3–4 eating and about 1 waiting to be cleared**, 14 delivered and 10 cleared, no lives lost. So roughly half the floor is tied up mid-meal at steady state, which is the intended squeeze. Note the consequence at full rush: eight tables with 22-second meals cannot absorb 17.6 orders/min, so `spawnTicket` simply finds no idle table and skips. The game self-throttles rather than punishing — nothing is lost, there are just fewer orders. Turn `EAT_MS` down if the floor feels too tied up.
+
+The tutorial gained a **Clear the table** lesson (step 5 of 6). Early steps set `bussingEnabled = false` so they keep the old straight-back-to-idle path and can re-stage an order at the table their text names; the bussing lesson turns it on, serves a table immediately and shortens that one meal to 3.2s, because the lesson is about the clearing rather than the waiting. The practice round runs with bussing on, so it rehearses the real loop.
 
 ## Carry-two — unimplemented, no longer load-bearing
 
