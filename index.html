@@ -142,6 +142,11 @@
     max-width: 460px; text-align: center; font-size: 13px;
     color: #E0A72E; line-height: 1.45; margin: 12px 0 0;
   }
+  #avatarCredit {
+    max-width: 520px; text-align: center; font-size: 11px;
+    opacity: 0.55; line-height: 1.5; margin: 14px 0 0;
+  }
+  #avatarCredit a { color: inherit; }
   #avatarActions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 18px 0 4px; }
   #avatarActions .cta { margin-top: 0; }
   .hidden { display: none !important; }
@@ -197,6 +202,11 @@
       <button class="cta ghost" id="avatarRandom">Surprise me</button>
       <button class="cta ghost" id="avatarCancel">Back</button>
     </div>
+    <p id="avatarCredit">
+      Avatars by <a href="https://www.dicebear.com/styles/avataaars/" target="_blank" rel="noopener">DiceBear</a> —
+      a remix of <a href="https://avataaars.com/" target="_blank" rel="noopener">Avataaars</a> by Pablo Stanley,
+      free for personal and commercial use.
+    </p>
   </div>
 </div>
 
@@ -299,20 +309,47 @@
   // nothing else changes.
   //
   // AVATAR_STYLE and the option keys/values below map to DiceBear's schema for
-  // that style. If a value stops matching their docs the preview simply shows
-  // the style default, which is visible immediately in the picker.
-  const AVATAR_API = 'https://api.dicebear.com/9.x';
+  // that style. Two traps, both verified against the live API rather than the
+  // docs, because DiceBear 10 answers 200 for an option name it does not know
+  // and silently serves the style default — a typo here is invisible in the
+  // network tab and only shows up as a row of identical swatches.
+  //
+  //   1. v10 renamed the component selectors to <component>Variant, so 9.x's
+  //      `top`/`clothing`/`facialHair` are now `topVariant`/`clothesVariant`/
+  //      `facialHairVariant`. The colour keys did not change.
+  //   2. Optional components are gated by a probability that defaults to 10,
+  //      so a chosen beard rendered only one seed in ten. See avatarUrl.
+  //
+  // `radius` was dropped in v10 and is no longer sent; the swatch CSS and the
+  // canvas clip in drawPlayer both round the token already.
+  const AVATAR_API = 'https://api.dicebear.com/10.x';
   const AVATAR_STYLE = 'avataaars';
   const AVATAR_OPTIONS = [
-    { key: 'skinColor',    label: 'Skin',        values: ['f2d3b1','edb98a','d08b5b','ae5d29','614335'] },
-    { key: 'top',          label: 'Hair',        values: ['shortFlat','shortCurly','theCaesar','longButNotTooLong','bigHair','curly','hijab','turban'] },
-    { key: 'hairColor',    label: 'Hair colour', values: ['2c1b18','724133','a55728','b58143','c93305','e8e1e1'] },
-    { key: 'clothing',     label: 'Uniform',     values: ['blazerAndShirt','shirtCrewNeck','collarAndSweater','shirtVNeck','overall'] },
-    { key: 'clothesColor', label: 'Uniform colour', values: ['2f6f6b','c1443a','e0a72e','3c4f5c','262e33'] },
-    { key: 'facialHair',   label: 'Facial hair', values: ['','beardLight','beardMedium','moustacheFancy'] }
+    { key: 'skinColor',         label: 'Skin',        values: ['f2d3b1','edb98a','d08b5b','ae5d29','614335'] },
+    { key: 'topVariant',        label: 'Hair',        values: ['shortFlat','shortCurly','theCaesar','longButNotTooLong','bigHair','curly','hijab','turban'] },
+    { key: 'hairColor',         label: 'Hair colour', values: ['2c1b18','724133','a55728','b58143','c93305','e8e1e1'] },
+    { key: 'clothesVariant',    label: 'Uniform',     values: ['blazerAndShirt','shirtCrewNeck','collarAndSweater','shirtVNeck','overall'] },
+    { key: 'clothesColor',      label: 'Uniform colour', values: ['2f6f6b','c1443a','e0a72e','3c4f5c','262e33'] },
+    { key: 'facialHairVariant', label: 'Facial hair', values: ['','beardLight','beardMedium','moustacheFancy'] }
   ];
 
-  let avatarSel = { seed: 'rush-hour', opts: {} };
+  // Opening on an explicit selection rather than "whatever the seed rolled"
+  // keeps every row meaningful: the seed's own top happened to be a covered
+  // one, which left all six Hair colour swatches identical until you picked
+  // a hairstyle first.
+  //
+  // eyes/mouth are pinned for the same reason and are deliberately not picker
+  // rows — the seed rolled xDizzy, and X'd-out eyes read as knocked out
+  // rather than as someone about to take your order.
+  const AVATAR_DEFAULTS = {
+    skinColor: 'edb98a', topVariant: 'shortFlat', hairColor: '2c1b18',
+    clothesVariant: 'blazerAndShirt', clothesColor: '2f6f6b',
+    eyesVariant: 'happy', mouthVariant: 'smile'
+  };
+  // 9.x saves carry the old key names; map them so an existing pick survives.
+  const AVATAR_KEY_ALIASES = { top: 'topVariant', clothing: 'clothesVariant', facialHair: 'facialHairVariant' };
+
+  let avatarSel = { seed: 'rush-hour', opts: Object.assign({}, AVATAR_DEFAULTS) };
   let avatarImg = null;      // rasterised avatar, drawn each frame
   let avatarObjUrl = null;
 
@@ -321,8 +358,12 @@
     p.set('seed', avatarSel.seed);
     const merged = Object.assign({}, avatarSel.opts, overrides || {});
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
+    // facialHair is an optional component: naming a variant is not enough,
+    // the probability has to be forced or DiceBear rolls it per seed (default
+    // 10%). Pinning it to 100/0 also makes "none" mean clean-shaven rather
+    // than another roll of the dice.
+    p.set('facialHairProbability', merged.facialHairVariant ? '100' : '0');
     p.set('backgroundColor', 'E8E2D5');
-    p.set('radius', '50');
     return AVATAR_API + '/' + AVATAR_STYLE + '/svg?' + p.toString();
   }
 
@@ -341,7 +382,12 @@
   function loadSavedAvatar(){
     try {
       const sel = localStorage.getItem('rushhour.avatarSel');
-      if (sel) avatarSel = JSON.parse(sel);
+      if (sel) {
+        const saved = JSON.parse(sel);
+        const opts = {};
+        for (const [k, v] of Object.entries(saved.opts || {})) opts[AVATAR_KEY_ALIASES[k] || k] = v;
+        avatarSel = { seed: saved.seed || 'rush-hour', opts: Object.assign({}, AVATAR_DEFAULTS, opts) };
+      }
       const svg = localStorage.getItem('rushhour.avatarSvg');
       if (svg) applyAvatarSvg(svg);
     } catch (e) { /* private mode or bad JSON — defaults are fine */ }

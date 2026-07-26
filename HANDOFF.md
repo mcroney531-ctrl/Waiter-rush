@@ -127,13 +127,17 @@ Chosen deliberately over Avataaars/Big Heads/Personas because those ship as Reac
 
 ## Unfinished and unverified — start here
 
-**1. The DiceBear option keys and values are unverified.** The previous session's environment could not reach `api.dicebear.com` (egress policy), so the picker shipped without anyone seeing it render. The new environment should have `api.dicebear.com` and `www.dicebear.com` allowed.
+**1. DiceBear options — verified and fixed.** Done. `api.dicebear.com` is reachable from the current environment, and the picker was checked against the live API rather than the docs. Three real faults were found and corrected:
 
-**First job: confirm `AVATAR_OPTIONS` matches DiceBear's real schema for the `avataaars` style, and that `9.x` is still current.** The tell is whether the swatches within a row look different from each other — if a row's options all look identical, that key or its values are wrong and the API is quietly serving the style default. Fix by editing the array; the picker builds itself from it, so it is a data change.
+- **`9.x` was not current.** DiceBear 10 is (`@dicebear/styles@10.2.0`, `@dicebear/core@10.3.0`; the old `@dicebear/collection` package was renamed to `@dicebear/styles` at v10, which is why npm's `collection` still tops out at 9.4.x and looks current). `AVATAR_API` now points at `10.x`.
+- **v10 renamed the component selectors** to `<component>Variant`, so `top`/`clothing`/`facialHair` became `topVariant`/`clothesVariant`/`facialHairVariant`. Colour keys were unchanged.
+- **Optional components are gated by a probability defaulting to 10**, so a chosen beard rendered only one seed in ten. `avatarUrl` now pins `facialHairProbability` to 100 or 0.
 
-What *was* verified, with the service blocked at the network layer: the picker builds six rows and 33 swatches, request URLs are well formed, a failed save warns without breaking, the game stays playable on the fallback circle, and the full render path works — cache → rasterise → circular token — confirmed by seeding `localStorage` with a known SVG and checking the pixel painted at the player's position matched that SVG's face colour.
+Two things worth knowing before touching this again. **v10 does not validate option names** — an unknown one returns 200 and the style default, so a typo is invisible in the network tab and only shows as a row of identical swatches. 9.x returned 400 for the same mistake; that safety net is gone, so changes here need a rendered check, not a status-code check. And **`radius` was dropped in v10**; the swatch CSS and the canvas clip already round the token, so it is simply no longer sent.
 
-**2. Licensing.** DiceBear's core is MIT but individual art styles carry their own licences and several are CC BY 4.0, requiring attribution. Confirm the licence for whichever style is settled on and add a credit line before this is submitted publicly.
+Verified by rendering: all six rows now produce fully distinct swatches (5/5, 8/8, 6/6, 5/5, 5/5, 4/4, hashed from the bytes the API returned for each URL the page built). Also confirmed still true: no request is made if the picker is never opened, an unreachable API warns and leaves the game playable on the fallback circle, and a 9.x-era `localStorage` selection migrates to the v10 key names.
+
+**2. Licensing — done.** `avataaars` is not CC BY. DiceBear's own style definition declares it "Free for personal and commercial use", a remix of [Avataaars](https://avataaars.com/) by Pablo Stanley. A credit line to that effect now sits at the bottom of the picker.
 
 **3. Every swatch click re-requests all 33 previews**, since each shows the current selection with one option swapped. The browser caches identical URLs, but first open will visibly populate on a slow connection.
 
@@ -168,8 +172,8 @@ When something is genuinely ambiguous, ask with a recommendation attached rather
 
 ## Immediate next steps
 
-1. Verify the DiceBear options render correctly now that the API is reachable; fix `AVATAR_OPTIONS` if not. Screenshot the picker and the in-game token for Rone.
-2. Confirm the style's licence and add attribution.
-3. Build carry-two, then retune the spawn floor and patience curve together against it.
+1. ~~Verify the DiceBear options; confirm the licence and attribute.~~ Done — see items 1 and 2 above.
+2. **Build carry-two, then retune the spawn floor and patience curve together against it.** This is now the top of the list and still gates every other tuning decision; read "The open problem" above before starting.
+3. Smaller things, in rough order of how much they cost to leave: the scoring speed bonus is always 20 and rewards nothing; the HUD label reads "Tables lost" while the dots deplete as lives remaining; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
 
 Rone was also about to generate art in DALL·E. The advice given, still standing: with the avatar handled by DiceBear, spend that effort on the room — tables, counter, food icons, floor — where per-asset style consistency matters far less than it does for character parts.
