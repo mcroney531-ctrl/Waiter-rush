@@ -37,7 +37,7 @@ One file, `index.html`, about 1150 lines: styles, then markup, then the whole ga
 - `DROP` — the drop-off pad geometry
 - `resetGame` / `updateHUD`
 - **Avatar section** — local avatar generation and the picker
-- Spawning, input, game logic (`tryPickup`, `tryDeliver`, `checkAutoInteract`)
+- Spawning, input, game logic (`tryPickup`/`inPickupZone`, `tryDeliver`, `tryBusPickup`/`tryBusDrop`, `checkAutoInteract`)
 - **Tutorial section** — `TUTORIAL_STEPS` and its step machine
 - `update(dt)` — the single update path for everything
 - Drawing functions, then `render()`
@@ -105,6 +105,16 @@ The underlying cause is worth knowing: **a near-optimal bot's delivery time bare
 At 900ms/8s good play spans 66-100 and splits across the top two tiers — measured 15 big / 1 good over 16 deliveries at the opening, and 17 big / 9 good over 26 at full rush, the spread widening as the queue builds. A slower player still sees the whole range down to nothing. Score reconciles exactly against `sum(100 + tip) + cleared*40` in both runs.
 
 Tiers are `TIP_BIG` (0.85) and `TIP_GOOD` (0.5) of the tip fraction, shown as a floater rising off the table — label, total, and the wait in seconds, so the player can connect the reward to the cause without reading a manual. Tips are mentioned in the deliver lesson's success line and in the pre-shift blurb; a scoring rule nobody is told about teaches nothing.
+
+## The pass, and money
+
+**Pickup needs a marked pad.** Touching the counter anywhere used to hand you an order, so brushing it while running past gave you a ticket you had never looked at — which quietly deletes the memory mechanic, since you cannot hold a number in your head that you never saw. `PICKUP` is a pad at `x: 56, y: 118`, directly under the front ticket slot, and `tryPickup` gates on `inPickupZone()`. The front ticket is marked **NEXT UP**; that does not leak anything protected, because the ticket is legible at the counter anyway and the standing rule is about not revealing the table *once you have walked away with it*.
+
+The pass is at the left end where the queue starts, which makes trips asymmetric. Measured per-table mean waits over a bot run: 1.58s to the nearest table, 2.50s to the farthest — a spread of under a second, so the asymmetry is texture rather than unfairness. It also *improved* the tip gradient, since fixing the pickup point lengthened trips slightly: the tier split went from 15 big / 1 good to 8 big / 6 good over comparable runs.
+
+**Score is money, held in cents.** `DELIVERY_BASE_C` (500) is what a table leaves regardless, `TIP_MAX_C` (1000) is the speed-earned part, and `BUS_PAY_C` (200) pays for clearing so bussing is not unpaid work. A table is therefore worth $5.00-$15.00 and a 100-second bot shift earns about **$212**, which is a believable night. Integer cents rather than a running float means a shift total cannot drift; `money()` is the single place cents become a string, and everything on screen goes through it.
+
+One testing note worth keeping: reconciling score against `sum(base + tip) + cleared * BUS_PAY_C` will be off by a cent or two if the probe records `Math.round(waited)`, because the game computes the tip from the unrounded value. Record the raw wait and it matches exactly.
 
 ## Bussing (eat / clear cycle)
 
