@@ -305,6 +305,33 @@
   const EAT_MS = 22000;
   const BUS_SCORE = 40;
 
+  // Tips scale with how long the guest waited from their order appearing at
+  // the counter to it landing on their table.
+  //
+  // Measured against patience-remaining instead, which is the obvious version,
+  // the mechanic would be dead: at the two-minute opening a leisurely 10s
+  // delivery still leaves 92% of the meter, so everything reads as fast, while
+  // the identical delivery at full rush (an 18s window) leaves 44% and reads
+  // as mediocre. Same play, opposite verdict, and no gradient at all in the
+  // part of the shift where players spend most of their time. Absolute wait is
+  // independent of the ramp and is also what a guest actually experiences.
+  //
+  // These thresholds were fitted to measured play, not guessed. A bot playing
+  // near-optimally delivers in 1.7-5.4s, and that barely changes at full rush
+  // because bussing caps how fast orders can arrive, so the queue rarely
+  // builds. Earlier 6s/40s and 3s/25s pairs both put every one of those
+  // deliveries at the maximum — a flat top with nothing left to chase. At
+  // 2s/18s good play spans 79-100 and splits across the top two tiers, while a
+  // slower player sees the whole range down to nothing.
+  //
+  // Clearing tables is deliberately outside this; bussing keeps its flat
+  // BUS_SCORE, so tips are purely about how long the guest waited to be fed.
+  const TIP_FULL_MS = 2000;    // at or under this, the whole tip
+  const TIP_NONE_MS = 18000;   // at or over this, nothing
+  const TIP_MAX = 100;         // on top of the flat 100 for the delivery itself
+  const TIP_BIG = 0.85;        // fraction at which it reads as a big tip
+  const TIP_GOOD = 0.5;
+
   const lerp = (a, b, t) => a + (b - a) * t;
   const rushProgress = () => Math.min(1, elapsed / RUSH_PEAK_MS);
 
@@ -338,6 +365,7 @@
     carryCapacity = 1;
     deliveries = 0;
     cleared = 0;
+    floaters = [];
     score = 0;
     lives = 3;
     spawnTimer = 900;
@@ -601,6 +629,51 @@
            Math.abs(player.y - (t.y + DROP.dy)) <= DROP.h/2 + pad;
   }
 
+  // 1 at TIP_FULL_MS or faster, 0 at TIP_NONE_MS or slower, linear between.
+  function tipFraction(waitedMs){
+    const span = TIP_NONE_MS - TIP_FULL_MS;
+    return Math.max(0, Math.min(1, 1 - (waitedMs - TIP_FULL_MS) / span));
+  }
+
+  // Transient text that rises off the table. The tip is the only feedback the
+  // player gets on their own speed, so it has to be legible at a glance
+  // without needing to read a number.
+  let floaters = [];
+  function tipFloater(x, y, tip, waitedMs){
+    const frac = tipFraction(waitedMs);
+    let label, colour;
+    if (frac >= TIP_BIG)       { label = 'BIG TIP';  colour = COLORS.mustard; }
+    else if (frac >= TIP_GOOD) { label = 'GOOD TIP'; colour = COLORS.happy; }
+    else if (tip > 0)          { label = 'TIP';      colour = COLORS.text; }
+    else                       { label = 'NO TIP';   colour = COLORS.angry; }
+    floaters.push({
+      x, y, colour,
+      top: label,
+      bottom: '+' + (100 + tip),
+      secs: (waitedMs/1000).toFixed(1) + 's',
+      big: frac >= TIP_BIG,
+      life: 1500, max: 1500
+    });
+  }
+
+  function drawFloaters(){
+    for (const f of floaters){
+      const k = 1 - f.life / f.max;          // 0 at spawn, 1 at expiry
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, f.life / 420);   // hold, then fade out
+      ctx.textAlign = 'center';
+      ctx.fillStyle = f.colour;
+      ctx.font = '900 ' + (f.big ? 13 : 11) + 'px DM Sans, sans-serif';
+      ctx.fillText(f.top, f.x, f.y - k * 26);
+      ctx.font = '900 ' + (f.big ? 20 : 17) + 'px DM Sans, sans-serif';
+      ctx.fillText(f.bottom, f.x, f.y - k * 26 + (f.big ? 19 : 17));
+      ctx.globalAlpha *= 0.6;
+      ctx.font = '700 10px DM Sans, sans-serif';
+      ctx.fillText(f.secs, f.x, f.y - k * 26 + (f.big ? 33 : 30));
+      ctx.restore();
+    }
+  }
+
   function inBusZone(){
     const pad = player.size * 0.4;
     return Math.abs(player.x - BUS.x) <= BUS.w/2 + pad &&
@@ -614,7 +687,10 @@
     if (tickets.length === 0) return;
     const t = tickets[0];
     tickets.shift();
-    carrying = { type: 'order', tableId: t.tableId, icon: t.icon, pickedAt: performance.now() };
+    // orderedAt is when the ticket appeared, not when it was picked up: time
+    // spent sitting in the queue is time the guest waited, so it counts.
+    carrying = { type: 'order', tableId: t.tableId, icon: t.icon,
+                 pickedAt: performance.now(), orderedAt: t.spawnTime };
   }
 
   // Dishes share the single carry slot with orders on purpose: every trip is a
@@ -650,8 +726,10 @@
       table.happyTimer = 1200;
       table.ticketId = null;
       table.patience = 1;
-      const speedBonus = Math.max(0, Math.round((table.patience) * 20));
-      score += 100 + speedBonus;
+      const waited = performance.now() - carrying.orderedAt;
+      const tip = Math.round(tipFraction(waited) * TIP_MAX);
+      score += 100 + tip;
+      tipFloater(table.x, table.y - 62, tip, waited);
       deliveries++;
       carrying = null;
       updateHUD();
@@ -716,7 +794,7 @@
         : 'Step onto the dashed pad in front of the table to hand the order over.',
       enter(){ drainEnabled = false; bussingEnabled = false; },
       done(){ return !carrying; },
-      success: () => 'Delivered. That is a full loop.'
+      success: () => 'Delivered. That is a full loop — and the quicker it lands, the bigger the tip.'
     },
     {
       hint: 'Watch their patience',
@@ -817,7 +895,7 @@
     const overlay = document.getElementById('overlay');
     overlay.innerHTML = `
       <h1>Training Done</h1>
-      <p>You know the floor now. The real shift ramps up — orders arrive faster the longer you last, tables lose patience quicker, and every table that walks costs one of three lives.</p>
+      <p>You know the floor now. The real shift ramps up — orders arrive faster the longer you last, tables lose patience quicker, and every table that walks costs one of three lives. Tips scale with how long the guest waited, so speed is worth real money.</p>
       <button class="cta" id="startBtn">Start the Shift</button>
     `;
     overlay.classList.remove('hidden');
@@ -906,6 +984,9 @@
       }
       if (t.bump){ t.bump -= dt; if (t.bump < 0) t.bump = 0; }
     }
+
+    for (const f of floaters) f.life -= dt;
+    if (floaters.some(f => f.life <= 0)) floaters = floaters.filter(f => f.life > 0);
   }
 
   function endGame(){
@@ -1316,6 +1397,7 @@
     drawBusStation();
     tables.forEach(drawTable);
     drawPlayer();
+    drawFloaters();
     drawCounter();
     drawTutorialBanner();
   }

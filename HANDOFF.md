@@ -74,7 +74,23 @@ Verified live rather than derived: at shift open a fresh table reads 119.7s and 
 
 **Traversal.** Average one-way trip from counter to a table is **1.37s**; round trip **2.74s**, which is where the 21.9/min ceiling comes from. That ceiling assumes flawless play with zero hesitation, so treat it as a hard wall rather than a target.
 
-**Scoring.** A delivery scores exactly **120** — `100 + speedBonus`, where `speedBonus` reads `table.patience` on the line *after* it has been reset to `1`, so it is always 20. The speed bonus rewards nothing. Still untouched because it is a design decision, not just a bug: it needs a real definition of what "fast" means. Note this got *worse* to leave alone now that windows open at two minutes — there is much more room for a meaningful speed bonus than there was at nine seconds.
+**Scoring.** A delivery scores `100 + tip`, where the tip is up to another 100 and scales with **how long the guest waited from their order appearing at the counter to it landing on their table**. Clearing a table is a separate flat `BUS_SCORE` (40) and deliberately does not affect the tip.
+
+The old bug is fixed: `speedBonus` used to read `table.patience` on the line *after* it was reset to 1, so it was always exactly 20 and rewarded nothing.
+
+**Measuring absolute wait rather than patience remaining is the load-bearing decision.** Patience-remaining is the obvious version and it does not work: at the two-minute opening a leisurely 10s delivery still leaves 92% of the meter, so everything reads as fast, while the identical delivery at full rush (an 18s window) leaves 44% and reads as mediocre. Same play, opposite verdict, and no gradient at all in the part of the shift where players spend most of their time. Absolute wait is independent of the ramp and is also what a guest actually experiences.
+
+`TIP_FULL_MS` (2000) and `TIP_NONE_MS` (18000) were **fitted to measured play, not guessed**, and this took three attempts:
+
+| curve | good play | slower player |
+| --- | --- | --- |
+| 6s / 40s | all maximum | some gradient |
+| 3s / 25s | all maximum, 89-100 | 14-86 |
+| **2s / 18s** | **79-100, splits BIG/GOOD** | **0-75, full range** |
+
+The reason the first two failed is worth remembering: **a bot playing near-optimally delivers in 1.7-5.4s, and that barely changes at full rush**, because bussing caps how fast orders can arrive so the queue rarely builds. Any curve whose top threshold sits above ~6s therefore gives a competent player a flat maximum with nothing left to chase. Verified in play at 2s/18s: 12 BIG and 2 GOOD over 14 deliveries, and score reconciles exactly against `sum(100 + tip) + cleared*40`.
+
+Tiers are `TIP_BIG` (0.85) and `TIP_GOOD` (0.5) of the tip fraction, shown as a floater rising off the table — label, total, and the wait in seconds, so the player can connect the reward to the cause without reading a manual. Tips are mentioned in the deliver lesson's success line and in the pre-shift blurb; a scoring rule nobody is told about teaches nothing.
 
 ## Bussing (eat / clear cycle)
 
@@ -191,6 +207,6 @@ When something is genuinely ambiguous, ask with a recommendation attached rather
 2. **Play it and re-tune.** The shift was slowed a long way — two minutes on a fresh table at open, ramping over ten minutes — on Rone's call that it was too hard out of the gate. The numbers are measured but nobody has actually played the new curve, and the four constants at the top of the difficulty block are meant to be moved. The opening may now be too slack; that is a feel question, not an arithmetic one.
 3. **Rone wants to revisit the picker flow** — the picker works and is verified, but where it sits in the title-screen journey is up for change.
 4. Carry-two, whenever it is wanted; see the section above for why it is no longer urgent.
-5. Smaller things, in rough order of how much they cost to leave: the scoring speed bonus is always 20 and rewards nothing (and there is much more room for a real one now that windows open at two minutes); the HUD label reads "Tables lost" while the dots deplete as lives remaining; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
+5. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×600 scaled by CSS rather than a true responsive layout; a wrong delivery costs nothing beyond a visual bump, which is deliberate but unexamined; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
 
 Rone was also about to generate art in DALL·E. The advice given, still standing: with the avatar handled by DiceBear, spend that effort on the room — tables, counter, food icons, floor — where per-asset style consistency matters far less than it does for character parts.
