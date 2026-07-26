@@ -339,8 +339,12 @@
 
     checkAutoInteract();
 
-    // patience drain
-    const drainRate = 0.00011 + Math.min(0.00009, elapsed/1000/9000);
+    // Patience drain. A fresh table gives the player ~9s at the top of the
+    // shift, tightening toward ~5s once the rush peaks. RUSH_PEAK_MS is how
+    // long that squeeze takes to arrive — turn it down for a meaner shift.
+    const RUSH_PEAK_MS = 240000;
+    const rush = Math.min(1, elapsed / RUSH_PEAK_MS);
+    const drainRate = 0.00011 + 0.00009 * rush;
     for (const t of tables){
       if (t.state === 'waiting'){
         t.patience -= drainRate * dt;
