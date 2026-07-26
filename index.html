@@ -21,7 +21,13 @@
   }
   #wrap {
     position: relative;
-    width: 100vw; height: 100vh;
+    width: 100vw;
+    /* 100vh on a phone means the viewport *without* the browser's URL bar, so
+       anything pinned to the bottom of it sits below what you can actually
+       see — which cut the bottom off the d-pad. dvh tracks the visible area.
+       The vh line stays first as a fallback for browsers without dvh. */
+    height: 100vh;
+    height: 100dvh;
     display: flex; align-items: center; justify-content: center;
   }
   canvas {
@@ -47,7 +53,9 @@
   .life-dot.lost { background: rgba(255,255,255,0.15); }
 
   #controls-mobile {
-    position: absolute; bottom: 22px; left: 0; right: 0;
+    /* safe-area keeps the pad clear of the home indicator on notched phones */
+    position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    left: 0; right: 0;
     display: none;
     justify-content: space-between;
     padding: 0 20px;
@@ -103,7 +111,8 @@
   button.cta.ghost:active { transform: translateY(2px); box-shadow: none; }
 
   #skipBtn {
-    position: absolute; bottom: 22px; right: 20px; z-index: 12;
+    position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    right: 20px; z-index: 12;
     font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 11px;
     letter-spacing: 1.5px; text-transform: uppercase;
     background: rgba(244,238,219,0.12); color: #F4EEDB;
