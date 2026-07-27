@@ -14,27 +14,16 @@ The person you are working with is Rone. Working style notes are at the bottom �
 
 Live at **https://mcroney531-ctrl.github.io/Waiter-rush/**, served by GitHub Pages from `main` at the repository root. Deploys on push to `main` — there is no build step, so a push is a deploy, usually live inside a minute.
 
-Six commits, all on `main`:
-
-```
-2427222 Add a DiceBear-backed waiter avatar picker
-73bebd6 Add a live seconds countdown beside each table meter
-b4caf06 Move delivery onto a marked drop-off pad
-986cd49 Add a gated tutorial with a practice round
-8e20700 Fix patience drain ramp saturating instantly
-4960960 Add Rush Hour waiter game as deployable static site
-```
-
-The commit messages are deliberately detailed and carry the reasoning and measurements behind each change. `git log` is a real source, not ceremony.
+Everything is on `main`; `git log --oneline` is the current list and this document does not try to mirror it. The commit messages are deliberately detailed and carry the reasoning and measurements behind each change. **`git log` is a real source, not ceremony** — if a number in here disagrees with the code, the commit that changed it says why.
 
 **Repo housekeeping still outstanding:** the repository's default branch is still `claude/new-session-e86btx`, not `main`. GitHub set it to the first branch pushed to an empty repo and pushing `main` later did not change it. It does not affect the Pages deploy, which targets `main` explicitly, but it means the repo landing page and fresh clones show the wrong branch, and new PRs default to the wrong base. It is a two-click fix in Settings → General. `netlify.toml` is present and valid but unused, since hosting went to Pages.
 
 ## How the code is laid out
 
-One file, `index.html`, about 1150 lines: styles, then markup, then the whole game in a single IIFE. Rough order inside the script:
+One file, `index.html`, about 1830 lines: styles, then markup, then the whole game in a single IIFE. Rough order inside the script:
 
-- Colour palette and layout constants
-- `DROP` — the drop-off pad geometry
+- Colour palette and layout constants, then the ramp/tip/flow/penalty constants as one named block
+- `PASSES` (counter pickup pads), `BUS_STATIONS` (dish returns), and the per-table drop pad geometry
 - `resetGame` / `updateHUD`
 - **Avatar section** — local avatar generation and the picker
 - Spawning, input, game logic (`tryPickup`/`inPickupZone`, `tryDeliver`, `tryBusPickup`/`tryBusDrop`, `checkAutoInteract`)
@@ -85,7 +74,7 @@ Note the d-pad still overlays the canvas on short screens (7px on an iPhone SE, 
 
 **The d-pad could not move diagonally.** `bindHold` set both axes per button, so pressing Up ran `touchDir.x = 0` and wiped the horizontal. Touch players got four directions where the keyboard got eight, which costs about 34% extra distance on a diagonal trip — the d-pad felt sluggish for a reason unrelated to speed. Each button now owns one axis. Verified with two-finger input on the real on-screen buttons in an emulated touch device: holding Up+Right yields `{dx: 0.7071, dy: -0.7071}` and the player actually moves on both axes. The combined vector is also clamped to ±1 now, since keyboard and d-pad both feed it and could otherwise sum to 2 and defeat the diagonal correction.
 
-**Scoring.** A delivery scores `100 + tip`, where the tip is up to another 100 and scales with **how long the guest waited from their order appearing at the counter to it landing on their table**. Clearing a table is a separate flat `BUS_SCORE` (40) and deliberately does not affect the tip.
+**Scoring.** A delivery pays `DELIVERY_BASE_C + tip`, where the tip scales with **how long the guest waited from their order appearing at the counter to it landing on their table**. Clearing a table pays a separate flat `BUS_PAY_C` and deliberately does not affect the tip. Values are in the money section below; the numbers quoted in this section predate the switch to cents and are given as fractions of the tip rather than absolutes.
 
 The old bug is fixed: `speedBonus` used to read `table.patience` on the line *after* it was reset to 1, so it was always exactly 20 and rewarded nothing.
 
@@ -102,7 +91,9 @@ Curves that were tried and failed, all for the same reason — every delivery a 
 
 The underlying cause is worth knowing: **a near-optimal bot's delivery time barely changes between the shift opening and full rush**, because bussing caps how fast orders can arrive so the queue rarely builds. Speed of legs, not queue pressure, sets the distribution — which is exactly why `PLAYER_SPEED` and these thresholds are coupled. If you change the speed again, re-run the bot and refit.
 
-At 900ms/8s good play spans 66-100 and splits across the top two tiers — measured 15 big / 1 good over 16 deliveries at the opening, and 17 big / 9 good over 26 at full rush, the spread widening as the queue builds. A slower player still sees the whole range down to nothing. Score reconciles exactly against `sum(100 + tip) + cleared*40` in both runs.
+At 900ms/8s good play splits across the top two tiers — measured 15 big / 1 good over 16 deliveries at the opening, and 17 big / 9 good over 26 at full rush, the spread widening as the queue builds. A slower player still sees the whole range down to nothing. Score reconciles exactly against `sum(base + tip) + cleared * BUS_PAY_C` in both runs.
+
+**These tier numbers come from the camping bot and are an upper bound**, for the reason set out under flow tuning below. Do not read them as what a person will see.
 
 Tiers are `TIP_BIG` (0.85) and `TIP_GOOD` (0.5) of the tip fraction, shown as a floater rising off the table — label, total, and the wait in seconds, so the player can connect the reward to the cause without reading a manual. Tips are mentioned in the deliver lesson's success line and in the pre-shift blurb; a scoring rule nobody is told about teaches nothing.
 
@@ -125,7 +116,7 @@ The left/right bias is essentially gone. The remaining variation is front row ve
 
 **One thing it cost:** average trips got shorter, which compressed the tip gradient toward the top — the tier split went from 8 big / 6 good to 13 big / 3 good. Tip values still span, so it is not the flat maximum this curve keeps collapsing into. If it wants opening up, lower `TIP_FULL_MS` and re-run the bot rather than guessing.
 
-**Score is money, held in cents.** `DELIVERY_BASE_C` (500) is what a table leaves regardless, `TIP_MAX_C` (1000) is the speed-earned part, and `BUS_PAY_C` (200) pays for clearing so bussing is not unpaid work. A table is therefore worth $5.00-$15.00 and a 100-second bot shift earns about **$212**, which is a believable night. Integer cents rather than a running float means a shift total cannot drift; `money()` is the single place cents become a string, and everything on screen goes through it.
+**Score is money, held in cents.** `DELIVERY_BASE_C` (500) is what a table leaves regardless, `TIP_MAX_C` (1000) is the speed-earned part, and `BUS_PAY_C` (200) pays for clearing so bussing is not unpaid work. A table is therefore worth $5.00-$15.00, doubling its tip while flow is lit. A 100-second bot shift earned about **$212** when that was measured; with carry-two, waves and flow all in, peak-rush bot runs now clear **$600-$830** over the same window. Per table the numbers still read plainly, but the running total has not been looked at as a score — see the open items. Integer cents rather than a running float means a shift total cannot drift; `money()` is the single place cents become a string, and everything on screen goes through it.
 
 One testing note worth keeping: reconciling score against `sum(base + tip) + cleared * BUS_PAY_C` will be off by a cent or two if the probe records `Math.round(waited)`, because the game computes the tip from the unrounded value. Record the raw wait and it matches exactly.
 
@@ -159,9 +150,9 @@ Carried dishes never fade. The fade exists to force you to remember a table numb
 
 The tutorial gained a **Clear the table** lesson (step 5 of 6). Early steps set `bussingEnabled = false` so they keep the old straight-back-to-idle path and can re-stage an order at the table their text names; the bussing lesson turns it on, serves a table immediately and shortens that one meal to 3.2s, because the lesson is about the clearing rather than the waiting. The practice round runs with bussing on, so it rehearses the real loop.
 
-## Approved design, not yet built
+## The approved design — built, measured, live
 
-Rone reviewed the build and approved the following to answer one question: **the game is currently just running back and forth.** The diagnosis that framed it is worth keeping, because it explains why these five and not others:
+Rone reviewed the build and approved a set of changes answering one question: **the game is currently just running back and forth.** The diagnosis is worth keeping, because it explains why these and not others:
 
 > There is exactly one task type, you can hold exactly one of it, and its destination is decided the moment you pick it up. That is the structural definition of ping-pong — there is never a moment where two things are worth doing and you must choose. Memory is the only real skill, and routing barely matters because you can only carry one plate.
 
@@ -169,55 +160,70 @@ Three levers break that: more than one thing **in hand**, more than one **kind o
 
 **Explicitly declined: table interrupts** (a seated table flagging you down for a refill, check-back or the bill). It was recommended and turned down — do not re-propose it without new reason.
 
-### 1. Carry two, on a tray
+### 1. Carry two, on a tray — built
 
-Finally implements `carryCapacity`, which has flipped to 2 after six deliveries since the first build while **nothing reads it**. Replace `carrying` with an array capped at capacity; auto-deliver whichever carried order matches the pad you are standing on; draw two plates above the player with the fade rule applied per plate.
+`carrying` is gone. `carried` is an array of `{type, tableId, icon, pickedAt, orderedAt}` capped at `carryCapacity`, which starts at 1 and flips to `CARRY_MAX` (2) at `CARRY_UNLOCK` (6) deliveries — the flip is now read by the pickup path, so it finally does something. `tryDeliver` walks the carried orders and hands over whichever one matches the pad you are standing on.
 
-The real gain is not logistics, it is that you hold **two table numbers in your head instead of one**, so this deepens the core hook rather than sitting beside it.
+The plates draw side by side above the player, **each fading on its own `pickedAt` timer**, so the first one you picked up goes blank while the second is still legible. A faded plate leaves a mustard dot: still carrying something, without saying what. That is the point — the real gain is that you hold **two table numbers in your head instead of one**, so this deepens the core hook rather than sitting beside it.
 
-**It invalidates every tuned number** — traversal, the tip thresholds, the spawn floor. Build it before retuning anything else, and expect a fourth tip refit after it.
+`BOTH HANDS FREE` announces the unlock. Both that banner and the flow flourish draw at `FLOOR_TOP - 56` and above, **on the bench, never below `FLOOR_TOP`** — the band under it is where the table number plaques hang, and a banner there covers the numbers at the exact moment the game is telling you to memorise two of them.
 
-### 2. Party sizes
+### 2. Party sizes — on hold
 
-Two-tops, four-tops and six-tops. Bigger parties tip more, eat longer and leave more dishes to clear. Cheap logically, but **it needs an art decision**: the board is painted with eight identical tables, so party size cannot be shown by making a table bigger. It needs a drawn marker — guest count, a badge by the number plate, or something on the plates themselves. Settle that with Rone before building.
+Two-tops, four-tops and six-tops: bigger parties tip more, eat longer, leave more dishes. Cheap logically, but **it needs an art decision** and Rone chose to hold it there. The board is painted with eight identical tables, so party size cannot be shown by making a table bigger. It needs a drawn marker — guest count, a badge by the number plate, or something on the plates. Settle that with Rone before building.
 
-### 3. Rush waves instead of a smooth ramp
+### 3. Rush waves — built
 
-Replace the monotonic ten-minute ramp with surges — a party lands, then a lull to recover. Real services come in waves, and peaks and troughs read as drama where a linear slider reads as a slider.
+`waveFactor()` modulates the spawn gap on a `WAVE_PERIOD_MS` (42s) sine. Depth ramps with the shift, `WAVE_DEPTH_START` 0.18 → `WAVE_DEPTH_END` 0.55, so early service breathes gently and late service arrives in slams with real troughs between. Peaks and troughs read as drama where a linear slider reads as a slider.
 
-### 4. The shift stays endless, and the ramp gets richer
+### 4. Endless shift, richer ramp — built
 
 No win state; the run ends when you lose three tables. Rone's reasoning, which overrode the argument for a completable service: *"the game should get progressively harder (faster eat times, higher capacity, rush intensity). it'll end unless someone's a beast."*
 
-That expands the difficulty model. Today only **two** things ramp — patience and spawn gap. Approved additions:
+Four things now ramp instead of two:
 
-- **`EAT_MS` should shrink over the shift.** It is currently a fixed 22000. Faster turnover means more churn and more bussing pressure.
-- **Rush intensity ramps** — waves grow in size and close up over time.
-- **"Higher capacity" is ambiguous and needs one question answered before building.** It could mean the counter queue holding more orders (harder), or the player's carry capacity growing as a progression unlock (easier, but paired with the other axes rising to compensate). Ask Rone which.
+- **Patience** — `PATIENCE_START_S` 120 → `PATIENCE_END_S` 18
+- **Spawn gap** — `SPAWN_START_MS` 7000 → `SPAWN_FLOOR_MS` 3400, then modulated by `waveFactor()`
+- **Eat time** — `EAT_START_MS` 22000 → `EAT_END_MS` 12000. Faster turnover, more churn, more bussing pressure.
+- **Counter queue depth** — `QUEUE_CAP_START` 2 → `QUEUE_CAP_END` 4 per side. This is what Rone meant by "higher capacity": *"capacity = counter queue"*, i.e. the harder reading. The player's carry capacity is a one-time progression unlock, not a difficulty axis.
 
-### 5. Wrong deliveries cost something
+### 5. Wrong deliveries cost something — built, and the fix matters
 
-A wrong delivery currently costs **nothing** but a visual bump, which means a player can ignore the memory mechanic entirely and just try tables until one accepts — defeating the skill the game exists to teach. Approved: lose that order's tip, or eat a few seconds re-plating. Pick one and measure it.
+Standing on a waiting table's pad while carrying someone else's food costs a broken streak, `WRONG_PENALTY_MS` (1200) at `WRONG_SPEED_MULT` (0.45), and a `WRONG TABLE / no tip` floater.
 
-### 6. Flow state — a streak tip multiplier
+**The trap, discovered by measurement:** the first version fired the instant you touched a wrong pad. But walking to table 4 means crossing the pads of 1, 2 and 3 on the way, so ordinary movement triggered it — and it broke the flow streak on nearly every trip. Flow lit on **0% of deliveries (0/16)** and loosening the flow thresholds did not help, because the problem was not the thresholds.
 
-Built by consecutive fast deliveries, broken by a slow one or a walkout, multiplying tips while lit. Chosen over a speed/capacity boost because it changes *how you play* — you start deciding between banking a safe delivery and chasing one more — rather than just making you stronger.
+The fix is `WRONG_DWELL_MS` (420): a wrong delivery has to be a **deliberate act, not transit**. It only counts if the table is actually `waiting`, you hold no order for it, and you linger. The dwell also only accumulates once `WRONG_COOLDOWN_MS` (900) has run out, so parking on a wrong pad charges you every ~1.3s rather than twice inside the first second.
 
-**Build this last, and know the trap.** It keys off the tip tiers, and the measured tier split for competent play is currently **13 big / 3 good out of 16** (see Scoring). A streak that breaks on anything less than a fast delivery would therefore stay lit permanently for a decent player, and the multiplier would just be a flat bonus. Flow state only works if the tip curve has a real gradient — so it must come after carry-two, waves and the eat-time ramp have all disturbed that curve, and after the refit that follows them. Building it earlier means tuning it twice.
+Verified both directions: lingering costs you exactly once, and one continuous sweep across four pads without stopping is free.
 
-### Suggested build order
+### 6. Flow state — built last, for the reason below
 
-Carry-two first (it invalidates all tuning). Then the wrong-delivery penalty (cheap and independent). Then waves plus the eat-time ramp. Then party sizes, once the art question is settled. Flow state last, for the reason above.
+A streak of `FLOW_STREAK_NEEDED` (3) consecutive fast deliveries — fast meaning a tip fraction at or above `FLOW_FAST` (0.86) — lights it, and it multiplies tips by `FLOW_MULT` (2) until a slow delivery, a walkout or a wrong table breaks it. Chosen over a speed or capacity boost because it changes *how you play* — you start deciding between banking a safe delivery and chasing one more — rather than just making you stronger.
 
-## Carry-two — unimplemented, no longer load-bearing
+**It was built last on purpose.** It keys off the tip curve, so carry-two, waves and the eat-time ramp all had to disturb that curve first. Building it earlier would have meant tuning it twice.
 
-`carryCapacity` flips to 2 after six deliveries but nothing in the pickup or carry logic supports holding a second ticket. `carrying` is a single object, not a queue. **The flip is currently dead code**: it changes a number nothing reads, so a player who reaches six deliveries gets no second slot and no error either.
+The streak updates before the tip is worked out, so the delivery that lights flow is itself the first one paid double.
 
-This used to be the blocker that gated all tuning, because the old spawn floor of 1.04s sat far below the 2.74s round trip — orders arrived at nearly three times the rate one carry slot could clear them, and the game outran the player about thirty seconds in regardless of skill. **That is fixed**, not by building carry-two but by putting the spawn floor above the round trip: `SPAWN_FLOOR_MS` is 3400, so even at full rush the shift tops out at 17.6 orders/min against a 21.9/min ceiling. The game is now winnable end to end on one slot.
+## What flow tuning is actually based on
 
-So carry-two is a design choice again rather than a structural necessity. It is still worth building — it is the difference between a fetch-quest and actually holding two orders in your head, which is the thing the game is about — but nothing is blocked on it now, and the tuning above is safe to iterate on without it.
+The measurement problem worth knowing about: **a bot camps at the pass.** `orderedAt` is the table's spawn time, so for a bot that is already standing at the counter when the ticket lands, `waited` collapses to pure travel time and flow stays lit almost permanently. That is an upper bound, not a model of play — a human is mid-loop when the ticket appears, and has to read it, remember it and route.
 
-If it does get built, the spawn floor should come down with it. Two slots amortises to roughly 1.4s per order, so a floor near 2.0–2.4s would restore comparable pressure. Implementation sketch unchanged: replace `carrying` with a small array, cap it at `carryCapacity`, auto-deliver whichever carried order matches the pad you are standing on, and show two floating tickets above the player with the fade rule applied per ticket.
+So `human.js` in the scratch pattern adds a `LAG` reaction delay before acting on a new ticket. Measured at peak rush:
+
+| Player | Flow lit |
+|---|---|
+| Perfect camper (`bot.js`) | 79–85% of deliveries |
+| 1.2s reaction lag | 50% |
+| 2.5s reaction lag | 45% |
+
+Roughly half the time, losing it hurts, and it is unreachable as a permanent state. That is the shape wanted, and it is why `FLOW_FAST` is 0.86 rather than something tighter — tightening it against the bot would tune for a player nobody is.
+
+**If you retune flow, use the lagged bot, not the camper.**
+
+## Floaters carry their own outline
+
+Floaters land wherever the table is, which on this board means over number plaques, `SET DOWN` labels and the ticket rail. They are drawn with a `rgba(24,19,14,0.85)` stroke under the fill, which is what keeps them readable without moving them somewhere less useful. This was a real bug — the `WRONG TABLE` floater was illegible where it collided with the ticket bubble above the right-hand pass, and the two share a column.
 
 ## Feature notes
 
@@ -273,7 +279,7 @@ One real limitation: ES module imports are blocked on `file://`, so opening `ind
 
 **3. Every swatch click re-renders all 114 previews**, since each shows the current selection with one option swapped. That is ~120 ms of generation plus image decode, local and offline, so it is no longer a network concern — but it is the thing to look at first if the picker ever feels sluggish on a weak machine.
 
-**4. Still open from the original brief:** no audio at all; no difficulty feel-tuning pass has happened (all values are first guesses, and see the carry-two blocker above); the canvas is a fixed 960×600 scaled by CSS rather than a true responsive layout; a wrong delivery costs nothing beyond a visual bump, which is deliberate but unexamined; and the HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
+**4. Still open from the original brief:** no audio at all; no difficulty feel-tuning pass has happened by *feel* — every value is measured, none is played; the canvas is a fixed 960×640 scaled by CSS rather than a true responsive layout; and the HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
 
 ## Verifying your work
 
@@ -284,13 +290,27 @@ Playwright and Chromium are preinstalled (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-brow
 The useful trick: the game lives in an IIFE with no globals, so instrument a throwaway copy rather than the real file. Copy `index.html` to `probe.html` inserting a debug handle before the `// initial static preview render` line:
 
 ```js
-window.__dbg = { get tables(){return tables;}, get carrying(){return carrying;},
-                 get player(){return player;}, get score(){return score;},
-                 get deliveries(){return deliveries;}, get mode(){return mode;},
-                 get tut(){return tut;}, DROP: DROP };
+Object.defineProperty(window, '__dbg', { get(){ return {
+  get tables(){return tables;},   get carried(){return carried;},
+  get tickets(){return tickets;}, get player(){return player;},
+  get score(){return score;},     get cleared(){return cleared;},
+  get deliveries(){return deliveries;}, get mode(){return mode;},
+  get flow(){return flowLit;},    get streak(){return streak;},
+  get cap(){return carryCapacity;}, get wrong(){return wrongTurns;},
+  get tut(){return tut ? {index:tut.index, practice:!!tut.practice} : null;},
+  get steps(){return TUTORIAL_STEPS.length;},
+  PASSES: PASSES, BUS: BUS_STATIONS, set elapsed(v){elapsed = v;} };}});
 ```
 
+Getters, not a snapshot object — `carried` and `tables` are reassigned, so a plain object captures stale references. `set elapsed` is what lets a run be dropped straight into peak rush without waiting ten minutes for the ramp.
+
 Then drive real keyboard events and read actual state. **Delete `probe.html` before committing** — it is not in `.gitignore`.
+
+Three things the last session learned driving this, all of which cost a false failure first:
+
+- **Delivery is automatic on entering the right pad.** A bot walking toward a wrong table can cross the correct one and hand the plate over en route, so any wrong-table test has to re-check its preconditions on arrival and retry.
+- **The tutorial's coach copy is painted on the canvas, not in the DOM.** Read step progress from `tut.index`, not from an element.
+- **Tutorial step 1 needs `tut.moved > 300`.** A bot that parks on its idle target never clears it — make the idle behaviour pace between two points rather than stand still.
 
 Two environment gotchas that cost the previous session time. A stale `http-server` from an earlier turn can hold the port and silently serve the wrong directory — if a page loads as "Index of /", that is what happened. And **headless Chromium cannot use the sandbox proxy**: it returns `ERR_CONNECTION_RESET` with every proxy configuration tried, while `curl` through the same proxy succeeds. Consequence: **screenshots always render in fallback system fonts, never the real Alfa Slab One and DM Sans.** Do not chase this, and do not tell Rone a font problem exists in the game — it is a sandbox artefact only. For anything needing a real external asset in the browser, fetch it with `curl` and inject it (that is how the avatar render path was verified).
 
@@ -304,10 +324,10 @@ When something is genuinely ambiguous, ask with a recommendation attached rather
 
 ## Immediate next steps
 
-1. **Build the approved design** — see "Approved design, not yet built" above. It carries the reasoning, the dependency trap in flow state, and a build order. Start with carry-two, because it invalidates every tuned number and everything else should be measured after it.
-2. **Two questions to settle with Rone before building those:** what "higher capacity" means as a difficulty axis (queue depth versus the player's carry capacity as a progression unlock), and how party size should be shown on a painted board of eight identical tables.
-3. **Play it.** Still nobody has. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, and $5 base against $10 speed may be the wrong split. All are single constants.
+1. **Play it.** Still nobody has, and this is now the single highest-value thing left. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, `$5` base against `$10` speed may be the wrong split, and flow at roughly half of deliveries may land differently in the hand than on paper. All are single named constants.
+2. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
+3. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.
 4. **Rone wants to revisit the picker flow** — it works and is verified, but where it sits in the opening journey is up for change.
 5. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
 
-Rone was also about to generate art in DALL·E. That has since happened and landed — the landing key art, the painted kitchen board and ten plated dishes are all in. The remaining art gap is party-size indication, if that gets built.
+The art is in: the landing key art, the painted kitchen board and ten plated dishes all landed. The remaining art gap is party-size indication.
