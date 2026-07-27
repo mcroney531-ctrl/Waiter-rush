@@ -159,6 +159,56 @@ Carried dishes never fade. The fade exists to force you to remember a table numb
 
 The tutorial gained a **Clear the table** lesson (step 5 of 6). Early steps set `bussingEnabled = false` so they keep the old straight-back-to-idle path and can re-stage an order at the table their text names; the bussing lesson turns it on, serves a table immediately and shortens that one meal to 3.2s, because the lesson is about the clearing rather than the waiting. The practice round runs with bussing on, so it rehearses the real loop.
 
+## Approved design, not yet built
+
+Rone reviewed the build and approved the following to answer one question: **the game is currently just running back and forth.** The diagnosis that framed it is worth keeping, because it explains why these five and not others:
+
+> There is exactly one task type, you can hold exactly one of it, and its destination is decided the moment you pick it up. That is the structural definition of ping-pong — there is never a moment where two things are worth doing and you must choose. Memory is the only real skill, and routing barely matters because you can only carry one plate.
+
+Three levers break that: more than one thing **in hand**, more than one **kind of demand**, or non-uniform **pacing**. Rone took the in-hand and pacing levers and declined the second demand stream.
+
+**Explicitly declined: table interrupts** (a seated table flagging you down for a refill, check-back or the bill). It was recommended and turned down — do not re-propose it without new reason.
+
+### 1. Carry two, on a tray
+
+Finally implements `carryCapacity`, which has flipped to 2 after six deliveries since the first build while **nothing reads it**. Replace `carrying` with an array capped at capacity; auto-deliver whichever carried order matches the pad you are standing on; draw two plates above the player with the fade rule applied per plate.
+
+The real gain is not logistics, it is that you hold **two table numbers in your head instead of one**, so this deepens the core hook rather than sitting beside it.
+
+**It invalidates every tuned number** — traversal, the tip thresholds, the spawn floor. Build it before retuning anything else, and expect a fourth tip refit after it.
+
+### 2. Party sizes
+
+Two-tops, four-tops and six-tops. Bigger parties tip more, eat longer and leave more dishes to clear. Cheap logically, but **it needs an art decision**: the board is painted with eight identical tables, so party size cannot be shown by making a table bigger. It needs a drawn marker — guest count, a badge by the number plate, or something on the plates themselves. Settle that with Rone before building.
+
+### 3. Rush waves instead of a smooth ramp
+
+Replace the monotonic ten-minute ramp with surges — a party lands, then a lull to recover. Real services come in waves, and peaks and troughs read as drama where a linear slider reads as a slider.
+
+### 4. The shift stays endless, and the ramp gets richer
+
+No win state; the run ends when you lose three tables. Rone's reasoning, which overrode the argument for a completable service: *"the game should get progressively harder (faster eat times, higher capacity, rush intensity). it'll end unless someone's a beast."*
+
+That expands the difficulty model. Today only **two** things ramp — patience and spawn gap. Approved additions:
+
+- **`EAT_MS` should shrink over the shift.** It is currently a fixed 22000. Faster turnover means more churn and more bussing pressure.
+- **Rush intensity ramps** — waves grow in size and close up over time.
+- **"Higher capacity" is ambiguous and needs one question answered before building.** It could mean the counter queue holding more orders (harder), or the player's carry capacity growing as a progression unlock (easier, but paired with the other axes rising to compensate). Ask Rone which.
+
+### 5. Wrong deliveries cost something
+
+A wrong delivery currently costs **nothing** but a visual bump, which means a player can ignore the memory mechanic entirely and just try tables until one accepts — defeating the skill the game exists to teach. Approved: lose that order's tip, or eat a few seconds re-plating. Pick one and measure it.
+
+### 6. Flow state — a streak tip multiplier
+
+Built by consecutive fast deliveries, broken by a slow one or a walkout, multiplying tips while lit. Chosen over a speed/capacity boost because it changes *how you play* — you start deciding between banking a safe delivery and chasing one more — rather than just making you stronger.
+
+**Build this last, and know the trap.** It keys off the tip tiers, and the measured tier split for competent play is currently **13 big / 3 good out of 16** (see Scoring). A streak that breaks on anything less than a fast delivery would therefore stay lit permanently for a decent player, and the multiplier would just be a flat bonus. Flow state only works if the tip curve has a real gradient — so it must come after carry-two, waves and the eat-time ramp have all disturbed that curve, and after the refit that follows them. Building it earlier means tuning it twice.
+
+### Suggested build order
+
+Carry-two first (it invalidates all tuning). Then the wrong-delivery penalty (cheap and independent). Then waves plus the eat-time ramp. Then party sizes, once the art question is settled. Flow state last, for the reason above.
+
 ## Carry-two — unimplemented, no longer load-bearing
 
 `carryCapacity` flips to 2 after six deliveries but nothing in the pickup or carry logic supports holding a second ticket. `carrying` is a single object, not a queue. **The flip is currently dead code**: it changes a number nothing reads, so a player who reaches six deliveries gets no second slot and no error either.
@@ -254,10 +304,10 @@ When something is genuinely ambiguous, ask with a recommendation attached rather
 
 ## Immediate next steps
 
-1. ~~Verify the DiceBear options; confirm the licence and attribute.~~ Done — see items 1 and 2 above.
-2. **Play it and re-tune.** The shift was slowed a long way — two minutes on a fresh table at open, ramping over ten minutes — on Rone's call that it was too hard out of the gate. The numbers are measured but nobody has actually played the new curve, and the four constants at the top of the difficulty block are meant to be moved. The opening may now be too slack; that is a feel question, not an arithmetic one.
-3. **Rone wants to revisit the picker flow** — the picker works and is verified, but where it sits in the title-screen journey is up for change.
-4. Carry-two, whenever it is wanted; see the section above for why it is no longer urgent.
-5. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×600 scaled by CSS rather than a true responsive layout; a wrong delivery costs nothing beyond a visual bump, which is deliberate but unexamined; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
+1. **Build the approved design** — see "Approved design, not yet built" above. It carries the reasoning, the dependency trap in flow state, and a build order. Start with carry-two, because it invalidates every tuned number and everything else should be measured after it.
+2. **Two questions to settle with Rone before building those:** what "higher capacity" means as a difficulty axis (queue depth versus the player's carry capacity as a progression unlock), and how party size should be shown on a painted board of eight identical tables.
+3. **Play it.** Still nobody has. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, and $5 base against $10 speed may be the wrong split. All are single constants.
+4. **Rone wants to revisit the picker flow** — it works and is verified, but where it sits in the opening journey is up for change.
+5. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
 
-Rone was also about to generate art in DALL·E. The advice given, still standing: with the avatar handled by DiceBear, spend that effort on the room — tables, counter, food icons, floor — where per-asset style consistency matters far less than it does for character parts.
+Rone was also about to generate art in DALL·E. That has since happened and landed — the landing key art, the painted kitchen board and ten plated dishes are all in. The remaining art gap is party-size indication, if that gets built.
