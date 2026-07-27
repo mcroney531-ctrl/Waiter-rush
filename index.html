@@ -121,27 +121,6 @@
   }
   #skipBtn:hover { background: rgba(244,238,219,0.22); border-color: rgba(244,238,219,0.55); }
 
-  #landing {
-    position: absolute; inset: 0; z-index: 25;
-    background: #1c1712;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 20px; padding: 16px;
-  }
-  #landingArt {
-    /* source art is 864px wide; 1080 is a 1.25x upscale, which fills the
-       frame without visibly softening the linework. Raise this only if the
-       art is ever re-exported larger. */
-    width: min(100%, 1080px);
-    height: auto;
-    max-height: calc(100vh - 130px);
-    max-height: calc(100dvh - 130px);   /* dvh excludes mobile browser chrome */
-    object-fit: contain;
-    border-radius: 10px;
-    box-shadow: 0 18px 50px rgba(0,0,0,0.55);
-  }
-  #landingStart { font-size: 20px; padding: 16px 46px; }
-
   #avatarPicker {
     position: absolute; inset: 0; z-index: 30;
     background: #1c1712; color: #F4EEDB;
@@ -223,13 +202,7 @@
     <div style="width:1px;"></div>
   </div>
 
-  <div id="landing">
-    <img id="landingArt" src="assets/landing.jpg"
-         alt="Waiter Rush — a diner mid-rush, servers running plates through chaos">
-    <button class="cta" id="landingStart">Start</button>
-  </div>
-
-  <div id="overlay" class="hidden">
+  <div id="overlay">
     <h1>Rush Hour</h1>
     <p>Grab the order ticket from the counter, remember which table it's for, and deliver it before the ticket board goes blank on your walk. Miss too many tables and the shift is over.</p>
     <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
@@ -609,15 +582,7 @@
   // The only thing that can still fail is loading vendor/ itself — a partial
   // deploy, or opening index.html straight off disk, where module imports are
   // blocked by the browser. The picker says so and the game keeps the circle.
-  // Reached from the landing page the picker is part of the opening flow and
-  // hands off to the title screen; reached from the title or the end-of-shift
-  // screen it is a detour that returns where it came from.
-  let pickerFromLanding = false;
-
-  async function openPicker(fromLanding){
-    pickerFromLanding = !!fromLanding;
-    document.getElementById('avatarCancel').textContent =
-      pickerFromLanding ? 'Skip for now' : 'Back';
+  async function openPicker(){
     const warn = document.getElementById('avatarWarn');
     warn.classList.add('hidden');
     document.getElementById('avatarPicker').classList.remove('hidden');
@@ -631,11 +596,6 @@
   }
   function closePicker(){
     document.getElementById('avatarPicker').classList.add('hidden');
-    if (pickerFromLanding){
-      pickerFromLanding = false;
-      document.getElementById('landing').classList.add('hidden');
-      document.getElementById('overlay').classList.remove('hidden');
-    }
   }
 
   function commitAvatar(){
@@ -1115,7 +1075,7 @@
     `;
     overlay.classList.remove('hidden');
     document.getElementById('startBtn').addEventListener('click', startGame);
-    document.getElementById('avatarBtn2').addEventListener('click', () => openPicker(false));
+    document.getElementById('avatarBtn2').addEventListener('click', openPicker);
   }
 
   // ---------- Draw ----------
@@ -1592,12 +1552,7 @@
   document.getElementById('startBtn').addEventListener('click', startGame);
   document.getElementById('trainBtn').addEventListener('click', startTutorial);
   document.getElementById('skipBtn').addEventListener('click', startGame);
-  document.getElementById('landingStart').addEventListener('click', () => {
-    document.getElementById('landing').classList.add('hidden');
-    openPicker(true);
-  });
-  // wrapped so the click event is not passed through as fromLanding
-  document.getElementById('avatarBtn').addEventListener('click', () => openPicker(false));
+  document.getElementById('avatarBtn').addEventListener('click', openPicker);
   document.getElementById('avatarDone').addEventListener('click', commitAvatar);
   document.getElementById('avatarRandom').addEventListener('click', randomiseAvatar);
   document.getElementById('avatarCancel').addEventListener('click', closePicker);
