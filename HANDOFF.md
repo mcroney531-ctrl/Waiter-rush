@@ -129,6 +129,20 @@ The left/right bias is essentially gone. The remaining variation is front row ve
 
 One testing note worth keeping: reconciling score against `sum(base + tip) + cleared * BUS_PAY_C` will be off by a cent or two if the probe records `Math.round(waited)`, because the game computes the tip from the unrounded value. Record the raw wait and it matches exactly.
 
+## Food art
+
+Orders are plated dishes in `assets/food/` — ten of them: pizza, sub, tacos, pasta, salad, club, soup, ribs, tart, burger. They replaced the emoji in `FOOD_ITEMS`. Each is a speech-bubble plate with a pointer at the bottom, so a whole ticket, not an icon that sits inside a card. The old white card is gone.
+
+Three things about how they are prepared, because the source files were not uniform:
+
+- **Backgrounds differed.** Seven arrived with real alpha; three were flat near-white with compression noise. Those were keyed by **flood-filling from the border**, not by thresholding — the plate's cream is close enough to white that a global threshold ate into it. Verified by rendering every plate on magenta and checking mean edge alpha; all ten came out clean.
+- **Scale differed a lot** — cropped bubble widths ranged 723px to 1527px. Each is cropped to its own alpha bounds and fitted into a common slot, so a wide plate and a tall one both sit correctly.
+- **They are bottom-aligned** on the counter's front edge, so every pointer lines up along one line however much the dishes differ in shape.
+
+The table number is drawn as its own badge (`drawTableTag`) rather than baked into the art, so one set of plates serves all eight tables. It appears under the plate on the counter and under the carried plate in hand — and it still obeys the fade rule, disappearing with the plate once you walk away.
+
+`TICKET` sets the slot geometry. The sizing is deliberately tight: at four plates a side, anything larger makes the two queues meet in the middle and the section split — the entire point of two passes — stops being visible.
+
 ## Bussing (eat / clear cycle)
 
 Serving is no longer the end of a table. The full cycle is `idle → waiting → happy → eating → dirty → clearing → idle`, and **a table that is not `idle` cannot take a new order** — `spawnTicket` filters on `idle`, so this falls out of the state machine rather than needing a special case.

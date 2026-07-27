@@ -321,7 +321,46 @@
     {x: A(906.5),  padX: A(909.5),  ...R2}, {x: A(1173.5), padX: A(1182.5), ...R2},
   ];
 
-  const FOOD_ICONS = ['🍔','🍕','🥗','🍝','🍟','🌮','🍜','🥪'];
+  // Plated dishes, drawn as art rather than emoji. Each is a speech-bubble
+  // plate with a pointer at the bottom; they are bottom-aligned in their slot
+  // so every pointer lines up along the counter's front edge regardless of how
+  // wide the individual plate is.
+  const FOOD_ITEMS = ['pizza','sub','tacos','pasta','salad','club','soup','ribs','tart','burger'];
+  const foodImg = {};
+  for (const n of FOOD_ITEMS){
+    const im = new Image();
+    im.src = 'assets/food/' + n + '.png';
+    foodImg[n] = im;
+  }
+  // Sized so the two queues never meet in the middle — at four a side they
+  // would otherwise read as one row of eight and the section split, which is
+  // the whole point of two passes, would be invisible.
+  const TICKET = { slot: 68, maxH: 62, base: A(404), pitch: 70 };
+
+  // Fits a plate inside its slot without distorting it, bottom-aligned.
+  function foodBox(name){
+    const im = foodImg[name];
+    if (!im || !im.complete || !im.naturalWidth) return null;
+    const sc = Math.min(TICKET.slot / im.naturalWidth, TICKET.maxH / im.naturalHeight);
+    return { im, w: im.naturalWidth * sc, h: im.naturalHeight * sc };
+  }
+
+  // The table number is drawn as its own badge rather than baked into the art,
+  // so one set of plates serves every table.
+  function drawTableTag(cx, cy, id, big){
+    const w = big ? 34 : 30, h = big ? 19 : 17;
+    ctx.fillStyle = 'rgba(28,23,18,0.92)';
+    roundRect(ctx, cx - w/2, cy - h/2, w, h, h/2);
+    ctx.fill();
+    ctx.strokeStyle = COLORS.mustard;
+    ctx.lineWidth = 2;
+    roundRect(ctx, cx - w/2, cy - h/2, w, h, h/2);
+    ctx.stroke();
+    ctx.fillStyle = COLORS.mustard;
+    ctx.font = '900 ' + (big ? 12 : 11) + 'px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('T' + id, cx, cy + (big ? 4 : 4));
+  }
 
   // The painted SET DOWN pad each table sits behind. Delivery keys off this
   // rather than the table body, so the player never has to walk through the
@@ -691,7 +730,7 @@
     let t = null;
     if (forceTableId != null) t = idleTables.find(x => x.id === forceTableId);
     if (!t) t = idleTables[Math.floor(Math.random()*idleTables.length)];
-    const icon = FOOD_ICONS[Math.floor(Math.random()*FOOD_ICONS.length)];
+    const icon = FOOD_ITEMS[Math.floor(Math.random()*FOOD_ITEMS.length)];
     // The order is issued at its own section's pass, so a table's food always
     // appears at the end of the counter nearest to it.
     const side = sideOfTable(t);
@@ -1259,33 +1298,31 @@
   function drawCounter(){
 
     // Two queues, each stacked inward from its own end of the counter, so a
-    // ticket's position on screen tells you which pass it is waiting at.
+    // ticket's position on screen tells you which pass it is waiting at. The
+    // plates are bottom-aligned on the counter's front edge, so their pointers
+    // form one line however much the individual dishes differ in shape.
     for (const p of PASSES){
       queueFor(p.side).forEach((tk, i) => {
-        const tx = p.side === 'left' ? A(291) + i * 80 : A(1238) + 36 - 72 - i * 80;
+        const slotX = p.side === 'left'
+          ? A(291) + TICKET.slot/2 + i * TICKET.pitch
+          : A(1238) - TICKET.slot/2 - i * TICKET.pitch;
+        const box = foodBox(tk.icon);
         ctx.save();
-        ctx.translate(tx, A(322));
-        ctx.fillStyle = '#F4EEDB';
-        // The front of each queue is what that pass will hand you, so it is
-        // marked. This leaks nothing protected — the ticket is legible at the
-        // counter anyway, and the rule is about not revealing the table once
-        // you have walked away with it.
-        ctx.strokeStyle = i === 0 ? COLORS.mustard : '#2B2620';
-        ctx.lineWidth = i === 0 ? 3 : 2;
-        roundRect(ctx, 0, 0, 72, 46, 6);
-        ctx.fill(); ctx.stroke();
+        if (box){
+          ctx.drawImage(box.im, slotX - box.w/2, TICKET.base - box.h, box.w, box.h);
+        } else {
+          // art still loading — a plain card keeps the queue readable
+          ctx.fillStyle = '#F4EEDB';
+          roundRect(ctx, slotX - 30, TICKET.base - 46, 60, 42, 6);
+          ctx.fill();
+        }
         if (i === 0){
           ctx.fillStyle = COLORS.mustard;
-          ctx.font = '900 8px DM Sans, sans-serif';
+          ctx.font = '900 9px DM Sans, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('NEXT UP', 36, -4);
+          ctx.fillText('NEXT UP', slotX, TICKET.base - (box ? box.h : 46) - 6);
         }
-        ctx.font = '26px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(tk.icon, 36, 30);
-        ctx.fillStyle = COLORS.text;
-        ctx.font = '900 11px DM Sans, sans-serif';
-        ctx.fillText('T' + tk.tableId, 36, 42);
+        drawTableTag(slotX, TICKET.base - 8, tk.tableId, false);
         ctx.restore();
       });
     }
@@ -1465,14 +1502,13 @@
         alpha = Math.max(0, 1 - (timeSince - 0) / fadeWindow);
       }
       if (alpha > 0){
+        const box = foodBox(carrying.icon);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.font = '24px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(carrying.icon, player.x, player.y - player.size - 10);
-        ctx.font = '900 11px DM Sans, sans-serif';
-        ctx.fillStyle = COLORS.text;
-        ctx.fillText('T' + carrying.tableId, player.x, player.y - player.size - 26);
+        const w = box ? box.w * 0.78 : 46, h = box ? box.h * 0.78 : 34;
+        const cy = player.y - player.size - 12;
+        if (box) ctx.drawImage(box.im, player.x - w/2, cy - h, w, h);
+        drawTableTag(player.x, cy + 2, carrying.tableId, true);
         ctx.restore();
       } else {
         // small neutral dot to show still carrying *something*, without revealing table
