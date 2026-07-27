@@ -203,7 +203,7 @@
 </head>
 <body>
 <div id="wrap">
-  <canvas id="game" width="960" height="600"></canvas>
+  <canvas id="game" width="960" height="640"></canvas>
 
   <div id="hud">
     <div class="stat">
@@ -283,51 +283,67 @@
   };
 
   // ---------- Layout ----------
-  const counterRect = { x: 0, y: 0, w: W, h: 90 };
+  // The board is a painted background (assets/kitchen.jpg, 1536x1024). Every
+  // coordinate below is that art's own pixel position scaled by ART_SCALE, so
+  // the game's logical geometry sits exactly on top of what is drawn. The art
+  // already contains the counter, the tables, their numbers, the SET DOWN
+  // pads, both PICK UP signs and both dish returns — so the code no longer
+  // draws any furniture, only the things that change: the player, tickets,
+  // patience meters, plates, and the pads' standing highlight.
+  const ART_W = 1536, ART_H = 1024;
+  const ART_SCALE = W / ART_W;          // 960/1536 = 0.625
+  const A = n => n * ART_SCALE;         // art px -> canvas px
 
+  // The counter is painted across the top; the floor the player can walk on
+  // starts below it.
+  const counterRect = { x: 0, y: 0, w: W, h: A(430) };
+  const FLOOR_TOP = A(432);
+
+  // Table anchors are the painted number plates. Note the two rows are not
+  // evenly spaced and the front row is wider than the back — that is the
+  // art's perspective, and the game follows it rather than fighting it.
+  // padY is the painted SET DOWN pad; barY is just above the painted number
+  // plate, which is the highest part of the table and where a meter can sit
+  // without covering the number.
+  // padX/padY are measured from the painted SET DOWN pads, which sit slightly
+  // wider apart than the number plates above them — the art's perspective, not
+  // an error. barY is just above the plate, where a meter clears the number.
+  const R1 = { y: A(520), padY: A(622), barY: A(420) };
+  const R2 = { y: A(788), padY: A(888), barY: A(668) };
   const tableDefs = [
-    {x: 120, y: 200}, {x: 320, y: 200}, {x: 520, y: 200}, {x: 720, y: 200},
-    {x: 120, y: 400}, {x: 320, y: 400}, {x: 520, y: 400}, {x: 720, y: 400},
+    {x: A(406),    padX: A(395),    ...R1}, {x: A(652),    padX: A(652),    ...R1},
+    {x: A(902.5),  padX: A(902.5),  ...R1}, {x: A(1154),   padX: A(1167.5), ...R1},
+    {x: A(374),    padX: A(379.5),  ...R2}, {x: A(638),    padX: A(635.5),  ...R2},
+    {x: A(906.5),  padX: A(909.5),  ...R2}, {x: A(1173.5), padX: A(1182.5), ...R2},
   ];
 
   const FOOD_ICONS = ['🍔','🍕','🥗','🍝','🍟','🌮','🍜','🥪'];
 
-  // The pad in front of each table where orders get set down. Delivery keys
-  // off this zone rather than the table body, so the player never has to walk
-  // through the furniture. Pads look identical on every table on purpose —
-  // highlighting the one you are carrying for would give away the answer.
-  const DROP = { dy: 52, w: 78, h: 38 };
+  // The painted SET DOWN pad each table sits behind. Delivery keys off this
+  // rather than the table body, so the player never has to walk through the
+  // furniture. Every pad is identical on purpose — highlighting the one you
+  // are carrying for would give away the answer. See the standing rule.
+  const DROP = { w: A(196), h: A(58) };
 
-  // Two passes, one per section, as a real floor is laid out. Pickup needs a
-  // pad rather than any counter contact: brushing the counter while running
-  // past used to hand you a ticket you had never looked at, which quietly
-  // deletes the memory mechanic — you cannot hold a number in your head that
-  // you never saw.
-  //
-  // Splitting it in two also fixes the travel asymmetry a single left-hand
-  // pass created, where the far-right tables were systematically the worst
-  // paying. An order for a table is always issued at that table's own end of
-  // the counter, so no section is further from its food than any other.
-  //
-  // Each side has exactly four tables and a table can only have one order
-  // outstanding, so a per-side cap of four is the natural maximum rather than
-  // an artificial throttle.
-  const PASS_W = 88, PASS_H = 44, PASS_Y = 118;
+  // The two passes, under the painted PICK UP signs at each end of the
+  // counter. Each serves its own section; see the pickup notes below.
+  const PASS_W = A(150), PASS_H = A(58);
+  // Under the painted signs, in the open floor at each end — the aisle between
+  // the counter and the front row is only a few pixels tall, so the pads live
+  // in the side margins where there are no tables.
   const PASSES = [
-    { side: 'left',  x: 56,  y: PASS_Y, w: PASS_W, h: PASS_H },
-    { side: 'right', x: 904, y: PASS_Y, w: PASS_W, h: PASS_H }
+    { side: 'left',  x: A(232),  y: A(478), w: PASS_W, h: PASS_H },
+    { side: 'right', x: A(1276), y: A(478), w: PASS_W, h: PASS_H }
   ];
   const QUEUE_CAP_PER_SIDE = 4;
-  // Tables 1, 2, 5, 6 sit left of centre; 3, 4, 7, 8 right of it.
   const sideOfTable = t => (t.x < W/2 ? 'left' : 'right');
 
-  // The dish return, deliberately off on its own against the right wall rather
-  // than tucked into the counter. Clearing a table is meant to be a real trip
-  // you choose to make, not something you do in passing while grabbing the
-  // next order. Sits in the corridor between the two table rows, which keeps
-  // it clear of the furniture and reachable during the tutorial (the
-  // instruction panel owns the bottom strip, so it cannot live down there).
-  const BUS = { x: 886, y: 300, w: 58, h: 104 };
+  // Both painted dish returns are live, one per section, so clearing a table
+  // is a trip to your own end of the room rather than across the whole floor.
+  const BUS_STATIONS = [
+    { side: 'left',  x: A(118),  y: A(700), w: A(210), h: A(230) },
+    { side: 'right', x: A(1432), y: A(690), w: A(200), h: A(250) }
+  ];
 
   let tables = [];
   let tickets = []; // waiting at the counter: {id, tableId, icon, spawnTime}
@@ -426,7 +442,7 @@
 
   function resetGame(){
     tables = tableDefs.map((t, i) => ({
-      id: i+1, x: t.x, y: t.y,
+      id: i+1, x: t.x, y: t.y, padX: t.padX, padY: t.padY, barY: t.barY,
       // idle -> waiting (ticket at counter) -> happy (brief tick) -> eating
       // -> dirty -> idle again once the player clears it. A table that is not
       // idle cannot take a new order, so dirty tables shrink the usable floor.
@@ -730,8 +746,8 @@
 
   function inDropZone(t){
     const pad = player.size * 0.4;
-    return Math.abs(player.x - t.x) <= DROP.w/2 + pad &&
-           Math.abs(player.y - (t.y + DROP.dy)) <= DROP.h/2 + pad;
+    return Math.abs(player.x - t.padX) <= DROP.w/2 + pad &&
+           Math.abs(player.y - t.padY) <= DROP.h/2 + pad;
   }
 
   // 1 at TIP_FULL_MS or faster, 0 at TIP_NONE_MS or slower, linear between.
@@ -779,11 +795,15 @@
     }
   }
 
-  function inBusZone(){
+  function busUnderPlayer(){
     const pad = player.size * 0.4;
-    return Math.abs(player.x - BUS.x) <= BUS.w/2 + pad &&
-           Math.abs(player.y - BUS.y) <= BUS.h/2 + pad;
+    for (const b of BUS_STATIONS){
+      if (Math.abs(player.x - b.x) <= b.w/2 + pad &&
+          Math.abs(player.y - b.y) <= b.h/2 + pad) return b;
+    }
+    return null;
   }
+  const inBusZone = () => !!busUnderPlayer();
 
   // Which pass the player is standing at, or null.
   function passUnderPlayer(){
@@ -1038,12 +1058,14 @@
     player.x += dx * player.speed * dt/1000;
     player.y += dy * player.speed * dt/1000;
     player.x = Math.max(player.size/2, Math.min(W - player.size/2, player.x));
-    player.y = Math.max(counterRect.h + player.size/2, Math.min(H - player.size/2, player.y));
+    player.y = Math.max(FLOOR_TOP + player.size/2, Math.min(H - player.size/2, player.y));
 
     if (mode === 'tutorial' && tut){
       tut.moved += Math.hypot(dx, dy) * player.speed * dt/1000;
-      // the instruction panel owns the bottom strip while it is on screen
-      player.y = Math.min(player.y, tut.bannerTop - player.size/2 - 8);
+      // No clamp: the back row of tables sits under the panel on the painted
+      // board, so holding the player above it would make four of the eight
+      // undeliverable. The panel is translucent and the player draws on top of
+      // it instead, so nothing is ever hidden.
     }
 
     checkAutoInteract();
@@ -1122,128 +1144,122 @@
   }
 
   // ---------- Draw ----------
+  // The board is one painted image. It is loaded once and drawn every frame;
+  // until it arrives the floor colour stands in, so a slow load shows a plain
+  // room rather than a blank canvas.
+  const boardImg = new Image();
+  let boardReady = false;
+  boardImg.onload = () => { boardReady = true; };
+  boardImg.src = 'assets/kitchen.jpg';
+
   function drawFloor(){
-    const tile = 60;
-    for (let y = counterRect.h; y < H; y += tile){
-      for (let x = 0; x < W; x += tile){
-        const idx = Math.floor(x/tile) + Math.floor(y/tile);
-        ctx.fillStyle = idx % 2 === 0 ? COLORS.floorA : COLORS.floorB;
-        ctx.fillRect(x, y, tile, tile);
-      }
+    if (boardReady){
+      ctx.drawImage(boardImg, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = COLORS.floorA;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = COLORS.counter;
+      ctx.fillRect(0, 0, W, counterRect.h);
     }
   }
 
-  // Drawn on the floor beneath the tables so the player walks over them.
+  // The pads themselves are painted into the board. All the code adds is the
+  // highlight for the one you are standing on, plus the CLEAR prompt when a
+  // table is waiting to be bussed — a dirty table is public knowledge, so that
+  // label gives nothing away about the order you are carrying.
   function drawDropZones(){
     for (const t of tables){
       const standing = inDropZone(t);
-      const zy = t.y + DROP.dy;
+      if (!standing && t.state !== 'dirty') continue;
       ctx.save();
-      ctx.translate(t.x, zy);
-
-      ctx.fillStyle = standing ? 'rgba(47,111,107,0.30)' : 'rgba(43,38,32,0.06)';
-      roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 9);
-      ctx.fill();
-
-      ctx.strokeStyle = standing ? COLORS.counter : 'rgba(43,38,32,0.30)';
-      ctx.lineWidth = standing ? 3 : 2;
-      ctx.setLineDash(standing ? [] : [7, 5]);
-      roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 9);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.fillStyle = standing ? COLORS.counter : 'rgba(43,38,32,0.30)';
-      ctx.font = '900 9px DM Sans, sans-serif';
-      ctx.textAlign = 'center';
-      // The pad is the same on every table so it cannot give away which order
-      // you are carrying — but a dirty table is public knowledge, so relabelling
-      // that one costs the memory mechanic nothing.
-      ctx.fillText(t.state === 'dirty' ? 'CLEAR' : 'SET DOWN', 0, 3);
+      ctx.translate(t.padX, t.padY);
+      if (standing){
+        ctx.fillStyle = 'rgba(47,111,107,0.32)';
+        roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
+        ctx.fill();
+        ctx.strokeStyle = COLORS.counter;
+        ctx.lineWidth = 3;
+        roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
+        ctx.stroke();
+      }
+      if (t.state === 'dirty'){
+        // Painted into the pad is the words SET DOWN, so this is masked rather
+        // than overprinted — the two together were unreadable.
+        ctx.fillStyle = 'rgba(28,23,18,0.96)';
+        roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
+        ctx.fill();
+        ctx.strokeStyle = COLORS.mustard;
+        ctx.lineWidth = 2;
+        roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
+        ctx.stroke();
+        ctx.fillStyle = COLORS.mustard;
+        ctx.font = '900 13px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CLEAR', 0, 5);
+      }
       ctx.restore();
     }
   }
 
-  // The pass. Same visual language as the table pads so "stand on the marked
-  // pad to interact" reads as one rule across the whole floor.
+  // The PICK UP signs are painted on the wall; these pads are the floor
+  // positions beneath them. Only the live state is drawn: amber when that
+  // section has an order waiting, teal when you are standing on it.
   function drawPickupZone(){
     const at = passUnderPlayer();
     for (const p of PASSES){
       const standing = at === p;
       const ready = queueFor(p.side).length > 0;
+      if (!standing && !ready) continue;
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.fillStyle = standing ? 'rgba(47,111,107,0.30)' : 'rgba(43,38,32,0.06)';
-      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 9);
+      ctx.fillStyle = standing ? 'rgba(47,111,107,0.32)' : 'rgba(224,167,46,0.16)';
+      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
       ctx.fill();
-      ctx.strokeStyle = standing ? COLORS.counter : (ready ? COLORS.mustard : 'rgba(43,38,32,0.30)');
-      ctx.lineWidth = standing || ready ? 3 : 2;
-      ctx.setLineDash(standing ? [] : [7, 5]);
-      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 9);
+      ctx.strokeStyle = standing ? COLORS.counter : COLORS.mustard;
+      ctx.lineWidth = 3;
+      ctx.setLineDash(standing ? [] : [8, 6]);
+      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = standing ? COLORS.counter : (ready ? COLORS.mustard : 'rgba(43,38,32,0.30)');
-      ctx.font = '900 10px DM Sans, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('PICK UP', 0, 4);
       ctx.restore();
     }
   }
 
-  // The dish return. Highlights when you are standing in it, same as the pads.
+  // Both dish returns are painted into the board. The code highlights the one
+  // you are standing at, and outlines both in amber while you are carrying
+  // dishes so it is obvious where they go.
   function drawBusStation(){
-    const standing = inBusZone();
+    const at = busUnderPlayer();
     const holding = carrying && carrying.type === 'dishes';
-    ctx.save();
-    ctx.translate(BUS.x, BUS.y);
-
-    ctx.fillStyle = 'rgba(0,0,0,0.10)';
-    ctx.beginPath();
-    ctx.ellipse(0, BUS.h/2 - 2, BUS.w/2, 8, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // a bus tub against the wall
-    ctx.fillStyle = standing ? '#3d8783' : '#4a5560';
-    roundRect(ctx, -BUS.w/2, -BUS.h/2, BUS.w, BUS.h, 10);
-    ctx.fill();
-    ctx.strokeStyle = holding ? COLORS.mustard : 'rgba(43,38,32,0.45)';
-    ctx.lineWidth = holding ? 4 : 2;
-    ctx.setLineDash(holding && !standing ? [7,5] : []);
-    roundRect(ctx, -BUS.w/2, -BUS.h/2, BUS.w, BUS.h, 10);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // stacked plates inside
-    ctx.fillStyle = 'rgba(244,238,219,0.85)';
-    for (let i = 0; i < 3; i++){
-      roundRect(ctx, -BUS.w/2 + 11, BUS.h/2 - 20 - i*7, BUS.w - 22, 5, 2.5);
+    for (const b of BUS_STATIONS){
+      const standing = at === b;
+      if (!standing && !holding) continue;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.fillStyle = standing ? 'rgba(47,111,107,0.30)' : 'rgba(224,167,46,0.14)';
+      roundRect(ctx, -b.w/2, -b.h/2, b.w, b.h, 12);
       ctx.fill();
+      ctx.strokeStyle = standing ? COLORS.counter : COLORS.mustard;
+      ctx.lineWidth = 3;
+      ctx.setLineDash(standing ? [] : [8, 6]);
+      roundRect(ctx, -b.w/2, -b.h/2, b.w, b.h, 12);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
     }
-
-    ctx.fillStyle = '#F4EEDB';
-    ctx.font = '900 9px DM Sans, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('DISH', 0, -BUS.h/2 + 18);
-    ctx.fillText('RETURN', 0, -BUS.h/2 + 29);
-    ctx.restore();
   }
 
+  // The counter and its PICKUP COUNTER label are painted into the board, so
+  // only the tickets sitting on it are drawn here.
   function drawCounter(){
-    ctx.fillStyle = COLORS.counter;
-    ctx.fillRect(0, 0, W, counterRect.h);
-    ctx.fillStyle = COLORS.counterTop;
-    ctx.fillRect(0, counterRect.h - 12, W, 12);
-    ctx.fillStyle = '#F4EEDB';
-    ctx.font = '700 13px DM Sans, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('PICKUP COUNTER', 16, 24);
 
     // Two queues, each stacked inward from its own end of the counter, so a
     // ticket's position on screen tells you which pass it is waiting at.
     for (const p of PASSES){
       queueFor(p.side).forEach((tk, i) => {
-        const tx = p.side === 'left' ? 20 + i * 82 : W - 92 - i * 82;
+        const tx = p.side === 'left' ? A(290) + i * 82 : W - A(290) - 72 - i * 82;
         ctx.save();
-        ctx.translate(tx, 38);
+        ctx.translate(tx, A(322));
         ctx.fillStyle = '#F4EEDB';
         // The front of each queue is what that pass will hand you, so it is
         // marked. This leaks nothing protected — the ticket is legible at the
@@ -1312,44 +1328,22 @@
     ctx.stroke();
   }
 
+  // The table, its legs and its number are painted into the board. This draws
+  // only what changes: the patience meter, the meal clock, and the dishes.
   function drawTable(t){
     ctx.save();
-    ctx.translate(t.x, t.y);
-
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.beginPath();
-    ctx.ellipse(0, 34, 34, 10, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // legs
-    ctx.fillStyle = COLORS.tableWood;
-    ctx.fillRect(-26, -6, 8, 34);
-    ctx.fillRect(18, -6, 8, 34);
-
-    // top
-    ctx.fillStyle = COLORS.tableTop;
-    roundRect(ctx, -32, -30, 64, 34, 8);
-    ctx.fill();
-    ctx.strokeStyle = COLORS.tableWood;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // table number
-    ctx.fillStyle = COLORS.text;
-    ctx.font = '900 13px DM Sans, sans-serif';
+    ctx.translate(t.x, t.barY);
     ctx.textAlign = 'center';
-    ctx.fillText(t.id, 0, -9);
 
     // state indicator
     if (t.state === 'waiting'){
       // patience bar
       const barW = 52;
       ctx.fillStyle = 'rgba(0,0,0,0.2)';
-      ctx.fillRect(-barW/2, -46, barW, 8);
+      ctx.fillRect(-barW/2, -4, barW, 8);
       const col = t.patience > 0.5 ? COLORS.happy : (t.patience > 0.25 ? COLORS.mustard : COLORS.angry);
       ctx.fillStyle = col;
-      ctx.fillRect(-barW/2, -46, barW * t.patience, 8);
+      ctx.fillRect(-barW/2, -4, barW * t.patience, 8);
 
       // Seconds left, riding alongside the meter. Hidden while the tutorial
       // has drain switched off, where a frozen number would just mislead.
@@ -1364,44 +1358,41 @@
         ctx.textAlign = 'left';
         ctx.font = '900 15px DM Sans, sans-serif';
         ctx.fillStyle = col;
-        ctx.fillText(label, barW/2 + 7, -38);
+        ctx.fillText(label, barW/2 + 7, 4);
         ctx.textAlign = 'center';
       }
     } else if (t.state === 'happy'){
       ctx.font = '22px serif';
       ctx.fillStyle = COLORS.happy;
-      ctx.fillText('✓', 0, -46);
+      ctx.fillText('✓', 0, 2);
     } else if (t.state === 'eating'){
       // Deliberately a different shape and colour from the patience meter:
       // this clock running down is a good thing, and the two must never be
       // mistaken for each other at a glance.
       const barW = 52, frac = Math.max(0, t.eatTimer / EAT_MS);
       ctx.fillStyle = 'rgba(0,0,0,0.14)';
-      roundRect(ctx, -barW/2, -46, barW, 6, 3);
+      roundRect(ctx, -barW/2, -4, barW, 6, 3);
       ctx.fill();
       ctx.fillStyle = COLORS.counter;
-      roundRect(ctx, -barW/2, -46, barW * frac, 6, 3);
+      roundRect(ctx, -barW/2, -4, barW * frac, 6, 3);
       ctx.fill();
       // Offset right so the table number stays readable — it is how the
       // player identifies the table, and it must not be covered on the
       // states that most need attention.
-      drawPlate(15, -13, 9, true);
+      drawPlate(0, t.y - t.barY, 9, true);
     } else if (t.state === 'dirty'){
       // Dirty plates sit on the table and the pad reads CLEAR instead of SET
       // DOWN. No timer: the cost of ignoring it is that the table cannot take
       // another order, not a countdown.
-      drawDirtyDishes(14, -13, 0.78);
-      ctx.fillStyle = COLORS.mustard;
-      ctx.font = '900 9px DM Sans, sans-serif';
-      ctx.fillText('NEEDS CLEARING', 0, -44);
+      drawDirtyDishes(-2, t.y - t.barY, 0.78);
     } else if (t.state === 'angry'){
       ctx.font = '20px serif';
-      ctx.fillText('😠', 0, -50);
+      ctx.fillText('😠', 0, 0);
     }
     if (t.bump && t.bump > 0){
       ctx.fillStyle = 'rgba(193,68,58,0.5)';
       ctx.beginPath();
-      ctx.arc(0, -8, 40, 0, Math.PI*2);
+      ctx.arc(0, 30, 46, 0, Math.PI*2);
       ctx.fill();
     }
 
@@ -1461,7 +1452,7 @@
 
     // carried order — visible near counter, fades after leaving
     if (carrying){
-      const nearCounter = player.y - player.size/2 <= counterRect.h + 70;
+      const nearCounter = player.y - player.size/2 <= FLOOR_TOP + A(60);
       const timeSince = performance.now() - carrying.pickedAt;
       const fadeWindow = 1600; // ms of grace visibility after leaving counter
       let alpha = 1;
@@ -1520,9 +1511,9 @@
     const lines = wrapText(body, panelW - padX*2 - 110);
     const panelH = 48 + lines.length * 22;
     const px = 24, py = H - panelH - 16;
-    tut.bannerTop = py;   // update() keeps the player out from under it
+    tut.bannerTop = py;
 
-    ctx.fillStyle = 'rgba(28,23,18,0.94)';
+    ctx.fillStyle = 'rgba(28,23,18,0.86)';
     roundRect(ctx, px, py, panelW, panelH, 12); ctx.fill();
     ctx.strokeStyle = accent; ctx.lineWidth = 3;
     roundRect(ctx, px, py, panelW, panelH, 12); ctx.stroke();
@@ -1551,10 +1542,10 @@
     drawPickupZone();
     drawBusStation();
     tables.forEach(drawTable);
-    drawPlayer();
     drawFloaters();
     drawCounter();
     drawTutorialBanner();
+    drawPlayer();   // above the panel, so you can always see yourself
   }
 
   // ---------- Loop ----------
