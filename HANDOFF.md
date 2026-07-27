@@ -1,4 +1,4 @@
-# Rush Hour — Session Handoff
+# Waiter Rush — Session Handoff
 
 Read this first. It is the working brief for continuing development, written at the point where the previous session's environment had to be replaced. The README covers what the game *is* for anyone arriving cold; this covers what has been decided, what has been measured, what is unresolved, and what to be careful about.
 
@@ -43,7 +43,7 @@ One file, `index.html`, about 1150 lines: styles, then markup, then the whole ga
 - Drawing functions, then `render()`
 - `loop` / `beginRun` / `startGame` / `startTutorial`, then event wiring
 
-Canvas is a fixed 960×600 internal resolution scaled by CSS. Eight tables in two rows of four, at x = 120/320/520/720 and y = 200/400. Player is a circle of radius 26 moving at `PLAYER_SPEED` (550 px/s). The counter occupies the top 90px and holds at most 5 queued tickets. The dish return (`BUS`) sits against the right wall at x = 886, y = 300.
+Canvas is a fixed 960×640 internal resolution scaled by CSS, matching the 3:2 of the painted board. **All geometry is measured off `assets/kitchen.jpg` and expressed as `A(artPixel)`** — see the Board section. Player is a circle of radius 26 moving at `PLAYER_SPEED` (550 px/s).
 
 ## The core hook, and the rule that protects it
 
@@ -108,20 +108,22 @@ Tiers are `TIP_BIG` (0.85) and `TIP_GOOD` (0.5) of the tip fraction, shown as a 
 
 ## The pass, and money
 
-**Pickup needs a marked pad, and there are two of them — one per section.** Touching the counter anywhere used to hand you an order, so brushing it while running past gave you a ticket you had never looked at, which quietly deletes the memory mechanic: you cannot hold a number in your head that you never saw. `PASSES` defines a pad at each end (`x: 56` and `x: 904`, both at `y: 118`), `tryPickup` gates on `passUnderPlayer()`, and each pass only hands over its own section's queue.
+**Pickup needs a marked pad, and there are two of them — one per section, both at the counter.** Touching the counter anywhere used to hand you an order, so brushing it while running past gave you a ticket you had never looked at, which quietly deletes the memory mechanic: you cannot hold a number in your head that you never saw. `PASSES` defines a pad under each section's NEXT UP ticket, `tryPickup` gates on `passUnderPlayer()`, and each pass only hands over its own section's queue.
+
+The pads sit on the floor at the **base of the counter**, not on it — the counter is furniture you stand in front of. Getting them to read as "at the counter" needed `FLOOR_TOP` raised to `A(400)` so the player overlaps the counter's lower face; at the art's true floor line the pads were pushed down level with the table number plates and looked like they belonged to the tables instead.
 
 Sections split on table x against `W/2`: tables 1, 2, 5, 6 are left, 3, 4, 7, 8 are right. An order is issued at its own table's end of the counter, so no section is further from its food than any other. Each side has exactly four tables and a table can only have one order outstanding, so the per-side cap of four is the natural maximum rather than an artificial throttle. The front of each queue is marked **NEXT UP** — that leaks nothing protected, since the ticket is legible at the counter anyway and the standing rule is about not revealing the table *once you have walked away with it*.
 
-This was built to fix a real asymmetry a single left-hand pass created, and it worked:
+Two passes were built to fix a real asymmetry a single left-hand pass created, and it worked:
 
 | | left/right gap | front/back row gap |
 | --- | ---: | ---: |
 | one pass, left end | 147ms | 186ms |
 | **two passes** | **14ms** | 422ms |
 
-The left/right bias is essentially gone. The remaining variation is now front row versus back row, which is inherent to the layout — the back tables really are further from the counter — and it is symmetric, so it reads as spatial texture rather than a lopsided design.
+The left/right bias is essentially gone. The remaining variation is front row versus back row, inherent to the layout and symmetric, so it reads as spatial texture rather than a lopsided design.
 
-**Two things it cost, worth knowing before tuning further.** Average trips got shorter (median wait 1.8s to 1.6s), so the shift is slightly easier. And that compressed the tip gradient back toward the top: the tier split went from 8 big / 6 good with one pass to **13 big / 3 good** with two. Tip *values* still span (roughly $7.98-$9.62 of tip for near-optimal play), so it is not the flat maximum this curve keeps collapsing into, but it is closer to it than before. If it wants opening up again, lower `TIP_FULL_MS` — and re-run the bot rather than guessing, per the table above.
+**One thing it cost:** average trips got shorter, which compressed the tip gradient toward the top — the tier split went from 8 big / 6 good to 13 big / 3 good. Tip values still span, so it is not the flat maximum this curve keeps collapsing into. If it wants opening up, lower `TIP_FULL_MS` and re-run the bot rather than guessing.
 
 **Score is money, held in cents.** `DELIVERY_BASE_C` (500) is what a table leaves regardless, `TIP_MAX_C` (1000) is the speed-earned part, and `BUS_PAY_C` (200) pays for clearing so bussing is not unpaid work. A table is therefore worth $5.00-$15.00 and a 100-second bot shift earns about **$212**, which is a believable night. Integer cents rather than a running float means a shift total cannot drift; `money()` is the single place cents become a string, and everything on screen goes through it.
 

@@ -1,4 +1,4 @@
-# Rush Hour — The Waiter Game
+# Waiter Rush — The Waiter Game
 
 A short Overcooked-style arcade game built for Articulate E-Learning Challenge #561 ("Online Training for Restaurant Servers & Waiters").
 

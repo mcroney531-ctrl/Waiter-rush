@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>Rush Hour — The Waiter Game</title>
+<title>Waiter Rush — The Waiter Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
@@ -233,7 +233,7 @@
   </div>
 
   <div id="overlay" class="hidden">
-    <h1>Rush Hour</h1>
+    <h1>Waiter Rush</h1>
     <p>Grab the order ticket from the counter, remember which table it's for, and deliver it before the ticket board goes blank on your walk. Miss too many tables and the shift is over.</p>
     <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
     <button class="cta" id="trainBtn">Start Training</button>
@@ -297,7 +297,11 @@
   // The counter is painted across the top; the floor the player can walk on
   // starts below it.
   const counterRect = { x: 0, y: 0, w: W, h: A(430) };
-  const FLOOR_TOP = A(432);
+  // The player stands in front of the counter, overlapping its lower face, so
+  // the walkable area starts at the counter's base rather than below it. Any
+  // lower and the pass pads get pushed down level with the table number plates
+  // instead of hugging the counter.
+  const FLOOR_TOP = A(400);
 
   // Table anchors are the painted number plates. Note the two rows are not
   // evenly spaced and the front row is wider than the back — that is the
@@ -328,12 +332,13 @@
   // The two passes, under the painted PICK UP signs at each end of the
   // counter. Each serves its own section; see the pickup notes below.
   const PASS_W = A(150), PASS_H = A(58);
-  // Under the painted signs, in the open floor at each end — the aisle between
-  // the counter and the front row is only a few pixels tall, so the pads live
-  // in the side margins where there are no tables.
+  // On the floor directly beneath the counter, each pad under its own section's
+  // NEXT UP ticket, so you collect at the counter rather than off in a corner.
+  // They cannot sit on the counter itself — that is furniture the player walks
+  // in front of, not on — so they occupy the strip of floor at its base.
   const PASSES = [
-    { side: 'left',  x: A(232),  y: A(478), w: PASS_W, h: PASS_H },
-    { side: 'right', x: A(1276), y: A(478), w: PASS_W, h: PASS_H }
+    { side: 'left',  x: A(349),  y: A(428), w: PASS_W, h: PASS_H },
+    { side: 'right', x: A(1238), y: A(428), w: PASS_W, h: PASS_H }
   ];
   const QUEUE_CAP_PER_SIDE = 4;
   const sideOfTable = t => (t.x < W/2 ? 'left' : 'right');
@@ -1134,7 +1139,7 @@
     overlay.innerHTML = `
       <h1>Shift Over</h1>
       <div class="big-stat">${money(score)}</div>
-      <p>${deliveries} orders delivered and ${cleared} tables cleared before the floor got the better of you. Rush hour only gets faster from here — want another go?</p>
+      <p>${deliveries} orders delivered and ${cleared} tables cleared before the floor got the better of you. The rush only gets faster from here — want another go?</p>
       <button class="cta" id="startBtn">Run It Back</button>
       <button class="cta ghost" id="avatarBtn2">Change your waiter</button>
     `;
@@ -1257,7 +1262,7 @@
     // ticket's position on screen tells you which pass it is waiting at.
     for (const p of PASSES){
       queueFor(p.side).forEach((tk, i) => {
-        const tx = p.side === 'left' ? A(290) + i * 82 : W - A(290) - 72 - i * 82;
+        const tx = p.side === 'left' ? A(291) + i * 80 : A(1238) + 36 - 72 - i * 80;
         ctx.save();
         ctx.translate(tx, A(322));
         ctx.fillStyle = '#F4EEDB';
