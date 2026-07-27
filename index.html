@@ -48,6 +48,11 @@
   }
   #hud .stat { font-size: 20px; letter-spacing: 0.5px; }
   #hud .stat span.label { font-family: 'DM Sans', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; font-weight: 700;}
+  #flow {
+    display: block; font-family: 'DM Sans', sans-serif; font-size: 12px;
+    font-weight: 900; letter-spacing: 2px; color: #E0A72E; min-height: 15px;
+  }
+  #flow.lit { text-shadow: 0 0 12px rgba(224,167,46,0.9); }
   #lives { display: flex; gap: 6px; margin-top: 2px; }
   .life-dot { width: 14px; height: 14px; border-radius: 50%; background: #C1443A; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
   .life-dot.lost { background: rgba(255,255,255,0.15); }
@@ -209,6 +214,7 @@
     <div class="stat">
       <span class="label">Tips</span>
       <span id="score">$0.00</span>
+      <span id="flow"></span>
     </div>
     <div class="stat" style="text-align:right;">
       <span class="label">Tables lost</span>
@@ -379,7 +385,14 @@
     { side: 'left',  x: A(349),  y: A(428), w: PASS_W, h: PASS_H },
     { side: 'right', x: A(1238), y: A(428), w: PASS_W, h: PASS_H }
   ];
-  const QUEUE_CAP_PER_SIDE = 4;
+  // The counter queue deepens as the shift wears on — one of the difficulty
+  // axes Rone named. Four a side is the natural ceiling anyway, since each
+  // section has four tables and a table can only have one order outstanding,
+  // so this really controls how much backlog you are allowed to accumulate
+  // early rather than raising a hard cap.
+  const QUEUE_CAP_START = 2, QUEUE_CAP_END = 4;
+  const queueCapPerSide = () =>
+    Math.round(lerp(QUEUE_CAP_START, QUEUE_CAP_END, rushProgress()));
   const sideOfTable = t => (t.x < W/2 ? 'left' : 'right');
 
   // Both painted dish returns are live, one per section, so clearing a table
@@ -392,7 +405,25 @@
   let tables = [];
   let tickets = []; // waiting at the counter: {id, tableId, icon, spawnTime}
   let player, keys, touchDir;
-  let carrying = null; // {tableId, icon, pickedAt}
+  // What is in your hands. An array rather than a single object: capacity
+  // starts at one and a second slot unlocks after CARRY_UNLOCK deliveries, at
+  // which point every trip becomes a route-planning problem and you hold two
+  // table numbers in your head instead of one. That is the point — it deepens
+  // the memory hook rather than sitting beside it.
+  let carried = [];   // [{type:'order'|'dishes', tableId, icon, pickedAt, orderedAt}]
+  const carryingDishes = () => carried.find(c => c.type === 'dishes');
+  const handsFull = () => carried.length >= carryCapacity;
+  let capacityNotice = 0;     // ms left on the "second hand unlocked" banner
+  let penaltyUntil = 0;       // wrong-table slowdown expires at this timestamp
+  let wrongTurns = 0;
+  let streak = 0;             // consecutive fast deliveries
+  let flowLit = false;
+  let flowFlash = 0;          // ms of the "IN THE WEEDS... IN A GOOD WAY" flourish
+  function breakStreak(){
+    if (flowLit) flowFlash = 0;
+    streak = 0;
+    flowLit = false;
+  }
   let carryCapacity = 1;
   let deliveries = 0;
   let cleared = 0;      // tables bussed; not shown in the HUD, used by the tutorial
@@ -417,6 +448,19 @@
   // it below that and orders arrive faster than one carry slot can clear
   // them no matter how well you play — see the carry-two note in HANDOFF.md.
   const SPAWN_FLOOR_MS  = 3400;
+
+  // Real services arrive in surges, not on a slider. The ramp above still sets
+  // the baseline; this swings the spawn gap either side of it so a party lands,
+  // then the floor breathes. The swing deepens as the shift wears on, which is
+  // the "rush intensity" axis — late waves hit harder and the lulls between
+  // them stop being long enough to fully recover in.
+  const WAVE_PERIOD_MS = 42000;
+  const WAVE_DEPTH_START = 0.18, WAVE_DEPTH_END = 0.55;
+  function waveFactor(){
+    const depth = lerp(WAVE_DEPTH_START, WAVE_DEPTH_END, rushProgress());
+    const phase = (Math.sin(elapsed / WAVE_PERIOD_MS * Math.PI * 2 - Math.PI/2) + 1) / 2;
+    return 1 + depth * (1 - 2 * phase);   // <1 at the peak, >1 in the lull
+  }
   // Tutorial lessons only; see the note where drainRate is computed.
   const TUTORIAL_PATIENCE_S = 20;
 
@@ -431,7 +475,38 @@
   // against how fast a delivery can physically be made.
   const PLAYER_SPEED = 550;
 
-  const EAT_MS = 22000;
+  // Carrying. The second slot is a mid-shift unlock rather than a starting
+  // state, so the opening teaches one-at-a-time and the doubling of memory
+  // load arrives as a reward once you have proved the basic loop.
+  const CARRY_MAX = 2;
+  const CARRY_UNLOCK = 6;          // deliveries before the second hand opens
+  const CAPACITY_NOTICE_MS = 2600;
+
+  // Delivering to the wrong table used to cost nothing but a visual bump,
+  // which meant a player could ignore the memory mechanic and just try tables
+  // until one accepted — defeating the skill the game exists to teach. It now
+  // costs the streak and a brief slowdown while you re-plate.
+  const WRONG_PENALTY_MS = 1200;   // how long you move at WRONG_SPEED_MULT
+  const WRONG_SPEED_MULT = 0.45;
+  const WRONG_COOLDOWN_MS = 900;   // per table, so brushing past is not spammed
+  const WRONG_DWELL_MS = 420;      // how long you must linger for it to count
+
+  // Flow state. A streak of consecutive fast deliveries lights it and it
+  // multiplies tips; a slow delivery, a walkout or a wrong table puts it out.
+  // Chosen over a speed or capacity boost because it changes how you play —
+  // you start weighing a safe delivery against chasing one more — rather than
+  // just making you stronger.
+  //
+  // FLOW_FAST is deliberately stricter than the BIG TIP tier. Measured play
+  // lands most deliveries in that tier, so keying the streak to it would leave
+  // flow permanently lit and the multiplier would be a flat bonus. Retune this
+  // against a bot run rather than guessing; see the Scoring notes.
+  const FLOW_FAST = 0.86;          // tip fraction a delivery must beat
+  const FLOW_STREAK_NEEDED = 3;    // consecutive fast ones to light it
+  const FLOW_MULT = 2;
+
+  const EAT_START_MS = 22000, EAT_END_MS = 12000;
+  const eatMs = () => lerp(EAT_START_MS, EAT_END_MS, rushProgress());
 
   // Money is held in whole cents so a shift's total never drifts the way a
   // running float would. Everything reaching the screen goes through money().
@@ -491,13 +566,19 @@
       // -> dirty -> idle again once the player clears it. A table that is not
       // idle cannot take a new order, so dirty tables shrink the usable floor.
       state: 'idle',
-      patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0
+      patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0, wrongCooldown: 0, wrongDwell: 0
     }));
     tickets = [];
     player = { x: W/2, y: H - 90, size: 26, speed: PLAYER_SPEED };
     keys = {};
     touchDir = {x:0, y:0};
-    carrying = null;
+    carried = [];
+    capacityNotice = 0;
+    penaltyUntil = 0;
+    wrongTurns = 0;
+    streak = 0;
+    flowLit = false;
+    flowFlash = 0;
     carryCapacity = 1;
     deliveries = 0;
     cleared = 0;
@@ -518,6 +599,12 @@
 
   function updateHUD(){
     document.getElementById('score').textContent = money(score);
+    const fl = document.getElementById('flow');
+    if (fl){
+      fl.textContent = flowLit ? 'FLOW x' + FLOW_MULT
+                    : (streak > 0 ? '\u2022'.repeat(streak) : '');
+      fl.className = flowLit ? 'lit' : '';
+    }
     const livesEl = document.getElementById('lives');
     livesEl.innerHTML = '';
     for (let i=0;i<3;i++){
@@ -735,7 +822,7 @@
     // appears at the end of the counter nearest to it.
     const side = sideOfTable(t);
     const ticket = { id: ticketIdCounter++, tableId: t.id, icon, side, spawnTime: performance.now() };
-    if (tickets.filter(tk => tk.side === side).length >= QUEUE_CAP_PER_SIDE) return;
+    if (tickets.filter(tk => tk.side === side).length >= queueCapPerSide()) return;
     tickets.push(ticket);
     t.state = 'waiting';
     t.ticketId = ticket.id;
@@ -804,10 +891,11 @@
   // player gets on their own speed, so it has to be legible at a glance
   // without needing to read a number.
   let floaters = [];
-  function tipFloater(x, y, tip, waitedMs){
+  function tipFloater(x, y, tip, waitedMs, lit){
     const frac = tipFraction(waitedMs);
     let label, colour;
-    if (frac >= TIP_BIG)       { label = 'BIG TIP';  colour = COLORS.mustard; }
+    if (lit)                   { label = 'FLOW  x' + FLOW_MULT; colour = COLORS.mustard; }
+    else if (frac >= TIP_BIG)  { label = 'BIG TIP';  colour = COLORS.mustard; }
     else if (frac >= TIP_GOOD) { label = 'GOOD TIP'; colour = COLORS.happy; }
     else if (tip > 0)          { label = 'TIP';      colour = COLORS.text; }
     else                       { label = 'NO TIP';   colour = COLORS.angry; }
@@ -816,7 +904,7 @@
       top: label,
       bottom: '+' + money(DELIVERY_BASE_C + tip),
       secs: (waitedMs/1000).toFixed(1) + 's',
-      big: frac >= TIP_BIG,
+      big: lit || frac >= TIP_BIG,
       life: 1500, max: 1500
     });
   }
@@ -827,14 +915,27 @@
       ctx.save();
       ctx.globalAlpha = Math.min(1, f.life / 420);   // hold, then fade out
       ctx.textAlign = 'center';
-      ctx.fillStyle = f.colour;
-      ctx.font = '900 ' + (f.big ? 13 : 11) + 'px DM Sans, sans-serif';
-      ctx.fillText(f.top, f.x, f.y - k * 26);
-      ctx.font = '900 ' + (f.big ? 20 : 17) + 'px DM Sans, sans-serif';
-      ctx.fillText(f.bottom, f.x, f.y - k * 26 + (f.big ? 19 : 17));
-      ctx.globalAlpha *= 0.6;
-      ctx.font = '700 10px DM Sans, sans-serif';
-      ctx.fillText(f.secs, f.x, f.y - k * 26 + (f.big ? 33 : 30));
+      // Floaters land wherever the table is, which on this board means over
+      // number plaques, pad labels and the ticket rail. A dark outline is what
+      // keeps them readable without moving them somewhere less useful.
+      ctx.lineJoin = 'round';
+      ctx.miterLimit = 2;
+      ctx.strokeStyle = 'rgba(24,19,14,0.85)';
+      const line = (text, y, px, alpha) => {
+        const prev = ctx.globalAlpha;
+        ctx.globalAlpha = alpha;
+        ctx.font = px + ' DM Sans, sans-serif';
+        ctx.lineWidth = 4;
+        ctx.strokeText(text, f.x, y);
+        ctx.fillStyle = f.colour;
+        ctx.fillText(text, f.x, y);
+        ctx.globalAlpha = prev;
+      };
+      const a = ctx.globalAlpha;
+      const base = f.y - k * 26;
+      line(f.top,    base,                            '900 ' + (f.big ? 13 : 11) + 'px', a);
+      line(f.bottom, base + (f.big ? 19 : 17),        '900 ' + (f.big ? 20 : 17) + 'px', a);
+      line(f.secs,   base + (f.big ? 33 : 30),        '700 10px',                        a * 0.6);
       ctx.restore();
     }
   }
@@ -861,7 +962,7 @@
   const queueFor = side => tickets.filter(tk => tk.side === side);
 
   function tryPickup(){
-    if (carrying) return; // already holding max? we only support 1 slot visually, capacity affects nothing beyond flavor for now
+    if (handsFull()) return;
     const pass = passUnderPlayer();
     if (!pass) return;
     const queue = queueFor(pass.side);
@@ -870,60 +971,74 @@
     tickets.splice(tickets.indexOf(t), 1);
     // orderedAt is when the ticket appeared, not when it was picked up: time
     // spent sitting in the queue is time the guest waited, so it counts.
-    carrying = { type: 'order', tableId: t.tableId, icon: t.icon,
-                 pickedAt: performance.now(), orderedAt: t.spawnTime };
+    carried.push({ type: 'order', tableId: t.tableId, icon: t.icon,
+                   pickedAt: performance.now(), orderedAt: t.spawnTime });
   }
 
-  // Dishes share the single carry slot with orders on purpose: every trip is a
-  // choice about what is most urgent, which is the whole point of the mechanic.
+  // Dishes take a carry slot like an order does, so with two slots you can run
+  // a plate out and a stack of dirties back on the same trip. That is what the
+  // second slot is really for, and it is what a real server does.
   function tryBusPickup(){
-    if (carrying) return;
+    if (handsFull() || carryingDishes()) return;   // one tray is plenty
     for (const t of tables){
       if (t.state === 'dirty' && inDropZone(t)){
         t.state = 'clearing';
-        carrying = { type: 'dishes', tableId: t.id, pickedAt: performance.now() };
+        carried.push({ type: 'dishes', tableId: t.id, pickedAt: performance.now() });
         return;
       }
     }
   }
 
   function tryBusDrop(){
-    if (!carrying || carrying.type !== 'dishes') return;
-    if (!inBusZone()) return;
-    const table = tables.find(t => t.id === carrying.tableId);
+    const tray = carryingDishes();
+    if (!tray || !inBusZone()) return;
+    const table = tables.find(t => t.id === tray.tableId);
     if (table) { table.state = 'idle'; table.patience = 1; }
     score += BUS_PAY_C;
     cleared++;
-    carrying = null;
+    carried.splice(carried.indexOf(tray), 1);
     updateHUD();
   }
 
+  // Delivery keys off the pad you are standing on rather than a chosen item:
+  // whichever carried order belongs to this table goes down. With two in hand
+  // you never pick "which plate", you just walk to a table and the right one
+  // lands — so the load stays on remembering numbers, not managing inventory.
   function tryDeliver(){
-    if (!carrying || carrying.type !== 'order') return;
-    const table = tables.find(t => t.id === carrying.tableId);
-    if (!table) { carrying = null; return; }
-    if (inDropZone(table)) {
+    const orders = carried.filter(c => c.type === 'order');
+    if (!orders.length) return;
+    for (const item of orders.slice()){
+      const table = tables.find(t => t.id === item.tableId);
+      if (!table){ carried.splice(carried.indexOf(item), 1); continue; }
+      // Only a table that is actually still waiting accepts food. Without this
+      // a delivery could overwrite a table that had moved on to another state.
+      if (table.state !== 'waiting'){ carried.splice(carried.indexOf(item), 1); continue; }
+      if (!inDropZone(table)) continue;
       table.state = 'happy';
       table.happyTimer = 1200;
       table.ticketId = null;
       table.patience = 1;
-      const waited = performance.now() - carrying.orderedAt;
-      const tip = Math.round(tipFraction(waited) * TIP_MAX_C);
+      const waited = performance.now() - item.orderedAt;
+      const frac = tipFraction(waited);
+      // The streak updates before the tip is worked out, so the delivery that
+      // lights flow is itself the first one paid double.
+      if (frac >= FLOW_FAST){
+        streak++;
+        if (streak >= FLOW_STREAK_NEEDED && !flowLit){ flowLit = true; flowFlash = 1800; }
+      } else {
+        breakStreak();
+      }
+      const tip = Math.round(frac * TIP_MAX_C * (flowLit ? FLOW_MULT : 1));
       score += DELIVERY_BASE_C + tip;
-      tipFloater(table.x, table.y - 62, tip, waited);
+      tipFloater(table.x, table.barY - 20, tip, waited, flowLit);
       deliveries++;
-      carrying = null;
+      carried.splice(carried.indexOf(item), 1);
       updateHUD();
-      if (deliveries === 6 && carryCapacity === 1){
-        carryCapacity = 2;
+      if (deliveries === CARRY_UNLOCK && carryCapacity < CARRY_MAX){
+        carryCapacity = CARRY_MAX;
+        capacityNotice = CAPACITY_NOTICE_MS;
       }
-    } else {
-      // check wrong table bump for feedback only
-      for (const other of tables){
-        if (other.id !== carrying.tableId && inDropZone(other)){
-          other.bump = 300;
-        }
-      }
+      return;
     }
   }
 
@@ -933,17 +1048,10 @@
 
   // Auto pickup/deliver on proximity for mobile ease, plus spacebar on desktop
   function checkAutoInteract(){
-    if (!carrying && tickets.length > 0){
-      tryPickup();
-    }
-    if (!carrying) tryBusPickup();
-    if (carrying && carrying.type === 'order'){
-      const table = tables.find(t => t.id === carrying.tableId);
-      if (table && inDropZone(table)){
-        tryDeliver();
-      }
-    }
-    if (carrying && carrying.type === 'dishes') tryBusDrop();
+    if (tickets.length > 0) tryPickup();
+    tryBusPickup();
+    tryDeliver();
+    tryBusDrop();
   }
 
   // ---------- Tutorial ----------
@@ -965,23 +1073,23 @@
       hint: 'Pick up an order',
       text: () => 'An order is up. There is a PICK UP pad at each end of the counter, one per section — step onto the one under the ticket to take it, no button needed. You always get the ticket marked NEXT UP, so read it before you walk.',
       enter(){ drainEnabled = false; bussingEnabled = false; spawnTicket(6); },
-      done(){ return !!carrying; },
-      success: () => 'You are carrying table ' + carrying.tableId + '.'
+      done(){ return carried.length > 0; },
+      success: () => 'You are carrying table ' + (carried[0] ? carried[0].tableId : '') + '.'
     },
     {
       hint: 'Deliver it',
-      text: () => carrying
-        ? 'Take it to table ' + carrying.tableId + ' and step onto the dashed pad in front of it — no need to walk through the table. Watch the ticket fade as you go; you have to hold the number in your head. Drift back toward the counter any time to peek.'
+      text: () => carried[0]
+        ? 'Take it to table ' + carried[0].tableId + ' and step onto the dashed pad in front of it — no need to walk through the table. Watch the ticket fade as you go; you have to hold the number in your head. Drift back toward the counter any time to peek.'
         : 'Step onto the dashed pad in front of the table to hand the order over.',
       enter(){ drainEnabled = false; bussingEnabled = false; },
-      done(){ return !carrying; },
+      done(){ return carried.length === 0; },
       success: () => 'Delivered. That is a full loop — and the quicker it lands, the bigger the tip.'
     },
     {
       hint: 'Watch their patience',
       text: () => 'This one is on the clock. The bar above the table drains while they wait — empty it and they walk out, costing you one of three lives. Get this order out.',
       enter(){ drainEnabled = true; bussingEnabled = false; spawnTicket(3); },
-      done(){ return !carrying && !tables.some(t => t.state === 'waiting'); },
+      done(){ return carried.length === 0 && !tables.some(t => t.state === 'waiting'); },
       onMiss(){
         tut.note = 'They walked. On a real shift that costs a life — here we just run it again.';
         tut.noteTimer = 2600;
@@ -1086,7 +1194,7 @@
   // ---------- Update ----------
   function update(dt){
     elapsed += dt;
-    spawnInterval = lerp(SPAWN_START_MS, SPAWN_FLOOR_MS, rushProgress());
+    spawnInterval = lerp(SPAWN_START_MS, SPAWN_FLOOR_MS, rushProgress()) * waveFactor();
 
     // Tutorial steps stage their own orders; only the real shift and the
     // practice round spawn on the timer.
@@ -1099,8 +1207,11 @@
     }
 
     const {dx, dy} = getMoveVector();
-    player.x += dx * player.speed * dt/1000;
-    player.y += dy * player.speed * dt/1000;
+    // Re-plating after a wrong table: you keep control, you just move like
+    // someone carrying something they should not be.
+    const speed = player.speed * (performance.now() < penaltyUntil ? WRONG_SPEED_MULT : 1);
+    player.x += dx * speed * dt/1000;
+    player.y += dy * speed * dt/1000;
     player.x = Math.max(player.size/2, Math.min(W - player.size/2, player.x));
     player.y = Math.max(FLOOR_TOP + player.size/2, Math.min(H - player.size/2, player.y));
 
@@ -1135,7 +1246,9 @@
           // remove its ticket from queue if still there
           tickets = tickets.filter(tk => tk.tableId !== t.id || tk.tableId !== t.id);
           tickets = tickets.filter(tk => !(tk.tableId === t.id));
-          if (carrying && carrying.tableId === t.id) carrying = null;
+          const lost = carried.find(c => c.type === 'order' && c.tableId === t.id);
+          if (lost) carried.splice(carried.indexOf(lost), 1);
+          breakStreak();
           if (mode === 'tutorial'){
             tut.missed = true;   // teach the lesson, do not charge for it
           } else {
@@ -1153,7 +1266,7 @@
       if (t.state === 'happy'){
         t.happyTimer -= dt;
         if (t.happyTimer <= 0){
-          if (bussingEnabled){ t.state = 'eating'; t.eatTimer = EAT_MS; }
+          if (bussingEnabled){ t.state = 'eating'; t.eatTimer = eatMs(); }
           else t.state = 'idle';
         }
       }
@@ -1166,8 +1279,37 @@
         if (t.angryTimer <= 0) t.state = 'idle';
       }
       if (t.bump){ t.bump -= dt; if (t.bump < 0) t.bump = 0; }
+      if (t.wrongCooldown > 0) t.wrongCooldown -= dt;
+
+      // A wrong delivery has to be a deliberate act, not transit. Walking to
+      // table 4 means crossing the pads of 1, 2 and 3 on the way, and an
+      // instant trigger punished ordinary movement — it broke the flow streak
+      // on nearly every trip. It only counts if the table is actually waiting
+      // for food and you linger on its pad.
+      // The dwell only builds once the cooldown has run out, so parking on a
+      // wrong pad charges you every WRONG_COOLDOWN_MS + WRONG_DWELL_MS rather
+      // than twice inside the first second.
+      const carryingFor = carried.some(c => c.type === 'order' && c.tableId === t.id);
+      if (t.state === 'waiting' && !carryingFor && carried.some(c => c.type === 'order') && inDropZone(t)){
+        if (t.wrongCooldown <= 0) t.wrongDwell = (t.wrongDwell || 0) + dt;
+        if (t.wrongDwell >= WRONG_DWELL_MS){
+          t.bump = 300;
+          t.wrongCooldown = WRONG_COOLDOWN_MS;
+          t.wrongDwell = 0;
+          wrongTurns++;
+          penaltyUntil = performance.now() + WRONG_PENALTY_MS;
+          breakStreak();
+          floaters.push({ x: t.x, y: t.barY - 12, colour: COLORS.angry,
+                          top: 'WRONG TABLE', bottom: 'no tip', secs: '',
+                          big: false, life: 1300, max: 1300 });
+        }
+      } else {
+        t.wrongDwell = 0;
+      }
     }
 
+    if (capacityNotice > 0) capacityNotice -= dt;
+    if (flowFlash > 0) flowFlash -= dt;
     for (const f of floaters) f.life -= dt;
     if (floaters.some(f => f.life <= 0)) floaters = floaters.filter(f => f.life > 0);
   }
@@ -1274,7 +1416,7 @@
   // dishes so it is obvious where they go.
   function drawBusStation(){
     const at = busUnderPlayer();
-    const holding = carrying && carrying.type === 'dishes';
+    const holding = !!carryingDishes();
     for (const b of BUS_STATIONS){
       const standing = at === b;
       if (!standing && !holding) continue;
@@ -1411,7 +1553,7 @@
       // Deliberately a different shape and colour from the patience meter:
       // this clock running down is a good thing, and the two must never be
       // mistaken for each other at a glance.
-      const barW = 52, frac = Math.max(0, t.eatTimer / EAT_MS);
+      const barW = 52, frac = Math.max(0, t.eatTimer / EAT_START_MS);
       ctx.fillStyle = 'rgba(0,0,0,0.14)';
       roundRect(ctx, -barW/2, -4, barW, 6, 3);
       ctx.fill();
@@ -1444,6 +1586,19 @@
   function drawPlayer(){
     ctx.save();
     ctx.translate(player.x, player.y);
+
+    // Flow reads on the player rather than only in the HUD, so you can feel it
+    // without looking away from the floor.
+    if (flowLit){
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now()/180);
+      ctx.save();
+      ctx.globalAlpha = 0.30 + 0.25 * pulse;
+      ctx.fillStyle = COLORS.mustard;
+      ctx.beginPath();
+      ctx.arc(0, 0, player.size + 9 + 3*pulse, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.beginPath();
     ctx.ellipse(0, player.size*0.6, player.size*0.55, player.size*0.2, 0, 0, Math.PI*2);
@@ -1482,43 +1637,45 @@
 
     ctx.restore();
 
-    // Carried dishes never fade. The fade exists to make you remember a table
-    // number; dishes have a fixed destination, so hiding them would be noise
+    // Everything in your hands, laid out side by side. Each item fades on its
+    // own clock: the fade is what forces you to hold the table number in your
+    // head, and with two plates that means two numbers. Dish trays never fade —
+    // the dish return is a fixed destination, so hiding them would be noise
     // rather than difficulty.
-    if (carrying && carrying.type === 'dishes'){
-      ctx.save();
-      drawDirtyDishes(player.x - 4, player.y - player.size - 12, 1);
-      ctx.restore();
-      return;
-    }
-
-    // carried order — visible near counter, fades after leaving
-    if (carrying){
+    if (carried.length){
       const nearCounter = player.y - player.size/2 <= FLOOR_TOP + A(60);
-      const timeSince = performance.now() - carrying.pickedAt;
-      const fadeWindow = 1600; // ms of grace visibility after leaving counter
-      let alpha = 1;
-      if (!nearCounter){
-        alpha = Math.max(0, 1 - (timeSince - 0) / fadeWindow);
-      }
-      if (alpha > 0){
-        const box = foodBox(carrying.icon);
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        const w = box ? box.w * 0.78 : 46, h = box ? box.h * 0.78 : 34;
+      const n = carried.length;
+      carried.forEach((item, i) => {
+        const spread = n > 1 ? (i - (n-1)/2) * 46 : 0;
+        const cx = player.x + spread;
         const cy = player.y - player.size - 12;
-        if (box) ctx.drawImage(box.im, player.x - w/2, cy - h, w, h);
-        drawTableTag(player.x, cy + 2, carrying.tableId, true);
-        ctx.restore();
-      } else {
-        // small neutral dot to show still carrying *something*, without revealing table
-        ctx.save();
-        ctx.fillStyle = COLORS.mustard;
-        ctx.beginPath();
-        ctx.arc(player.x, player.y - player.size - 14, 5, 0, Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-      }
+        if (item.type === 'dishes'){
+          ctx.save();
+          drawDirtyDishes(cx - 4, cy - 4, 0.9);
+          ctx.restore();
+          return;
+        }
+        const timeSince = performance.now() - item.pickedAt;
+        let alpha = nearCounter ? 1 : Math.max(0, 1 - timeSince / 1600);
+        if (alpha > 0){
+          const box = foodBox(item.icon);
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          const w = box ? box.w * (n > 1 ? 0.6 : 0.78) : 40;
+          const h = box ? box.h * (n > 1 ? 0.6 : 0.78) : 30;
+          if (box) ctx.drawImage(box.im, cx - w/2, cy - h, w, h);
+          drawTableTag(cx, cy + 2, item.tableId, n === 1);
+          ctx.restore();
+        } else {
+          // still carrying something, without saying what
+          ctx.save();
+          ctx.fillStyle = COLORS.mustard;
+          ctx.beginPath();
+          ctx.arc(cx, cy - 4, 5, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+      });
     }
   }
 
@@ -1533,6 +1690,46 @@
     }
     if (line) lines.push(line);
     return lines;
+  }
+
+  // Two moments worth calling out on the canvas rather than in the HUD, so the
+  // player never has to look away from the floor to notice them.
+  function drawMoments(){
+    if (capacityNotice > 0){
+      const a = Math.min(1, capacityNotice / 500);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.textAlign = 'center';
+      // Sits on the bench, not on the floor. Below FLOOR_TOP is where the table
+      // number plaques hang, and a banner there covers the numbers at the exact
+      // moment the game is telling you to hold two of them in your head.
+      ctx.fillStyle = 'rgba(28,23,18,0.9)';
+      roundRect(ctx, W/2 - 150, FLOOR_TOP - 56, 300, 44, 10); ctx.fill();
+      ctx.strokeStyle = COLORS.mustard; ctx.lineWidth = 3;
+      roundRect(ctx, W/2 - 150, FLOOR_TOP - 56, 300, 44, 10); ctx.stroke();
+      ctx.fillStyle = COLORS.mustard;
+      ctx.font = '900 15px DM Sans, sans-serif';
+      ctx.fillText('BOTH HANDS FREE', W/2, FLOOR_TOP - 36);
+      ctx.font = '700 11px DM Sans, sans-serif';
+      ctx.fillStyle = '#F4EEDB';
+      ctx.fillText('you can carry two orders now', W/2, FLOOR_TOP - 20);
+      ctx.restore();
+    }
+    if (flowFlash > 0){
+      // Same reasoning as the banner above: keep it off the table numbers. Rides
+      // up onto the wall on the rare occasion both land together.
+      const top = capacityNotice > 0 ? FLOOR_TOP - 96 : FLOOR_TOP - 40;
+      const a = Math.min(1, flowFlash / 500);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = COLORS.mustard;
+      ctx.font = '900 26px DM Sans, sans-serif';
+      ctx.fillText('IN THE FLOW', W/2, top);
+      ctx.font = '700 12px DM Sans, sans-serif';
+      ctx.fillText('tips x' + FLOW_MULT + ' while you keep it up', W/2, top + 20);
+      ctx.restore();
+    }
   }
 
   function drawTutorialBanner(){
@@ -1586,6 +1783,7 @@
     drawFloaters();
     drawCounter();
     drawTutorialBanner();
+    drawMoments();
     drawPlayer();   // above the panel, so you can always see yourself
   }
 
