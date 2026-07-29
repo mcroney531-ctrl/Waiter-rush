@@ -1,7 +1,7 @@
 # Dining room — production spec
 
-The brief for the playable board. Paste into DALL·E as-is; regenerate against it
-rather than editing the old board.
+The brief for the playable board, and the house style for every room after it.
+Paste into DALL·E as-is; regenerate against it rather than editing an old board.
 
 ---
 
@@ -16,6 +16,48 @@ drawn over it as a sprite.
 at the floor, near-orthographic. Avoid strong perspective — it makes the back
 row of tables tiny and breaks the sense that all eight tables are equally
 reachable, which the game depends on.
+
+---
+
+## Art direction
+
+**Dinosaurs invented diners.** This is the north star. Every object should look
+like it evolved naturally inside a dinosaur civilisation, not like a human
+restaurant with prehistoric wallpaper. These are professional restaurateurs, and
+the room should feel civilised, premium and whimsical.
+
+> Nintendo polish × cosy storybook diner × prehistoric civilisation.
+
+What that looks like in practice: carved basalt pillars, fossil-framed trim,
+amber and gold accents, chunky prehistoric joinery, pendant lamps like polished
+amber or fossilised eggs, table bases like carved trunks or stacked stone,
+wall art that is dinosaur-themed menus and fossil displays rather than generic
+restaurant décor.
+
+**What to avoid: full Jurassic Park.** No bones strewn about, no vines
+reclaiming the room, no primitive cave aesthetic. This is upscale dining that
+happens to have evolved among dinosaurs.
+
+---
+
+## Visual hierarchy
+
+The rule that resolves every conflict below. **A player must never notice a
+fossil carving before they notice where table 6 is.**
+
+**Level 1 — instant read.** The character, the eight tables, the two pickup
+zones, the dish returns, the walkable lanes. Highest contrast and saturation
+belongs to the characters; gameplay objects come second.
+
+**Level 2 — environment identity.** Counter, walls, lighting, trim,
+architecture. These frame the gameplay without competing with it.
+
+**Level 3 — reward detail.** Fossils, amber, carved crests, the little touches of
+dinosaur civilisation. These enrich the room and are noticed on the second or
+third look, never the first.
+
+And the tiebreaker: **if an element hurts gameplay readability, simplify or
+remove it regardless of how good it looks.**
 
 ---
 
@@ -37,9 +79,9 @@ whatever gets built.
 
 **The pickup floor band is the most important requirement in this document.** The
 previous board did not have it — the counter sat directly against the back row of
-tables, so the two pickup zones and the back-row tables occupied the same
-pixels, and there was physically nowhere to stand at the counter. Everything
-awkward about the old board followed from that.
+tables, so the two pickup zones and the back-row tables occupied the same pixels
+and there was physically nowhere to stand at the counter. Everything awkward
+about the old board followed from that one missing band.
 
 Also needed:
 
@@ -49,30 +91,79 @@ Also needed:
 - **Eight tables, two rows of four**, each with room above it for a number plate
   to be drawn.
 
+### The counter silhouette is sacred
+
+Gameplay first, theme second. Wrap it in carved stone, fossil trim and amber
+accents as much as you like, but underneath it must remain **a clean rectangular
+serving counter whose front face is a clear horizontal edge meeting lit floor.**
+
+Specifically: do not make the pass a cave mouth or a dark recessed opening. A
+shadowed, receding counter front is exactly the ambiguity that broke the last
+board — if the floor line disappears, there is nowhere to put the pickup zones.
+
 ---
 
-## Lighting and shadow — the part that makes the character belong
+## Lighting and shadow
 
 The character is a 3D render with real directional light and self-shadowing. If
-the room is uniformly lit with nothing casting shadows, he reads as pasted on
-top of a painting rather than standing in a room. This is currently the single
-most noticeable flaw.
+the room is uniformly lit with nothing casting shadows, he reads as pasted on top
+of a painting rather than standing in a room. On the current board this is the
+most noticeable flaw, and the cause is not his shadow — it is that **nothing else
+in the room casts one**, so the floor reads as flat paint rather than ground.
 
 - **Everything on the floor casts a soft contact shadow.** Tables, counter, dish
   returns, anything against a wall. Not dramatic — a soft dark pool where the
   object meets the ground. This establishes that objects in this world touch the
   floor, which is what makes the character's own shadow believable.
-- **One consistent light direction: soft and slightly from the upper front-left.**
-  State it and hold to it. The character's render lights are matched to it, and a
-  room lit from a different direction than the character will always look wrong.
-  Overhead-only lighting is the specific thing to avoid, because it produces no
-  directional shadow to match.
+- **One directional light: soft, from the upper front-left.** The sprite renderer
+  is matched to it. A room lit from a different direction than the character will
+  always look wrong.
+- **Fake it, deliberately.** The amber pendants provide warm atmosphere and glow,
+  but they are *not* the shading direction. Overhead light casts no directional
+  shadow to match, so the room's directional shading comes from the front-left
+  regardless of where the lamps appear to be. This is not physically accurate and
+  players accept it instinctively.
 - **Warm ambient fill** so nothing is in true black.
-- **Floorboards running away from the camera**, which gives depth and scale for
-  free.
+- **Floorboards running away from the camera**, which gives depth and scale free.
 - **Each table needs a readable near edge** — a value step or shadow at its front
   — so it is obvious whether the character is standing in front of it or behind
-  it. On a flat floor with no shadows there is no way to tell.
+  it. On a flat unshadowed floor there is no way to tell, and "am I on the pad" is
+  a decision the player makes constantly.
+
+---
+
+## Ornament has a minimum size
+
+The board is displayed at 62.5% of this canvas — 1536 × 1024 becomes 960 × 640 on
+screen. So:
+
+- Detail under **~16px** in this image is mush at play size. Fine as texture,
+  useless as a recognisable motif.
+- A motif needs **40px or more** to be identifiable as a fossil, a claw mark, a
+  spiral.
+
+Use large motifs to carry identity and let the small carvings become surface
+texture. Do not spend effort on detail nobody can resolve.
+
+---
+
+## The walkable floor is quiet
+
+Visual richness belongs on the walls, counter, trim, shelving, ceiling and the
+side margins. The floor the player walks on should be **visually boring on
+purpose**.
+
+Two reasons, and the second is easy to miss:
+
+1. **There is no collision with scenery.** Plants, crates, chairs or spilled
+   trays painted on the walkable floor get walked straight through, and it looks
+   broken.
+2. **The game draws its own floor markings** — SET DOWN pads in front of every
+   table, PICK UP pads at the counter. Those are functional UI the player reads
+   constantly, and floor ornament competes with them directly.
+
+So the genuinely safe area for floor decoration is the **far left and right
+margins**, not the space between the table rows. Fossil inlays there are welcome.
 
 ---
 
@@ -83,6 +174,9 @@ seventh of the image height. Size furniture around that: a table surface should
 sit at roughly two thirds of his height, so it reads as a table he is serving
 rather than a stool.
 
+Chunky carved table bases are on-theme, but the base is where the contact shadow
+lives — keep it from blurring where table ends and floor begins.
+
 ---
 
 ## Floor colour
@@ -90,18 +184,17 @@ rather than a stool.
 The floor needs **value contrast** against the cast, not just hue contrast. The
 current honey wood sits at almost the same brightness as the characters, so they
 separate only by colour — and hue is the first thing that fails at small sizes,
-on poor screens, and for colour-blind players. A floor that is clearly darker or
-cooler than the characters is worth more than one that is merely a different
-colour. Desaturate the image mentally: the cast should still pop.
+on poor screens, and for colour-blind players. A floor clearly darker or cooler
+than the characters is worth more than one that is merely a different colour.
+Desaturate the image mentally: the cast should still pop.
 
 ---
 
 ## Must not contain
 
-- **Anything on the walkable floor except the tables.** There is no collision
-  with scenery. Plants, crates, chairs, spilled trays painted on the floor will
-  be walked straight through, and it looks broken. Put set dressing against the
-  walls or behind the counter.
+- **Anything on the walkable floor except the tables.** See above.
+- **A dark or recessed counter front** that hides where the counter meets the
+  floor.
 - **People or other characters.** The cast is drawn separately.
 - **Text or signage that needs to be legible**, other than the PICK UP and DISH
   RETURN markers. Table numbers are drawn by the game.
@@ -113,7 +206,6 @@ colour. Desaturate the image mentally: the cast should still pop.
 
 ## Style
 
-Match the established Dine-O Dash look: warm, hand-painted, storybook, soft cel
-shading with light painterly texture, dark warm-brown outlines of varying
-weight. Cosy diner. Muted palette — the characters are the saturated things in
-frame, not the room.
+Warm, hand-painted, storybook. Soft cel shading with light painterly texture,
+dark warm-brown outlines of varying weight. Muted palette — **the characters are
+the saturated things in frame, not the room.**
