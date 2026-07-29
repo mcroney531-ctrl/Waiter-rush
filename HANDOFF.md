@@ -16,7 +16,9 @@ Live at **https://mcroney531-ctrl.github.io/Waiter-rush/**, served by GitHub Pag
 
 Everything is on `main`; `git log --oneline` is the current list and this document does not try to mirror it. The commit messages are deliberately detailed and carry the reasoning and measurements behind each change. **`git log` is a real source, not ceremony** — if a number in here disagrees with the code, the commit that changed it says why.
 
-**Repo housekeeping still outstanding:** the repository's default branch is still `claude/new-session-e86btx`, not `main`. GitHub set it to the first branch pushed to an empty repo and pushing `main` later did not change it. It does not affect the Pages deploy, which targets `main` explicitly, but it means the repo landing page and fresh clones show the wrong branch, and new PRs default to the wrong base. It is a two-click fix in Settings → General. `netlify.toml` is present and valid but unused, since hosting went to Pages.
+**Repo housekeeping — done.** The default branch was `claude/new-session-e86btx` for a long time, because GitHub set it to the first branch pushed to an empty repo and pushing `main` later did not change it. It never affected the Pages deploy, which targets `main` explicitly, but it did mean a fresh clone silently got a four-file snapshot of the first commit — which is exactly what happened the first time Rone cloned the repo, and cost a confusing round trip. The default is now `main` and the old branch is deleted. `netlify.toml` is present and valid but unused, since hosting went to Pages.
+
+The lesson worth keeping: **anything that only bites a newcomer will bite the newcomer**, and a note in a handoff is not a fix.
 
 ## How the code is laid out
 
@@ -476,6 +478,6 @@ From the Quaternius trial run, and they apply to any GLB:
 3. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
 4. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.
 5. **The picker is now a six-step flow** — head & hair, skin, facial hair, glasses, uniform colour, expression — opening straight into the tutorial with no title screen. If Dine-O Dash happens this is rebuilt over dino options; the flow itself is worth keeping either way. — it works and is verified, but where it sits in the opening journey is up for change.
-6. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
+6. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape.
 
 The art is in: the landing key art, the painted kitchen board and ten plated dishes all landed. The remaining art gap is party-size indication.
