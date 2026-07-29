@@ -141,6 +141,8 @@ screen. So:
   useless as a recognisable motif.
 - A motif needs **40px or more** to be identifiable as a fossil, a claw mark, a
   spiral.
+- For scale: the character is 208px tall, so a 40px motif is about the size of his
+  head and an 80px one is his whole torso.
 
 Use large motifs to carry identity and let the small carvings become surface
 texture. Do not spend effort on detail nobody can resolve.
@@ -169,10 +171,14 @@ margins**, not the space between the table rows. Fossil inlays there are welcome
 
 ## Scale
 
-The character stands **about 154px tall in this image's coordinates**, roughly a
-seventh of the image height. Size furniture around that: a table surface should
-sit at roughly two thirds of his height, so it reads as a table he is serving
-rather than a stool.
+The character stands **about 208px tall in this image's coordinates**, a fifth of
+the image height. Measured from the shipped Tyrone sprite, not estimated — he
+renders 130px tall on a 640px canvas, and this image is displayed at 62.5%.
+
+Size furniture around that: **a table surface should sit at roughly half his
+height**, which reads as hip height and looks like a table he is serving rather
+than a stool. On the current board the tables land at 49% of him, which is right
+— so match the existing proportion rather than shrinking them.
 
 Chunky carved table bases are on-theme, but the base is where the contact shadow
 lives — keep it from blurring where table ends and floor begins.
