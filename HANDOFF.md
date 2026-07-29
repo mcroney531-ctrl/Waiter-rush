@@ -322,12 +322,56 @@ Two things that have worked well and are worth continuing. **Push straight to `m
 
 When something is genuinely ambiguous, ask with a recommendation attached rather than presenting a neutral menu. When it is not ambiguous, just build it.
 
+## Open direction: the character, and "Dine-O Dash"
+
+Rone played the walk-cycle prototype: *"I like the movement concept a lot, it's a lot more fun. but I think we'd need to do a shit ton of iterating just to get it in a place I'd feel even semi-content with."* The animation approach is not the problem — the timing, facing and draw order already work. The problem is that the body is primitives drawn in code, and **polish comes from finished frames, not from a better system.**
+
+**The framing changed and it changes priorities.** Asked whether a non-realistic theme would hurt the e-learning angle, Rone: *"you can do whatever you really want with these challenges... for me the objective of this project is actually building a fun/clean & polished game, the waiter thing is low key barely relevant to me this week."* So judge everything on feel from here. The memory mechanic and its standing rule stay, but **on game-design grounds, not pedagogical ones** — it is what makes this more than a fetch quest.
+
+### Dine-O Dash
+
+Rone's proposal, and it is a good one: rethemed so the player is a dinosaur waiter who earns "cooler waiter accessories" as ranks. Not committed, but nothing has been raised against it.
+
+Why it is worth doing, in order of weight:
+
+1. **It lowers the polish bar permanently.** Humans are the hardest thing to animate credibly because every viewer has a lifetime of priors on how people move and what faces look like — that is *why* the placeholder reads as wrong. Nobody has that prior for a cartoon dinosaur, so the same animation quality reads as stylised instead of broken. That directly answers the "shit ton of iterating" objection.
+2. **Dinosaur art is abundant and pre-animated.** Packs with 20+ animated, 8-directional dinosaurs exist. Nothing equivalent exists for waiters in a painted style. "Buy a premade pack" moves from luck to likely.
+3. **Accessories are far cheaper art than characters.** A rank is a bowtie, an apron, a waistcoat — small pieces that ride the body without needing their own animation, layered on the frame index the sprite hook already exposes.
+
+What survives untouched: the kitchen board (a room, no people in it), all ten food plates (human food served by dinosaurs is funnier), dish returns, pickup signs, every mechanic, the tutorial, every tuned number. What changes: the character, the title, and `assets/landing.jpg`, which has human servers in it.
+
+**The one real cost: the avatar picker dies.** Open Peeps is human heads, so DiceBear cannot serve a dinosaur. The replacement is the same step flow over dino species, colour and starting accessory. Upside: `vendor/` goes away and the game ships with no third-party art at all.
+
+### The decision that gates asset shopping
+
+**Four-directional or left/right only.** Most dino packs are built for side-scrollers and ship side views only. The game does not strictly need four — plenty of top-down games keep the character facing left or right while walking up and down, and travel here is mostly horizontal along the rows. Accepting that makes most of the marketplace usable instead of a handful of packs, and halves any commissioned frame count. The sprite hook already supports it: any facing can mirror another, or several facings can share a row. **Settle this before shopping, because it decides which half of the marketplace is in play.**
+
+### Options, ranked
+
+Ranked against a live deadline, a painted style nothing off-the-shelf matches, and a one-file no-dependency architecture.
+
+1. **AI sprite-sheet generator trained on your own reference art** (SpriteFlow, Ludo.ai, Layer, SEELE). The only route that can match this specific look, because you feed it the existing kitchen and landing art. Also solves frame-to-frame consistency, which is what sinks generating frames one at a time — these produce the sheet as a unit. Ceiling unproven; nobody here has seen their output.
+2. **Rone's own DALL·E pipeline, body layer only.** Four successful art batches already shipped this way, so the style is guaranteed. The paper doll means only the body needs frames, and a torso has far less to drift than a face.
+3. **Buy a premade animated pack.** $10–40, available today, professionally animated, zero iteration. Ranks third only because style match is luck — if one matches, it goes first.
+4. **Keep iterating the drawn body.** Free, zero delivery risk, fully reversible. Rone's judgement is it will not reach his bar, and that is probably right, but it is a fine fallback.
+5. **LPC Spritesheet Generator.** Free, finished, layered, four directions, closest thing to our picker that already exists. Ranked here *purely* on style — pixel art on a painted board looks like two games stapled together. If the game ever went pixel art, this jumps to first. Art is GPL3 / CC-BY-SA 3.0: attribution for every contributor, and share-alike.
+6. **Spine or LoongBones skeletal rig.** Highest fidelity and smoothest motion, and preserves the painted look exactly. Wrong side of the deadline: paid tooling, a learning curve, and it puts a runtime dependency into a project whose whole architecture is one self-contained file.
+7. **Mixamo pre-rendered to sprites.** Best motion on the list and free, but a 3D-realistic look needing toon shading, and a Blender pipeline rather than an afternoon.
+8. **Commission an artist.** Highest ceiling, wrong timeline for a weekly build.
+
+**Rejected after review: [pixelhunt 200+ Dinosaurs Avatars](https://pixelhunt.itch.io/200-dinosaurs-avatars), $3.99.** Not the price — the wrong shape three times over. The listing promises *"different stylizations, different lighting, different locations"*, i.e. 206 images that deliberately do not match each other, which is right for visual-novel portraits and fatal for one game world. They are illustrated portraits with scenes baked behind them, so keying them out is not the flat-colour job the food plates were. And it is 285 MB against a 1.8 MB game. No animation either. **Reading an asset listing as a spec is the skill here: "avatars" and "icons" mean static portrait, every time.** Search `dinosaurs` + `sprites` instead.
+
+### What is already built for this
+
+`playerSheet` in `index.html` — null by default, drawn body runs. Set it and frames take over. It carries cell size, scale, anchor, a row per facing (any facing can mirror another) and frame ranges for walk and idle. The walk frame comes from the same distance-driven phase the drawn body uses, so swapping art changes only the art. A missing sheet falls back rather than leaving the player invisible. A rank/accessory layer is a second sheet on the same frame index.
+
 ## Immediate next steps
 
-1. **Play it.** Still nobody has, and this is now the single highest-value thing left. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, `$5` base against `$10` speed may be the wrong split, and flow at roughly half of deliveries may land differently in the hand than on paper. All are single named constants.
-2. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
-3. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.
-4. **Rone wants to revisit the picker flow** — it works and is verified, but where it sits in the opening journey is up for change.
-5. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
+1. **Settle four-directional vs left/right only**, then pick the character art. See the direction section above — that one decision determines which half of the asset marketplace is shoppable, and the sprite hook is already built to accept either.
+2. **Play it.** Rone has started. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, `$5` base against `$10` speed may be the wrong split, and flow at roughly half of deliveries may land differently in the hand than on paper. All are single named constants.
+3. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
+4. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.
+5. **The picker is now a six-step flow** — head & hair, skin, facial hair, glasses, uniform colour, expression — opening straight into the tutorial with no title screen. If Dine-O Dash happens this is rebuilt over dino options; the flow itself is worth keeping either way. — it works and is verified, but where it sits in the opening journey is up for change.
+6. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape; the repository default branch is still `claude/new-session-e86btx` rather than `main` (Settings → General, two clicks).
 
 The art is in: the landing key art, the painted kitchen board and ten plated dishes all landed. The remaining art gap is party-size indication.
