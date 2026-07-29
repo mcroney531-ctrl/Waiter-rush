@@ -375,6 +375,83 @@ Ranked against a live deadline, a painted style nothing off-the-shelf matches, a
 
 `playerSheet` in `index.html` — null by default, drawn body runs. Set it and frames take over. It carries cell size, scale, anchor, a row per facing (any facing can mirror another) and frame ranges for walk and idle. The walk frame comes from the same distance-driven phase the drawn body uses, so swapping art changes only the art. A missing sheet falls back rather than leaving the player invisible. A rank/accessory layer is a second sheet on the same frame index.
 
+## Character production spec (Dine-O Dash)
+
+Settled across a long design pass with Rone and ChatGPT/DALL-E. Written down because it is what twenty designs get checked against, and it was spread across a chat log.
+
+### The pipeline
+
+Concept art -> DALL-E **production render** (a technical asset, not an illustration) -> Meshy image-to-3D -> auto-rig -> walk animation -> GLB -> `tools/` render pass in headless Chromium -> sprite sheet -> `playerSheet` in the game.
+
+**Proven:** everything from GLB onward. Three.js installs from npm, WebGL 2.0 works in headless Chromium, and a rigged GLB renders to transparent four-direction sprite frames that run on the board. 48-89 KB per fully animated character. No Blender required.
+
+**Unproven:** everything before GLB. Whether Meshy produces a riggable mesh from a DALL-E image, and whether the auto-rig survives a tail, are the open questions.
+
+### The rule that orders everything else
+
+> The template is not the PNG. The template is the first character that completes the whole pipeline.
+
+Every criterion below can be judged in DALL-E. The expensive failures cannot: Meshy fusing an arm to the belly, the rigger refusing the tail, the walk shearing the apron through a leg, the whole thing reading as mush at 96px. **Do not generate character two until Tyrone tier 1 is walking on the board.** One mistake instead of twenty.
+
+Corollary, and it is the reason the production renders look boring: *judge them as technical assets first and artwork second.* A less stylish pose that yields a cleaner rig wins. Marketing art can be made later from the finished 3D model; a beautiful concept image that fails the pipeline has no production value.
+
+### The production render (Meshy input)
+
+- Symmetrical, front-on, neutral standing. No action, no attitude, no 3/4 camera.
+- **A-pose with arms 45 degrees out minimum.** ChatGPT proposed 20-30; that is too tight for a round-bellied character and the arms will rest on the belly. The whole point is clear air between arm and torso so the mesh does not fuse and the rigger can find a shoulder. Mixamo's own docs say it processes models **in a T-pose**, so if the auto-rig disappoints, go wider rather than narrower.
+- Feet flat and parallel, shoulder-width, with a visible gap between the legs.
+- Hands open and empty, fingers separated. **No props** — the game draws trays and food itself.
+- **Short stubby tail**, held low and clear of the legs. Mixamo lists large tails with wings and extra limbs as auto-rigger breakers, and it also fixes the wide-silhouette problem.
+- Mouth closed. Open jaws become messy interior geometry.
+- **No overlap.** No apron tails wrapping legs, no scarves over arms, no jacket flaps crossing thighs. Overlap is ambiguous geometry.
+- **Rigid accessories, not dangling.** Bow tie not necktie, tucked neckerchief not scarf, cropped jacket not tails. Free-hanging cloth melts.
+- Big simple forms. Meshy preserves large shapes and loses small detail.
+- Flat plain light-grey background, soft even frontal light, **no ground shadow** — baked lighting travels with the character forever. The flat background also lets downstream tooling isolate the character; a blurred scene defeats `tools/readcheck.py`.
+- Full body, nothing cropped, small margin.
+- Proportions ~3.5 heads tall. ChatGPT's first spec said "6.5 heads tall" *and* "head ~30% of height", which are contradictory — 30% is 3.3 heads. 6.5 is realistic adult human and would produce a lanky figure nothing like the concept.
+
+### Readability, and why it dominates
+
+**The player renders about 96px tall on a 960px board.** At that size a bow tie is roughly four pixels; buttons, stitching and teeth are invisible. Everything below follows from that one number.
+
+Acceptance test — at 96px, from front **and** back, in under a second:
+
+- Species is identifiable
+- Tier is identifiable
+- Character identity is identifiable
+- The character separates from the floor **in greyscale**, not only by hue
+- Limbs are still riggable
+- Species silhouette stays dominant over costume
+
+`tools/readcheck.py <image>` renders the first four of those: art at 96px on the floor colour, a greyscale value test against the floor's grey, and a hard silhouette.
+
+**Value, not hue.** The floor is warm wood and the current Tyrone sits at nearly the same brightness — he separates by colour alone. Hue is the first thing to fail at small sizes, on poor screens, and for colour-blind players. Each character wants to be clearly lighter or clearly darker than the floor.
+
+### Tier progression
+
+One **major silhouette change** per tier, not an accumulation of accessories:
+
+1. Base.
+2. Torso changes — waistcoat, apron shape, contrasting back panel.
+3. Head silhouette changes — cap, visor, chef hat.
+4. Iconic outerwear or shoulder profile.
+
+Two constraints on that ladder:
+
+- **Every tier signal must read from behind.** The player walks away from camera about a quarter of the time. Bow ties, waistcoat fronts, apron bibs and order pads are all invisible from the back, which would make tier unreadable for a whole facing direction.
+- **Species silhouette is sacred; career layers on top.** Frill, horns, crest, snout stay the first thing you notice. This collides with the tier-3 head rule, since the head is exactly where species identity lives — so tier-3 headgear must *extend* the head outline, never obscure it. A visor under the frill, a cap behind the horns. A chef hat that swallows Trixie's frill satisfies one rule by breaking the other.
+
+Small details are not banned, they are demoted: they live at character-select size as a reward for looking closely, and never carry progression.
+
+### Render-pass gotchas, learned the hard way
+
+From the Quaternius trial run, and they apply to any GLB:
+
+- **Force `metalness = 0`.** The pack shipped 0.4 with no environment map, and a metal with nothing to reflect renders black. The first pass came out as silhouettes for this reason alone.
+- **Lift the palette.** Naturalistic greens and browns read as a black blob on a wood floor.
+- **Measure the anchor from rendered pixels**, never guess it, or the character floats or sinks. Take the union bounding box across all frames; `anchorY` is its bottom edge over the frame height.
+- **Yaw mapping** for a model facing +Z: 180 = toward camera (down), 90 = right, 0 = away (up), 270 = left. Left mirrors right in the hook, so only three directions need rendering.
+
 ## Immediate next steps
 
 1. **Get character frames.** Four directions is settled, the sprite hook is built and tested, and Rone is trying the AI sheet generators and DALL·E. Only side, down and up need drawing — left mirrors right. Assembly into the sheet layout is a script to write once the output shape is known, not a constraint on how the art arrives.
