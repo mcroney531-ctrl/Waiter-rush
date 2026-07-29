@@ -720,6 +720,80 @@
     foreArm:   12
   };
 
+  // ---------- Sprite sheet hook ----------
+  // Real frames plug in here. Everything below the config is pack-agnostic, so
+  // swapping one asset pack for another is an edit to this object and nothing
+  // else — which is the point: the pack can be chosen by looking at it rather
+  // than committed to up front.
+  //
+  // Left null, the drawn placeholder body runs instead, so the game is never
+  // broken by not having art yet.
+  //
+  //   playerSheet = {
+  //     src:    'assets/dino.png',
+  //     frameW: 64, frameH: 64,   // one cell in the sheet
+  //     scale:  1.6,              // drawn at frameW * scale
+  //     anchorX: 0.5,             // 0..1 across the cell: the centre line
+  //     anchorY: 0.92,            // 0..1 down the cell: where the soles are
+  //     idleFps: 6,
+  //     dirs: {                   // a row per facing, or mirror another facing
+  //       down:  { row: 0 },
+  //       right: { row: 2 },
+  //       left:  { mirror: 'right' },
+  //       up:    { row: 3 }
+  //     },
+  //     walk: { first: 0, count: 6 },
+  //     idle: { first: 0, count: 1 }
+  //   };
+  //
+  // A rank/accessory layer is a second sheet drawn straight after this one on
+  // the same frame index — the layout below already assumes nothing about what
+  // is in the cell, so that stays a small addition rather than a rewrite.
+  let playerSheet = null;
+  let playerSheetImg = null;
+
+  function usePlayerSheet(cfg){
+    playerSheet = cfg || null;
+    playerSheetImg = null;
+    if (!cfg) return;
+    const im = new Image();
+    // Failure is silent on purpose: a missing or broken sheet falls back to the
+    // drawn body rather than leaving the player invisible mid-shift.
+    im.onload  = () => { playerSheetImg = im; };
+    im.onerror = () => { playerSheetImg = null; };
+    im.src = cfg.src;
+  }
+  const sheetReady = () => !!(playerSheet && playerSheetImg);
+
+  function drawSheetBody(){
+    const S = playerSheet, im = playerSheetImg;
+    const dir = (S.dirs && S.dirs[player.facing]) || { row: 0 };
+    const flip = !!dir.mirror;
+    const row = flip ? ((S.dirs[dir.mirror] || {}).row || 0) : (dir.row || 0);
+
+    // Walking is driven by distance through the same phase the drawn body uses,
+    // so the two render identically in time and swapping one for the other
+    // changes only the art. Standing falls back to a clock.
+    const anim = player.moving ? (S.walk || { first: 0, count: 1 })
+                               : (S.idle || { first: 0, count: 1 });
+    const count = Math.max(1, anim.count || 1);
+    const phase = player.moving
+      ? Math.floor(player.walk / (Math.PI * 2) * count)
+      : Math.floor(performance.now() / 1000 * (S.idleFps || 6));
+    const col = (anim.first || 0) + (((phase % count) + count) % count);
+
+    const scale = S.scale || 1;
+    const dw = S.frameW * scale, dh = S.frameH * scale;
+    const dx = -dw * (S.anchorX == null ? 0.5 : S.anchorX);
+    const dy = BODY.ground - dh * (S.anchorY == null ? 0.9 : S.anchorY);
+
+    ctx.save();
+    if (flip){ ctx.scale(-1, 1); ctx.translate(-dw - dx * 2, 0); }
+    ctx.imageSmoothingEnabled = S.smooth !== false;
+    ctx.drawImage(im, col * S.frameW, row * S.frameH, S.frameW, S.frameH, dx, dy, dw, dh);
+    ctx.restore();
+  }
+
   function limb(x1, y1, x2, y2, w, colour){
     ctx.strokeStyle = colour;
     ctx.lineWidth = w;
@@ -746,6 +820,7 @@
   }
 
   function drawBody(){
+    if (sheetReady()){ drawSheetBody(); return; }
     const face  = player.facing;
     const side  = face === 'left' || face === 'right';
     const f     = face === 'left' ? -1 : 1;      // horizontal sign for side poses
