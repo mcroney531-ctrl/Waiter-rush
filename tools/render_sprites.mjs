@@ -49,7 +49,12 @@ const ELEV   = +opt('elev', 34);
 const LIFT   = +opt('lift', 0);
 const ANIM   = opt('anim', 'Walk');
 const ROWS   = ['down', 'right', 'up'];          // left mirrors right in-game
-const YAW    = { down: 180, right: 90, up: 0 };
+// Which way the model faces at yaw 0. Meshy's biped rigs come out facing +Z,
+// i.e. toward the camera, so down is 0 and right is 90. A model authored the
+// other way round needs --yaw-down 180. Always check the rendered sheet: if the
+// "down" row shows a back and the "up" row shows a face, flip this.
+const YAW_DOWN = +opt('yaw-down', 0);
+const YAW = { down: YAW_DOWN, right: YAW_DOWN + 90, up: YAW_DOWN + 180 };
 
 if (!existsSync(GLB)) { console.error('no such model:', GLB); process.exit(1); }
 
