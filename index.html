@@ -616,7 +616,11 @@
       patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0, wrongCooldown: 0, wrongDwell: 0
     }));
     tickets = [];
-    player = { x: W/2, y: H - 90, size: 26, speed: PLAYER_SPEED };
+    // size stays the collision radius it has always been — the body is drawn
+    // around it, so none of the tuned geometry moves. facing/walk/moving drive
+    // the paper-doll animation only.
+    player = { x: W/2, y: H - 90, size: 26, speed: PLAYER_SPEED,
+               facing: 'down', walk: 0, moving: false };
     keys = {};
     touchDir = {x:0, y:0};
     carried = [];
@@ -684,11 +688,192 @@
   // free-form hex, so unlike variant names there is nothing here to mistype.
   const UNIFORM_COLOURS = ['#2f6f6b','#c1443a','#e0a72e','#3c4f5c','#262e33'];
 
+  // ---------- Player body (placeholder art) ----------
+  // Drawn in code rather than from a sprite sheet so the movement can be judged
+  // before any art is commissioned. The shapes are throwaway; the timing,
+  // proportions and facing logic are the parts worth reviewing, and they carry
+  // over unchanged when real frames replace the primitives.
+  const STRIDE_PX  = 34;      // distance covered per radian of the cycle
+  const BODY_TROUSER = '#3a3128';
+  const BODY_SHOE    = '#241d16';
+  const BODY_APRON   = '#F4EEDB';
+  const SKIN_FALLBACK = '#edb98a';
+  const HEAD_ART_SCALE = 1.75;   // the art is head + shoulders, so it overdraws the head box
+  const HEAD_ART_DROP  = 8;      // and sits low enough for the shoulders to land on the torso
+
+  // All offsets are from the player origin, which is still the collision centre.
+  // The figure stands on `ground` — the same point the old token's shadow sat
+  // on — and grows upward from there, so the character got taller without the
+  // hitbox moving a pixel.
+  const BODY = {
+    ground:   18,     // soles, near where the old token's shadow sat
+    hip:      -12,    // 30px of leg
+    shoulder: -46,    // 34px of torso
+    headR:    16,
+    get headY(){ return this.shoulder - this.headR - 2; },
+    get topY(){  return this.headY - this.headR; },
+    shoulderW: 12,
+    hipW:      9,
+    thigh:     16,
+    shin:      15,
+    upperArm:  13,
+    foreArm:   12
+  };
+
+  function limb(x1, y1, x2, y2, w, colour){
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // One jointed limb: hip/shoulder -> knee/elbow -> foot/hand, posed by two
+  // angles measured from straight down. Two segments rather than one is the
+  // whole difference between a walk and a pair of scissors opening.
+  function jointed(ox, oy, a1, a2, l1, l2, w1, w2, colour, endColour, endR){
+    const kx = ox + Math.sin(a1) * l1, ky = oy + Math.cos(a1) * l1;
+    const ex = kx + Math.sin(a2) * l2, ey = ky + Math.cos(a2) * l2;
+    limb(ox, oy, kx, ky, w1, colour);
+    limb(kx, ky, ex, ey, w2, colour);
+    if (endR){
+      ctx.fillStyle = endColour;
+      ctx.beginPath(); ctx.arc(ex, ey, endR, 0, Math.PI*2); ctx.fill();
+    }
+    return { x: ex, y: ey };
+  }
+
+  function drawBody(){
+    const face  = player.facing;
+    const side  = face === 'left' || face === 'right';
+    const f     = face === 'left' ? -1 : 1;      // horizontal sign for side poses
+    const s     = Math.sin(player.walk);
+    const bob   = -Math.abs(s) * 2.4;            // the body lifts at mid-stride
+    const uni   = (avatarSel.opts && avatarSel.opts.clothingColor) || UNIFORM_COLOURS[0];
+    const skin  = (avatarSel.opts && avatarSel.opts.skinColor) || SKIN_FALLBACK;
+    const uniBack  = shade(uni, -22);
+    const legBack  = shade(BODY_TROUSER, -12);
+    const shoeBack = shade(BODY_SHOE, -10);
+    const B     = BODY;
+
+    ctx.save();
+    ctx.translate(0, bob);
+
+    const torsoTop = B.shoulder, torsoH = B.hip - B.shoulder;
+    const halfW = side ? B.hipW : B.shoulderW;
+    const armY  = torsoTop + 6;
+
+    // A leg for one side of the body. dir -1 is the far leg, drawn behind and
+    // a shade darker; that is all the depth a flat character needs.
+    const leg = (dir) => {
+      const back = dir < 0;
+      if (side){
+        const ph = s * dir;                       // -1..1 through the stride
+        const a1 = f * ph * 0.62;                 // thigh swings fore and aft
+        const a2 = a1 - Math.max(0, -ph) * 0.85;  // knee folds on the back swing
+        const foot = jointed(f * 1.5, B.hip, a1, a2, B.thigh, B.shin, 9.5, 8,
+                             back ? legBack : BODY_TROUSER);
+        limb(foot.x, foot.y, foot.x + f * 6, foot.y, 6.5, back ? shoeBack : BODY_SHOE);
+      } else {
+        // Wider stance and a shade of difference, or the two trouser legs merge
+        // into one dark block and the step stops reading at all head-on.
+        const ph = s * dir;
+        const legX = dir * 7;
+        const lift = Math.max(0, ph) * 4.5;
+        limb(legX * 0.6, B.hip, legX, B.ground - lift, 8.5,
+             back ? legBack : BODY_TROUSER);
+        limb(legX - 3.5, B.ground - lift, legX + 3.5, B.ground - lift, 6.5,
+             back ? shoeBack : BODY_SHOE);
+      }
+    };
+
+    const arm = (dir) => {
+      const back = dir < 0;
+      if (side){
+        const ph = -s * dir;                      // arms lead the opposite leg
+        const a1 = f * ph * 0.55;
+        const a2 = a1 + f * 0.45 + Math.max(0, ph) * 0.3;
+        jointed(f * 2, armY, a1, a2, B.upperArm, B.foreArm, 7.5, 6.5,
+                back ? uniBack : uni, back ? shade(skin, -14) : skin, 3.8);
+      } else {
+        const ph = -s * dir;
+        const shX = dir * (B.shoulderW - 2);
+        const a1 = dir * (0.18 + ph * 0.12);
+        const a2 = a1 + dir * 0.22;
+        jointed(shX, armY, a1, a2, B.upperArm, B.foreArm, 7.5, 6.5, uni, skin, 3.8);
+      }
+    };
+
+    // Draw order is the depth: far limbs, then the torso over their tops, then
+    // the near limbs in front of it.
+    leg(-1);
+    arm(-1);
+
+    ctx.fillStyle = uni;
+    roundRect(ctx, -halfW, torsoTop, halfW * 2, torsoH + 5, 7);
+    ctx.fill();
+
+    // Apron below the waist only, and only on the front. Losing it when you
+    // turn your back is the clearest free signal that facing is working.
+    if (face !== 'up'){
+      ctx.save();
+      ctx.beginPath();
+      roundRect(ctx, -halfW, torsoTop, halfW * 2, torsoH + 5, 7);
+      ctx.clip();
+      ctx.fillStyle = BODY_APRON;
+      const aw = side ? halfW * 1.1 : halfW * 1.5;
+      const ax = side ? f * (halfW - aw/2 + 1) : 0;
+      roundRect(ctx, ax - aw/2, torsoTop + torsoH * 0.5, aw, torsoH, 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    leg(1);
+    arm(1);
+
+    // --- head, the one piece that is real art rather than placeholder
+    ctx.save();
+    ctx.translate(0, B.headY);
+    // Open Peeps heads are drawn in three-quarter profile facing right, so
+    // walking left mirrors them. There is no back-of-head art, so 'up' still
+    // shows a face — the most visible thing real sprites would fix.
+    if (face === 'left') ctx.scale(-1, 1);
+    if (avatarImg && avatarImg.complete && avatarImg.naturalWidth){
+      // The art is head plus a shoulder stub in the chosen uniform colour, so
+      // it is drawn oversized and sunk into the torso: the stub becomes the
+      // shoulders and the seam disappears into a shirt of the same colour.
+      const hw = B.headR * HEAD_ART_SCALE;
+      ctx.drawImage(avatarImg, -hw, -hw + HEAD_ART_DROP, hw*2, hw*2);
+    } else {
+      ctx.fillStyle = COLORS.player;
+      ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2);
+      ctx.strokeStyle = COLORS.playerDark; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // Nudge a hex colour toward black or white, for the limb on the far side of
+  // the body. Cheap depth without a second palette.
+  function shade(hex, amt){
+    const n = parseInt(hex.slice(1), 16);
+    const cl = v => Math.max(0, Math.min(255, v + amt));
+    return '#' + [cl(n >> 16 & 255), cl(n >> 8 & 255), cl(n & 255)]
+      .map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+
   // Bumped from avatarSel/avatarSvg: those hold avataaars picks whose option
   // names mean nothing to this style, so old saves are ignored rather than
   // migrated into a shape that cannot render.
   const AVATAR_STORE_SEL = 'rushhour.peeps.sel';
-  const AVATAR_STORE_SVG = 'rushhour.peeps.svg';
+  // Bumped again for the body: saves from before it hold a disc-backed head,
+  // which on a drawn torso renders as a cream helmet. Ignoring them costs a
+  // returning player one trip through the picker.
+  const AVATAR_STORE_SVG = 'rushhour.peeps.svg2';
 
   let avatarSel  = { seed: 'rush-hour', opts: {} };
   let avatarImg  = null;      // rasterised avatar, drawn each frame
@@ -736,11 +921,18 @@
   // roughly one waiter in twenty turns up in a surgical mask.
   function avatarOptions(overrides){
     const o = Object.assign({ seed: avatarSel.seed }, avatarSel.opts, overrides || {});
+    // Read the intent before the strip below, which deletes nulls along with
+    // the empty "none" choices and would otherwise swallow the opt-out.
+    const wantsPlate = !(overrides && overrides.backgroundColor === null);
     for (const k of Object.keys(o)) if (o[k] === '' || o[k] == null) delete o[k];
     o.facialHairProbability  = o.facialHairVariant  ? 100 : 0;
     o.accessoriesProbability = o.accessoriesVariant ? 100 : 0;
     o.maskProbability = 0;
-    o.backgroundColor = '#E8E2D5';
+    // The picker shows each waiter on a cream plate, rounded off by CSS, which
+    // is what makes a wall of swatches readable. On the floor that plate is a
+    // cream square behind the head, so the in-game sprite opts out and gets a
+    // transparent background — the art's own shoulders then meet the torso.
+    if (wantsPlate) o.backgroundColor = '#E8E2D5';
     return o;
   }
 
@@ -882,7 +1074,7 @@
 
   function commitAvatar(){
     if (!avatarEngine) return;
-    const svg = avatarSvgText();
+    const svg = avatarSvgText({ backgroundColor: null });
     applyAvatarSvg(svg);
     try {
       localStorage.setItem(AVATAR_STORE_SVG, svg);
@@ -1310,6 +1502,23 @@
     player.x = Math.max(player.size/2, Math.min(W - player.size/2, player.x));
     player.y = Math.max(FLOOR_TOP + player.size/2, Math.min(H - player.size/2, player.y));
 
+    // The stride advances with distance covered, not with time, so the legs
+    // stay in step with the floor at any speed — including the wrong-table
+    // slowdown, where a time-driven cycle would look like skating.
+    player.moving = (dx !== 0 || dy !== 0);
+    if (player.moving){
+      // Sideways wins ties: on this board most travel is along the rows, and
+      // flipping to a front-on pose every time you drift a pixel vertically
+      // reads as twitching.
+      if (Math.abs(dx) >= Math.abs(dy)) player.facing = dx > 0 ? 'right' : 'left';
+      else                              player.facing = dy > 0 ? 'down'  : 'up';
+      player.walk += Math.hypot(dx, dy) * speed * dt/1000 / STRIDE_PX;
+    } else {
+      // Settle to a standing pose rather than freezing mid-step.
+      const rest = Math.round(player.walk / Math.PI) * Math.PI;
+      player.walk += (rest - player.walk) * Math.min(1, dt / 90);
+    }
+
     if (mode === 'tutorial' && tut){
       tut.moved += Math.hypot(dx, dy) * player.speed * dt/1000;
       // No clamp: the back row of tables sits under the panel on the painted
@@ -1684,52 +1893,25 @@
 
     // Flow reads on the player rather than only in the HUD, so you can feel it
     // without looking away from the floor.
+    // Flow reads as a glow on the floor at the feet rather than a disc centred
+    // on the token: with a body to look at, a disc at waist height covered it.
     if (flowLit){
       const pulse = 0.55 + 0.45 * Math.sin(performance.now()/180);
       ctx.save();
       ctx.globalAlpha = 0.30 + 0.25 * pulse;
       ctx.fillStyle = COLORS.mustard;
       ctx.beginPath();
-      ctx.arc(0, 0, player.size + 9 + 3*pulse, 0, Math.PI*2);
+      ctx.ellipse(0, BODY.ground, player.size + 6 + 3*pulse, (player.size + 6 + 3*pulse) * 0.36,
+                  0, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
     }
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath();
-    ctx.ellipse(0, player.size*0.6, player.size*0.55, player.size*0.2, 0, 0, Math.PI*2);
+    ctx.ellipse(0, BODY.ground, player.size*0.5, player.size*0.17, 0, 0, Math.PI*2);
     ctx.fill();
 
-    if (avatarImg && avatarImg.complete && avatarImg.naturalWidth){
-      // chosen avatar, clipped into the same token shape the circle used
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(0, 0, player.size, 0, Math.PI*2);
-      ctx.clip();
-      ctx.fillStyle = COLORS.floorA;
-      ctx.fill();
-      ctx.drawImage(avatarImg, -player.size, -player.size, player.size*2, player.size*2);
-      ctx.restore();
-      ctx.beginPath();
-      ctx.arc(0, 0, player.size, 0, Math.PI*2);
-      ctx.strokeStyle = COLORS.playerDark;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = COLORS.player;
-      ctx.beginPath();
-      ctx.arc(0, 0, player.size, 0, Math.PI*2);
-      ctx.fill();
-      ctx.strokeStyle = COLORS.playerDark;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // apron highlight
-      ctx.fillStyle = '#F4EEDB';
-      ctx.beginPath();
-      ctx.arc(0, 6, player.size*0.55, 0, Math.PI);
-      ctx.fill();
-    }
-
+    drawBody();
     ctx.restore();
 
     // Everything in your hands, laid out side by side. Each item fades on its
@@ -1743,7 +1925,7 @@
       carried.forEach((item, i) => {
         const spread = n > 1 ? (i - (n-1)/2) * 46 : 0;
         const cx = player.x + spread;
-        const cy = player.y - player.size - 12;
+        const cy = player.y + BODY.topY - 14;   // clear of the head, not over it
         if (item.type === 'dishes'){
           ctx.save();
           drawDirtyDishes(cx - 4, cy - 4, 0.9);
