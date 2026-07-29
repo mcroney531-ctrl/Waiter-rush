@@ -342,9 +342,19 @@ What survives untouched: the kitchen board (a room, no people in it), all ten fo
 
 **The one real cost: the avatar picker dies.** Open Peeps is human heads, so DiceBear cannot serve a dinosaur. The replacement is the same step flow over dino species, colour and starting accessory. Upside: `vendor/` goes away and the game ships with no third-party art at all.
 
-### The decision that gates asset shopping
+### Settled: four directions
 
-**Four-directional or left/right only.** Most dino packs are built for side-scrollers and ship side views only. The game does not strictly need four — plenty of top-down games keep the character facing left or right while walking up and down, and travel here is mostly horizontal along the rows. Accepting that makes most of the marketplace usable instead of a handful of packs, and halves any commissioned frame count. The sprite hook already supports it: any facing can mirror another, or several facings can share a row. **Settle this before shopping, because it decides which half of the marketplace is in play.**
+Rone chose four-directional over left/right only. That rules out side-scroller-only packs, which is most of the cheap dinosaur art, so the AI-generation routes (options 1 and 2) matter more than the buy-a-pack route now.
+
+**It is three directions of art, not four.** Left mirrors right, which the hook does natively, so only *down*, *up* and *side* need drawing. At six to eight frames each that is 18–24 frames rather than 24–32.
+
+Priority if the set has to be built incrementally, since the hook takes facings independently and any facing can share another's row:
+
+1. **Side** — the most-seen direction by far, since travel is mostly horizontal along the rows, and the one that tells you whether a generator is any good.
+2. **Down** (front) — seen constantly at the pass and the drop pads.
+3. **Up** (back) — least seen. Until it exists, point `up` at the down row. That ships a character who faces you while walking away, which is exactly what the drawn body does today, so it is a known-acceptable degradation rather than a regression.
+
+One caveat on mirroring: it flips asymmetric detail. A plain dinosaur is fine. Anything one-sided — a name badge, an apron tie — belongs in the accessory layer, which is drawn separately and can compensate.
 
 ### Options, ranked
 
@@ -367,7 +377,7 @@ Ranked against a live deadline, a painted style nothing off-the-shelf matches, a
 
 ## Immediate next steps
 
-1. **Settle four-directional vs left/right only**, then pick the character art. See the direction section above — that one decision determines which half of the asset marketplace is shoppable, and the sprite hook is already built to accept either.
+1. **Get character frames.** Four directions is settled, the sprite hook is built and tested, and Rone is trying the AI sheet generators and DALL·E. Only side, down and up need drawing — left mirrors right. Assembly into the sheet layout is a script to write once the output shape is known, not a constraint on how the art arrives.
 2. **Play it.** Rone has started. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, `$5` base against `$10` speed may be the wrong split, and flow at roughly half of deliveries may land differently in the hand than on paper. All are single named constants.
 3. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
 4. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.
