@@ -1,4 +1,10 @@
+# Instrumented copy of index.html used by the test harness. Regenerated on
+# demand; committing it has been a live footgun more than once.
+probe.html
+
+# Dev-only dependencies for tools/render_sprites.mjs
 node_modules/
-.DS_Store
-.netlify/
-*.log
+package-lock.json
+
+# Scratch output from the sprite renderer
+.sprite-stage/

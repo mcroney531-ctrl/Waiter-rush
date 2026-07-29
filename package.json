@@ -1,0 +1,13 @@
+{
+  "name": "waiter-rush-tools",
+  "private": true,
+  "description": "Dev-only tooling. The game itself is index.html and has no dependencies.",
+  "type": "module",
+  "scripts": {
+    "sprites": "node tools/render_sprites.mjs"
+  },
+  "devDependencies": {
+    "three": "^0.185.1",
+    "playwright": "^1.49.0"
+  }
+}

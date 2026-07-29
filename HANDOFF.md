@@ -443,6 +443,23 @@ Two constraints on that ladder:
 
 Small details are not banned, they are demoted: they live at character-select size as a reward for looking closely, and never carry progression.
 
+### Getting art in, and out
+
+Source art comes in **through the repo, not through chat**. Chat uploads live only as long as a session's container; anything in `art-source/` is versioned and survives, which matters because sprites get re-rendered whenever the camera, scale or frame count changes. The sandbox also cannot reach meshy.ai, itch.io, quaternius.com or poly.pizza — the network policy blocks them — so the repo is the only channel between a local machine and this environment.
+
+The loop, once a rigged GLB exists:
+
+```
+drop it in art-source/<name>.glb, push
+node tools/render_sprites.mjs art-source/<name>.glb --name <name>
+```
+
+That writes `assets/sprites/<name>.png` and a `.json` holding the exact `playerSheet` object, with the anchor **measured from the rendered pixels**. It also reports when a GLB has no animation rather than silently producing 24 identical frames — which is what Meshy's mesh/texture export does, as opposed to its rig-and-animate export.
+
+Useful flags: `--frames` (default 8), `--cell` (192), `--elev` (34 degrees, matches the board), `--lift` (raise a naturalistic palette toward cartoon), `--anim` (clip name to match, default Walk).
+
+Dev dependencies live in `package.json` and never ship; `index.html` still has none. The renderer prefers a Chromium the environment already provides over letting playwright download its own.
+
 ### Render-pass gotchas, learned the hard way
 
 From the Quaternius trial run, and they apply to any GLB:
