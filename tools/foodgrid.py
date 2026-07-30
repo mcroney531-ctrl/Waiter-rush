@@ -44,6 +44,12 @@ MIN_SEPARATION = 70
 # undersized beside the rest even though nothing is wrong with it alone.
 ASPECT_MIN, ASPECT_MAX = 1.0, 1.3
 MIN_FILL = 0.80          # fraction of the slot's area the dish should cover
+# Provisional, and deliberately so. Across the set being replaced every dish
+# sits 0.95-0.99 against its closest twin — ten circles. The one 3D dish is the
+# most distinct at 0.89, which is better and still not good. So 0.90 flags
+# everything currently shipping and leaves room to tighten once there is a set
+# worth calibrating against.
+MAX_SIMILARITY = 0.90
 
 
 def lum(rgb):
@@ -74,6 +80,50 @@ def edge_luminance(icon):
     ring[ys, xs] = r > np.percentile(r, 75)
     L = 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
     return float(L[ring].mean())
+
+
+def normalised_silhouette(path, n=128):
+    """The dish's shape with size and aspect divided out, so what is left is
+    only the outline. Taken from the source art rather than the 68px icon: at
+    play size these shapes differ by a few pixels and the comparison drowns in
+    its own anti-aliasing."""
+    im = Image.open(path).convert('RGBA')
+    a = np.asarray(im)[..., 3] > 110
+    ys, xs = np.nonzero(a)
+    if not len(ys):
+        return np.zeros((n, n), bool)
+    box = im.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+    return np.asarray(box.resize((n, n), Image.LANCZOS))[..., 3] > 110
+
+
+def distinctness(paths):
+    """How much each dish's outline overlaps the most similar other dish.
+
+    Distinctness is relative, not absolute — the acceptance test is "can you
+    name all ten", which no per-dish shape statistic answers. So this compares
+    every pair and reports each dish's nearest neighbour.
+
+    The obvious per-dish alternative was tried first and does not work: how much
+    of the silhouette sits above the plate rim, plus solidity, circularity and
+    the height of the shape above its widest row. At 68px, on a dish where the
+    plate dominates the outline, all five score the 3D burger the same as the
+    nine flat plates it visibly differs from. Pairwise overlap separates them.
+    """
+    sil = {n: normalised_silhouette(p) for n, p in paths}
+    names = [n for n, _ in paths]
+    near = {}
+    for a in names:
+        best = (0.0, None)
+        for b in names:
+            if a == b:
+                continue
+            i = np.logical_and(sil[a], sil[b]).sum()
+            u = np.logical_or(sil[a], sil[b]).sum()
+            iou = i / u if u else 0.0
+            if iou > best[0]:
+                best = (iou, b)
+        near[a] = best
+    return near
 
 
 def strip(icons, mode, title):
@@ -107,13 +157,14 @@ def strip(icons, mode, title):
 
 
 def main(folder='assets/food'):
-    icons, missing = [], []
+    icons, paths, missing = [], [], []
     for n in ITEMS:
         p = os.path.join(folder, n + '.png')
         if not os.path.exists(p):
             missing.append(n)
             continue
         icons.append((n, at_slot_size(p)))
+        paths.append((n, p))
 
     if not icons:
         sys.exit(f'no icons found in {folder}')
@@ -125,7 +176,10 @@ def main(folder='assets/food'):
         strip(icons, mode, title).save(out)
         print('wrote', out)
 
-    print(f'\n{"dish":8} {"edge L":>7} {"vs floor":>9} {"aspect":>7} {"fill":>6}   notes')
+    near = distinctness(paths) if len(paths) > 1 else {}
+
+    print(f'\n{"dish":8} {"edge L":>7} {"vs floor":>9} {"aspect":>7} {"fill":>6} '
+          f'{"nearest":>16}   notes')
     for name, icon in icons:
         edge = edge_luminance(icon)
         sep = abs(edge - FLOOR_L)
@@ -138,11 +192,20 @@ def main(folder='assets/food'):
             notes.append(f'SMALL ({icon.width}x{icon.height} of {SLOT_W}x{SLOT_H})')
         if not ASPECT_MIN <= aspect <= ASPECT_MAX:
             notes.append(f'ASPECT {aspect:.2f} outside {ASPECT_MIN}-{ASPECT_MAX}')
-        print(f'{name:8} {edge:7.0f} {sep:9.0f} {aspect:7.2f} {fill:6.0%}   '
-              + (', '.join(notes) if notes else 'ok'))
+        iou, twin = near.get(name, (0.0, None))
+        if twin and iou > MAX_SIMILARITY:
+            notes.append(f'SAME SHAPE AS {twin.upper()}')
+        col = f'{twin[:9]} {iou:.2f}' if twin else ''
+        print(f'{name:8} {edge:7.0f} {sep:9.0f} {aspect:7.2f} {fill:6.0%} '
+              f'{col:>16}   ' + (', '.join(notes) if notes else 'ok'))
 
-    print(f'\nfloor luminance {FLOOR_L:.0f}; carrying two shrinks every dish to '
+    if near:
+        mean = np.mean([v for v, _ in near.values()])
+        print(f'\nmean overlap with nearest twin: {mean:.2f}  '
+              f'(1.00 would be ten copies of one shape)')
+    print(f'floor luminance {FLOOR_L:.0f}; carrying two shrinks every dish to '
           f'{CARRY_TWO:.0%}, so read the shape strip at arm\'s length too.')
+    print('the overlap number is an early warning, not a verdict — the strip is.')
     if missing:
         print('missing:', ', '.join(missing))
 

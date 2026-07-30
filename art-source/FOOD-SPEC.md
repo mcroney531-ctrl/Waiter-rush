@@ -125,11 +125,47 @@ size they draw at when carrying two orders.
 That is the real argument for rebuilding them in 3D, and it is worth stating
 because it is not "3D looks nicer". **A dish shot from 42° has its food rising
 above the plate rim, so the food gets into the silhouette.** A top-down plate
-can never do that no matter how well it is illustrated. The one 3D dish in the
-set is already the only one with a broken outline.
+can never do that no matter how well it is illustrated.
 
 So this section is not polish on top of the spec. It is the thing the rebuild is
 for, and a dish that comes back as another circle has failed its main job.
+
+### How this is scored, and how close the burger really is
+
+Distinctness is **relative** — "can you name all ten" is not a question any
+per-dish shape statistic answers, because a dish is not too circular in the
+abstract, it is too much like the other nine. So the tool normalises every
+outline to the same box, overlaps each pair, and reports how much each dish
+shares with its closest twin.
+
+The set being replaced:
+
+| | overlap with nearest twin |
+| --- | ---: |
+| ribs / tart | 0.99 |
+| sub / pasta | 0.99 |
+| salad, club, soup, tacos | 0.98 |
+| pizza | 0.95 |
+| **burger (the 3D one)** | **0.89** |
+
+The burger is the most distinct thing in the set, and it should not be read as
+a success. 0.89 is *less bad*, not good — its plate still dominates its own
+outline, and only the fries break the rim enough to register. **The bar for the
+new set is well under 0.89, not merely under 0.95.**
+
+Anything above **0.90** is flagged. That threshold is provisional on purpose: it
+currently fails everything shipping, which is correct, and it should be
+tightened once there is a set worth calibrating against.
+
+One thing that was tried and does not work, so it does not get tried again:
+measuring how much of a *single* dish's silhouette sits above the plate rim,
+along with solidity, circularity, and the height of the shape above its widest
+row. At play size, on a dish whose plate dominates the outline, all four score
+the 3D burger the same as the nine flat plates it visibly differs from. Only
+the pairwise comparison separates them.
+
+And the number is an early warning, not a verdict. The silhouette strip is the
+verdict, and reading it is a human job.
 
 ---
 
@@ -257,9 +293,13 @@ Judged in the running game, not on the reference image. A dish succeeds if, at
 - Nothing on it is detail the player cannot resolve.
 
 Run `python3 tools/foodgrid.py` and it will say so: it flags anything whose edge
-separates from the floor by less than 70, whose aspect falls outside 1.0-1.3, or
-which fills less than 80% of its slot. The silhouette strip it writes is not
-scored — that one still needs a human to look at it and try to name all ten.
+separates from the floor by less than 70, whose aspect falls outside 1.0-1.3,
+which fills less than 80% of its slot, or which shares more than 0.90 of its
+outline with another dish. It names the dish it is being confused with, which is
+usually the more useful half of the finding.
+
+The silhouette strip it writes is still not scored, and should not be. Look at
+it and try to name all ten.
 
 ---
 
