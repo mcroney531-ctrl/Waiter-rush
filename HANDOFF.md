@@ -1,4 +1,4 @@
-# Waiter Rush — Session Handoff
+# Dine-O Dash — Session Handoff
 
 Read this first. It is the working brief for continuing development, written at the point where the previous session's environment had to be replaced. The README covers what the game *is* for anyone arriving cold; this covers what has been decided, what has been measured, what is unresolved, and what to be careful about.
 

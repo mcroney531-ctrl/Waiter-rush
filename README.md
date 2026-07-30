@@ -1,4 +1,6 @@
-# Waiter Rush — The Waiter Game
+# Dine-O Dash
+
+*Formerly Waiter Rush — the repository still carries the old name.*
 
 A short Overcooked-style arcade game built for Articulate E-Learning Challenge #561 ("Online Training for Restaurant Servers & Waiters").
 

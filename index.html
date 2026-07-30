@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>Waiter Rush — The Waiter Game</title>
+<title>Dine-O Dash</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
@@ -135,12 +135,12 @@
   }
   #landingArt {
     /* max-* on both axes with auto width/height lets the browser preserve the
-       aspect itself, so the art can never distort. The source is 1920 wide and
-       is never displayed larger than that — the previous version showed an
-       864px image at 1080px, and that 1.25x upscale was the softness.
-       contain rather than cover because the title sits at the top edge of the
-       art and the tagline at the very bottom: any vertical crop loses one. */
-    max-width: min(100%, 1920px);
+       aspect itself, so the art can never distort. The source is 1536 wide and
+       is never displayed larger than that — upscaling a cover is what made an
+       earlier version look soft.
+       contain rather than cover because the DINE-O DASH title is painted into
+       the top edge of the art: any vertical crop cuts the game's own name off. */
+    max-width: min(100%, 1536px);
     max-height: calc(100vh - 118px);
     max-height: calc(100dvh - 118px);
     width: auto; height: auto;
@@ -279,12 +279,12 @@
 
   <div id="landing">
     <img id="landingArt" src="assets/landing.jpg"
-         alt="Waiter Rush — a diner mid-rush, servers running plates through the chaos">
+         alt="Dine-O Dash — a dinosaur diner mid-rush, waiters running plates through the chaos">
     <button class="cta" id="landingStart">Start</button>
   </div>
 
   <div id="overlay" class="hidden">
-    <h1>Waiter Rush</h1>
+    <h1>Dine-O Dash</h1>
     <p>Grab the order ticket from the counter, remember which table it's for, and deliver it before the ticket board goes blank on your walk. Miss too many tables and the shift is over.</p>
     <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
     <button class="cta" id="trainBtn">Start Training</button>
