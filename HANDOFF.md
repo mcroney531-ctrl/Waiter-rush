@@ -377,6 +377,26 @@ Ranked against a live deadline, a painted style nothing off-the-shelf matches, a
 
 `playerSheet` in `index.html` — null by default, drawn body runs. Set it and frames take over. It carries cell size, scale, anchor, a row per facing (any facing can mirror another) and frame ranges for walk and idle. The walk frame comes from the same distance-driven phase the drawn body uses, so swapping art changes only the art. A missing sheet falls back rather than leaving the player invisible. A rank/accessory layer is a second sheet on the same frame index.
 
+## The board is `assets/board.jpg`, and it carries no UI
+
+The Dine-O Dash dining room replaced the painted `kitchen.jpg`. Two things moved from the art into the code as a result, and both were invisible failures rather than errors.
+
+**Table numbers.** They were painted into the old board. The game never drew them — there is even a comment about offsetting the timer so it would not cover a number that the game itself was not rendering. On a board without painted numbers, all eight tables became anonymous, which deletes the entire mechanic: the game is remembering which table a plate belongs to.
+
+`drawTableNumber` now draws them, on the left of each tabletop, **last in `drawTable` so nothing can ever cover one**. Food and dirty dishes moved to the right half of the table so both read at once. Drawing them also removes a whole bug class — a painted 3 above a table the game calls 4 would be miserable, and now they are the same thing by construction.
+
+**The SET DOWN pads.** Same story: painted into the old art, with the game only drawing the active and dirty states over the top. `drawDropZones` used to `continue` when a pad was neither. On the new board that left nothing to walk to. There is now a resting state — dashed mustard outline plus the label — which also survives a change of floor colour in a way a painted pad does not.
+
+**The lesson generalises:** anything the old art happened to provide is a hidden dependency, and it fails silently rather than loudly. Before swapping a board, ask what the previous one was carrying.
+
+### Geometry for this board
+
+`FLOOR_TOP` 300, `R1` y 465 / pad 590 / bar 398, `R2` y 700 / pad 855 / bar 612, passes at (370, 357) and (1180, 357), dish returns at (115, 760) and (1425, 760) — all in art-space px on the 1536x1024 board.
+
+Verified by walking the character to all twelve stops — both pickups, all eight tables, both dish returns. `groundtest.js` in the scratch pattern does this and is worth rebuilding whenever the board changes.
+
+**This board is interim.** It will be replaced by a 3D room composed in Meshy Scene. The spec asks for matching proportions specifically so the geometry above is mapped once rather than twice.
+
 ## Character production spec (Dine-O Dash)
 
 Settled across a long design pass with Rone and ChatGPT/DALL-E. Written down because it is what twenty designs get checked against, and it was spread across a chat log.

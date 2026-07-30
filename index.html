@@ -336,7 +336,7 @@
   };
 
   // ---------- Layout ----------
-  // The board is a painted background (assets/kitchen.jpg, 1536x1024). Every
+  // The board is a painted background (assets/board.jpg, 1536x1024). Every
   // coordinate below is that art's own pixel position scaled by ART_SCALE, so
   // the game's logical geometry sits exactly on top of what is drawn. The art
   // already contains the counter, the tables, their numbers, the SET DOWN
@@ -354,7 +354,7 @@
   // the walkable area starts at the counter's base rather than below it. Any
   // lower and the pass pads get pushed down level with the table number plates
   // instead of hugging the counter.
-  const FLOOR_TOP = A(400);
+  const FLOOR_TOP = A(300);
 
   // Table anchors are the painted number plates. Note the two rows are not
   // evenly spaced and the front row is wider than the back — that is the
@@ -365,8 +365,8 @@
   // padX/padY are measured from the painted SET DOWN pads, which sit slightly
   // wider apart than the number plates above them — the art's perspective, not
   // an error. barY is just above the plate, where a meter clears the number.
-  const R1 = { y: A(520), padY: A(622), barY: A(420) };
-  const R2 = { y: A(788), padY: A(888), barY: A(668) };
+  const R1 = { y: A(465), padY: A(590), barY: A(398) };
+  const R2 = { y: A(700), padY: A(855), barY: A(612) };
   const tableDefs = [
     {x: A(406),    padX: A(395),    ...R1}, {x: A(652),    padX: A(652),    ...R1},
     {x: A(902.5),  padX: A(902.5),  ...R1}, {x: A(1154),   padX: A(1167.5), ...R1},
@@ -429,8 +429,8 @@
   // They cannot sit on the counter itself — that is furniture the player walks
   // in front of, not on — so they occupy the strip of floor at its base.
   const PASSES = [
-    { side: 'left',  x: A(349),  y: A(428), w: PASS_W, h: PASS_H },
-    { side: 'right', x: A(1238), y: A(428), w: PASS_W, h: PASS_H }
+    { side: 'left',  x: A(370),  y: A(357), w: PASS_W, h: PASS_H },
+    { side: 'right', x: A(1180), y: A(357), w: PASS_W, h: PASS_H }
   ];
   // The counter queue deepens as the shift wears on — one of the difficulty
   // axes Rone named. Four a side is the natural ceiling anyway, since each
@@ -445,8 +445,8 @@
   // Both painted dish returns are live, one per section, so clearing a table
   // is a trip to your own end of the room rather than across the whole floor.
   const BUS_STATIONS = [
-    { side: 'left',  x: A(118),  y: A(700), w: A(210), h: A(230) },
-    { side: 'right', x: A(1432), y: A(690), w: A(200), h: A(250) }
+    { side: 'left',  x: A(115),  y: A(760), w: A(200), h: A(240) },
+    { side: 'right', x: A(1425), y: A(760), w: A(200), h: A(240) }
   ];
 
   let tables = [];
@@ -1750,7 +1750,7 @@
   const boardImg = new Image();
   let boardReady = false;
   boardImg.onload = () => { boardReady = true; };
-  boardImg.src = 'assets/kitchen.jpg';
+  boardImg.src = 'assets/board.jpg';
 
   function drawFloor(){
     if (boardReady){
@@ -1770,9 +1770,28 @@
   function drawDropZones(){
     for (const t of tables){
       const standing = inDropZone(t);
-      if (!standing && t.state !== 'dirty') continue;
       ctx.save();
       ctx.translate(t.padX, t.padY);
+      // The resting pad. It used to be painted into the board art, so the game
+      // only drew the active and dirty states over the top — which meant that
+      // on a board without painted pads there was nothing to walk to at all.
+      // Drawn here it also survives a change of floor colour, which a painted
+      // one does not.
+      if (!standing && t.state !== 'dirty'){
+        ctx.globalAlpha = 0.55;
+        ctx.setLineDash([A(14), A(11)]);
+        ctx.strokeStyle = COLORS.mustard;
+        ctx.lineWidth = 2;
+        roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.42;
+        ctx.fillStyle = COLORS.mustard;
+        ctx.font = '900 11px DM Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('SET DOWN', 0, 4);
+        ctx.globalAlpha = 1;
+      }
       if (standing){
         ctx.fillStyle = 'rgba(47,111,107,0.32)';
         roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
@@ -1928,6 +1947,34 @@
 
   // The table, its legs and its number are painted into the board. This draws
   // only what changes: the patience meter, the meal clock, and the dishes.
+  // The number plate. It used to be painted into the board art, which meant the
+  // art and the logical table ids could silently disagree — a board saying 3
+  // where the game means 4 would be a miserable bug in a game about remembering
+  // table numbers. Drawing it here makes them the same thing by construction,
+  // and lets the plate be restyled with the room instead of re-generated.
+  function drawTableNumber(t){
+    // On the tabletop, not floating above it. Above the table there is only a
+    // 70px gap to the row behind, which has to hold the patience meter too —
+    // the plate collided with the previous row's tables every time. A number
+    // card sitting on the table is also what a restaurant actually does.
+    const w = A(72), h = A(54);
+    ctx.save();
+    ctx.translate(t.x - A(50), t.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    roundRect(ctx, -w/2 + 3, -h/2 + 4, w, h, 9); ctx.fill();
+    ctx.fillStyle = COLORS.counter || '#22403c';
+    roundRect(ctx, -w/2, -h/2, w, h, 9); ctx.fill();
+    ctx.strokeStyle = COLORS.mustard; ctx.lineWidth = 2.5;
+    roundRect(ctx, -w/2 + 3, -h/2 + 3, w - 6, h - 6, 7); ctx.stroke();
+    ctx.fillStyle = '#F4EEDB';
+    ctx.font = '900 ' + Math.round(A(40)) + 'px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(t.id), 0, 1);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   function drawTable(t){
     ctx.save();
     ctx.translate(t.x, t.barY);
@@ -1977,12 +2024,12 @@
       // Offset right so the table number stays readable — it is how the
       // player identifies the table, and it must not be covered on the
       // states that most need attention.
-      drawPlate(0, t.y - t.barY, 9, true);
+      drawPlate(A(46), t.y - t.barY, 9, true);
     } else if (t.state === 'dirty'){
       // Dirty plates sit on the table and the pad reads CLEAR instead of SET
       // DOWN. No timer: the cost of ignoring it is that the table cannot take
       // another order, not a countdown.
-      drawDirtyDishes(-2, t.y - t.barY, 0.78);
+      drawDirtyDishes(A(44), t.y - t.barY, 0.78);
     } else if (t.state === 'angry'){
       ctx.font = '20px serif';
       ctx.fillText('😠', 0, 0);
@@ -1995,6 +2042,9 @@
     }
 
     ctx.restore();
+    // Last, so nothing can cover it. The number is how the player identifies
+    // the table, and the whole game is remembering which one a plate is for.
+    drawTableNumber(t);
   }
 
   function drawPlayer(){
