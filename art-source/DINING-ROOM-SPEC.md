@@ -12,18 +12,31 @@ fixed, flat backdrop that a 3D-rendered dinosaur character walks around on top
 of. The camera never moves, nothing in it animates, and the player character is
 drawn over it as a sprite.
 
+**This is a gameplay asset, not an illustration. Where an artistic choice
+conflicts with gameplay readability, readability wins.** And the sentence that
+summarises everything below: **design for the character, not the room — the room
+exists to showcase the cast, not the other way round.**
+
 **Canvas: 1536 × 1024, landscape.** Fixed high three-quarter camera looking down
 at the floor, near-orthographic. Avoid strong perspective — it makes the back
 row of tables tiny and breaks the sense that all eight tables are equally
 reachable, which the game depends on.
 
+**Avoid impossible geometry and painted perspective tricks.** Every
+architectural element should be something that could be modelled in 3D at
+essentially the same proportions. The room is going to be rebuilt in 3D, and
+matching proportions mean the game geometry is mapped once rather than twice.
+
 ---
 
 ## Art direction
 
-**Dinosaurs invented diners.** This is the north star. Every object should look
-like it evolved naturally inside a dinosaur civilisation, not like a human
-restaurant with prehistoric wallpaper. These are professional restaurateurs, and
+**Dinosaurs invented diners.** This is the north star. Not a human restaurant
+decorated with dinosaur objects — a restaurant **designed by dinosaur
+civilisation**. Furniture, stonework, carvings, hardware, architecture and
+decorative language should all read as having evolved from dinosaur culture.
+Stated weakly, a generator drifts straight back to a chain diner with fossils on
+the wall. These are professional restaurateurs, and
 the room should feel civilised, premium and whimsical.
 
 > Nintendo polish × cosy storybook diner × prehistoric civilisation.
@@ -94,8 +107,10 @@ Also needed:
 ### The counter silhouette is sacred
 
 Gameplay first, theme second. Wrap it in carved stone, fossil trim and amber
-accents as much as you like, but underneath it must remain **a clean rectangular
-serving counter whose front face is a clear horizontal edge meeting lit floor.**
+accents as much as you like, but underneath it must remain **one long, continuous
+horizontal serving edge running left to right, visibly meeting lit floor along
+its whole length.** No broken silhouettes, and no pillars or ornament intruding
+into the serving edge or obscuring where the player stands.
 
 Specifically: do not make the pass a cave mouth or a dark recessed opening. A
 shadowed, receding counter front is exactly the ambiguity that broke the last
@@ -112,9 +127,11 @@ most noticeable flaw, and the cause is not his shadow — it is that **nothing e
 in the room casts one**, so the floor reads as flat paint rather than ground.
 
 - **Everything on the floor casts a soft contact shadow.** Tables, counter, dish
-  returns, anything against a wall. Not dramatic — a soft dark pool where the
-  object meets the ground. This establishes that objects in this world touch the
-  floor, which is what makes the character's own shadow believable.
+  returns, anything against a wall. This establishes that objects in this world
+  touch the floor, which is what makes the character's own shadow believable.
+- **Contact shadows matter more than cast shadows.** A soft dark pool where an
+  object meets the ground does more work than a long dramatic one. Grounding is
+  the problem; drama is not.
 - **One directional light: soft, from the upper front-left.** The sprite renderer
   is matched to it. A room lit from a different direction than the character will
   always look wrong.
@@ -180,8 +197,11 @@ height**, which reads as hip height and looks like a table he is serving rather
 than a stool. On the current board the tables land at 49% of him, which is right
 — so match the existing proportion rather than shrinking them.
 
-Chunky carved table bases are on-theme, but the base is where the contact shadow
-lives — keep it from blurring where table ends and floor begins.
+Tables should be **simple chunky rectangles with a strong horizontal front edge
+and uncomplicated bases.** Ornate legs, irregular silhouettes and heavy carving
+all obscure the contact shadow, and the base is exactly where that shadow lives.
+Carved stone is on-theme; keep it from blurring where table ends and floor
+begins.
 
 ---
 
@@ -215,3 +235,22 @@ Desaturate the image mentally: the cast should still pop.
 Warm, hand-painted, storybook. Soft cel shading with light painterly texture,
 dark warm-brown outlines of varying weight. Muted palette — **the characters are
 the saturated things in frame, not the room.**
+
+---
+
+## Acceptance test
+
+Judged in the running game, not by eye on the image. The board succeeds only if,
+with a character dropped in at game scale:
+
+- He grounds naturally at both pickup stations.
+- He grounds naturally at all eight tables.
+- He is clearly readable in every walkable lane.
+- The pickup lane, both table rows, the drop pads and the dish returns are each
+  immediately distinguishable.
+- The room never visually competes with him.
+
+Note the split when it fails: grounding is **joint**. The board owes a shadow
+language and clean geometry; the sprite renderer owes a contact shadow and a key
+light that match it. A failure needs diagnosing before it becomes a re-roll —
+the fix is often in code, not in the art.
