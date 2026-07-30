@@ -511,12 +511,19 @@ Two effects, both **synthesised rather than sampled** — there are no audio fil
 
 - **Footsteps** fire off `player.walk`, the same phase that drives the legs — a footfall every half cycle, two per stride, matching what the animation shows. Driving it off distance rather than a timer is what keeps the sound on the foot at any speed, including the wrong-table slowdown. At 550px/s over a 34px stride that is about five a second.
 - **The register** plays more of itself the better the delivery: drawer only and a flat thunk for no tip, drawer plus one bell for a tip, a rising pair at `TIP_GOOD`, and a third note on top at `TIP_BIG` or in flow.
+- **A click on pickup** at the pass. It fires on every single order, so it is the sound that most needs to stay out of the way — short, dry, nothing that rings.
+- **Ceramic on bussing**, split across the two halves of the job: one held clink lifting a stack of dirties, a spread of three to five impacts plus the bin underneath when they go in the return. Spreading them over a few tens of milliseconds is the whole difference between plates and a click.
+- **A falling pair when a table is nearly out of patience**, at `WARN_AT` (0.22). Falling rather than rising on purpose — up reads as reward, and this is the opposite.
+
+The warning is the only one of these that touches the standing design rule, so it is worth being explicit: it fires for *any* waiting table, it does not say which, and every table's patience is already drawn on the board as a countdown. It is a second channel on information the player can already see, not new information, so it does not tell you which table your carried order belongs to.
+
+It also collapses. Eight tables can cross the line in the same frame, and without `WARN_COOLDOWN` (900ms) that is eight overlapping copies of the same sound. A `warned` flag per table keeps it to once per order rather than once per frame.
 
 Nothing is created until the first gesture — browsers block audio before one, and a context built at load just starts suspended and stays there. Mute is a HUD button and the `M` key, persisted in `localStorage`.
 
 Every level worth changing is a named constant at the top of the section (`SFX_MASTER`, `STEP_SCUFF`, `STEP_THUMP`, `TIP_DRAWER`, `TIP_BELL`), because this has to be judged by ear and it was written by someone who could not hear it. Note that footstep *cadence* is not tunable that way — it follows the legs by design, so if it reads as busy the fix is the volume.
 
-`tools/sfx.js` verifies all of it without audio output, by patching the AudioContext prototype and counting the nodes the game builds.
+`tools/sfx.js` verifies all of it without audio output, by patching the AudioContext prototype and counting the nodes the game builds — 14 checks covering footstep rate, silence while standing, the register firing on a real delivery, the warning firing once and collapsing across a full floor, and mute surviving a reload.
 
 ## Immediate next steps
 

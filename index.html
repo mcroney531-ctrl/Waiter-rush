@@ -631,7 +631,8 @@
       // -> dirty -> idle again once the player clears it. A table that is not
       // idle cannot take a new order, so dirty tables shrink the usable floor.
       state: 'idle',
-      patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0, wrongCooldown: 0, wrongDwell: 0
+      patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0, wrongCooldown: 0, wrongDwell: 0,
+      warned: false
     }));
     tickets = [];
     // size stays the collision radius it has always been — the body is drawn
@@ -656,6 +657,7 @@
     // Back to the starting outfit — the shift is the progression, so it resets
     // with the shift rather than persisting.
     tierNotice = 0;
+    warnCooldown = 0;      // a new shift should not start inside the last one's gap
     applyTier(0);
     lives = 3;
     spawnTimer = 900;
@@ -765,6 +767,15 @@
   const STEP_THUMP  = 0.05;    // the weight behind it
   const TIP_DRAWER  = 0.10;    // the register opening
   const TIP_BELL    = 0.16;    // first bell; the rest are relative to it
+  const PICKUP_CLICK = 0.09;   // taking a ticket off the pass
+  const DISH_CLINK   = 0.07;   // lifting a stack of dirties
+  const DISH_CLATTER = 0.10;   // dropping them in the return
+  const WARN_LEVEL   = 0.10;   // a table running out of patience
+  // How low patience gets before the table is announced, and the shortest gap
+  // between announcements. Eight tables can cross the line together; without
+  // the gap that is eight overlapping copies of the same sound.
+  const WARN_AT       = 0.22;
+  const WARN_COOLDOWN = 900;
 
   let ac = null;
   let master = null;
@@ -863,6 +874,66 @@
     ding(t + 0.03, 1318.5, TIP_BELL, 0.28);                       // E6
     if (frac >= TIP_GOOD) ding(t + 0.10, 1760, TIP_BELL * 1.05, 0.34);  // A6
     if (lit || frac >= TIP_BIG) ding(t + 0.17, 2637, TIP_BELL * 0.8, 0.42); // E7
+  }
+
+  // Lifting a ticket off the pass. This fires on every single order, so it is
+  // the one sound that most needs to stay out of the way — a short dry click
+  // and a hint of pitch, nothing that rings.
+  function sfxPickup(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    burst(t, 3200, 2.2, PICKUP_CLICK, 0.035, 'highpass');
+    ding(t + 0.01, 880, PICKUP_CLICK * 0.55, 0.07, 'triangle');
+  }
+
+  // Lifting a stack of dirties: ceramic, but held — one clink, not a crash.
+  function sfxDishUp(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    ding(t, 1480 * (0.94 + Math.random() * 0.12), DISH_CLINK, 0.13, 'triangle');
+    burst(t, 2400, 1.6, DISH_CLINK * 0.7, 0.05, 'bandpass');
+  }
+
+  // Dropping them in the return. A stack landing is several impacts a few tens
+  // of milliseconds apart, not one — spreading them is the whole difference
+  // between plates and a single click.
+  function sfxClatter(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    const n = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++){
+      const at = t + i * (0.022 + Math.random() * 0.03);
+      burst(at, 2200 + Math.random() * 2200, 2.4, DISH_CLATTER * (1 - i * 0.14), 0.06);
+      if (i < 2) ding(at, 900 + Math.random() * 700, DISH_CLATTER * 0.5, 0.09, 'triangle');
+    }
+    // the bin underneath
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(140, t);
+    o.frequency.exponentialRampToValueAtTime(65, t + 0.09);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(DISH_CLATTER * 0.8, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.14);
+  }
+
+  // A table about to give up. Deliberately a falling pair rather than a rising
+  // one — up reads as reward, and this is the opposite.
+  //
+  // Worth being explicit about why this does not break the standing rule that
+  // nothing may indicate which table the carried order belongs to: it fires for
+  // any waiting table, it does not say which, and every table's patience is
+  // already drawn on the board as a countdown. It is a second channel on
+  // information the player can already see, not new information.
+  let warnCooldown = 0;
+  function sfxWarn(){
+    if (!ac || muted || warnCooldown > 0) return;
+    warnCooldown = WARN_COOLDOWN;
+    const t = ac.currentTime;
+    ding(t,        622.25, WARN_LEVEL, 0.20, 'triangle');   // D#5
+    ding(t + 0.13, 466.16, WARN_LEVEL, 0.30, 'triangle');   // A#4
   }
 
   // Both a button and a key: the button is the only option on a phone, and
@@ -1423,6 +1494,7 @@
     t.state = 'waiting';
     t.ticketId = ticket.id;
     t.patience = 1;
+    t.warned = false;
   }
 
   // ---------- Input ----------
@@ -1569,6 +1641,7 @@
     // spent sitting in the queue is time the guest waited, so it counts.
     carried.push({ type: 'order', tableId: t.tableId, icon: t.icon,
                    pickedAt: performance.now(), orderedAt: t.spawnTime });
+    sfxPickup();
   }
 
   // Dishes take a carry slot like an order does, so with two slots you can run
@@ -1580,6 +1653,7 @@
       if (t.state === 'dirty' && inDropZone(t)){
         t.state = 'clearing';
         carried.push({ type: 'dishes', tableId: t.id, pickedAt: performance.now() });
+        sfxDishUp();
         return;
       }
     }
@@ -1593,6 +1667,7 @@
     score += BUS_PAY_C;
     cleared++;
     carried.splice(carried.indexOf(tray), 1);
+    sfxClatter();
     updateHUD();
   }
 
@@ -1859,6 +1934,10 @@
     for (const t of tables){
       if (t.state === 'waiting' && drainEnabled){
         t.patience -= drainRate * dt;
+        if (!t.warned && t.patience <= WARN_AT && t.patience > 0){
+          t.warned = true;      // once per order, not once per frame
+          sfxWarn();
+        }
         if (t.patience <= 0){
           t.patience = 0;
           t.state = 'angry';
@@ -1930,6 +2009,7 @@
 
     if (capacityNotice > 0) capacityNotice -= dt;
     if (tierNotice > 0) tierNotice -= dt;
+    if (warnCooldown > 0) warnCooldown -= dt;
     if (flowFlash > 0) flowFlash -= dt;
     for (const f of floaters) f.life -= dt;
     if (floaters.some(f => f.life <= 0)) floaters = floaters.filter(f => f.life > 0);

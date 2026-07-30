@@ -109,6 +109,61 @@ const check = (name, ok, detail) => {
     for (const k of keys) await p.keyboard.up(k);
   }
   check('a delivery happened', delivered);
+  check('the delivery made a register sound', (await counts()).osc > 0);
+
+  // ---- the patience warning ----
+  // Both the table state and the patience value are set directly rather than
+  // played out. Orders spawn every seven seconds at shift open and a table
+  // drains 0.006 of its patience in 700ms, so doing this honestly would cost
+  // the best part of a minute per case and be at the mercy of whatever else the
+  // shift was doing. State and patience are exactly what the warning keys on,
+  // so setting them is the test rather than a shortcut around it.
+  //
+  // `quiet()` parks every table full and already-warned, so the only tables
+  // that can make a sound in a case are the ones that case armed.
+  //
+  // One warning is four oscillators, not two: two notes, each a fundamental
+  // plus a detuned partial — which is what makes a tone a bell and not a beep.
+  const PER_WARN = 4;
+
+  const quiet = () => p.evaluate(() => {
+    for (const t of window.__dbg.tables){
+      if (t.state === 'waiting'){ t.patience = 1; t.warned = true; }
+    }
+  });
+  const arm = n => p.evaluate(count => {
+    const w = window.__dbg.tables.slice(0, count);
+    for (const t of w){ t.state = 'waiting'; t.patience = 0.21; t.warned = false; }
+    return w.length;
+  }, n);
+
+  await quiet();
+  await p.waitForTimeout(1000);          // let any earlier cooldown expire
+  await reset();
+  check('a table was available to warn', await arm(1) === 1);
+  await p.waitForTimeout(350);
+  const warned = await counts();
+  check('dropping below the line warns', warned.osc === PER_WARN,
+        `${warned.osc / 2} notes`);
+
+  // still below, already announced — must not say it again
+  await reset();
+  await p.evaluate(() => {
+    const t = window.__dbg.tables.find(t => t.state === 'waiting' && t.warned);
+    if (t) t.patience = 0.15;
+  });
+  await p.waitForTimeout(600);
+  check('staying low does not repeat', (await counts()).osc === 0);
+
+  // a whole floor crossing at once is one announcement, not eight
+  await quiet();
+  await p.waitForTimeout(1000);
+  await reset();
+  const many = await arm(8);
+  await p.waitForTimeout(350);
+  const together = await counts();
+  check('simultaneous warnings collapse', together.osc === PER_WARN,
+        `${many} tables -> ${together.osc / PER_WARN} warning`);
 
   // ---- muting silences everything ----
   await p.evaluate(() => { document.getElementById('muteBtn').click(); });
@@ -116,9 +171,9 @@ const check = (name, ok, detail) => {
   await p.keyboard.down('ArrowRight');
   await p.waitForTimeout(1200);
   await p.keyboard.up('ArrowRight');
-  const quiet = await counts();
-  check('muted makes no nodes', quiet.osc === 0 && quiet.buf === 0,
-        `${quiet.osc} osc / ${quiet.buf} buf`);
+  const silent = await counts();
+  check('muted makes no nodes', silent.osc === 0 && silent.buf === 0,
+        `${silent.osc} osc / ${silent.buf} buf`);
   check('mute persists', await p.evaluate(() => localStorage.getItem('dineo.muted')) === '1');
 
   // ---- and it survives a reload ----
