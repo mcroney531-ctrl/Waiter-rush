@@ -1,5 +1,10 @@
 # Character pipeline — runbook
 
+*Food follows a shorter version of this — see `FOOD-SPEC.md`. The one thing to
+carry across: a dish has no skeleton, so it goes Image to 3D → Remesh → export.
+Skip Rig and Animate entirely, and render it with `tools/render_food.mjs`
+rather than `render_sprites.mjs`.*
+
 From a prepped reference image to a character walking on the live board.
 Everything here has been done once end to end on Tyrone tier 1, so the failure
 modes below are observed, not anticipated.
