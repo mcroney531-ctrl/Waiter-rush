@@ -86,10 +86,35 @@ Never one long prompt — generation takes minutes and a single block loses trac
    case, hyphen, no spaces.
 5. Drop it into `art-source/`.
 
-**Push the single Walking GLB, never the zip.** The zip carries four animation
-copies of the same character and the game uses one of them. This is also the
-answer to "the export is too big to send" — the file that needs to travel is
-about a megabyte, and it travels through git, not through a chat attachment.
+### Getting the file here
+
+**Git is the transfer channel, not a chat attachment.** Nothing needs to be
+uploaded into a conversation and no file-hosting API is involved — the files are
+read off disk from the repo. If an export is too big to attach somewhere, that
+is a reason to push it, not a reason to find a bigger pipe.
+
+Two ways to do step 3, and the difference is worth knowing:
+
+| | in the tree | in history, forever |
+| --- | --- | --- |
+| Walking GLB only, shrunk | ~1 MB | ~1 MB |
+| the whole Meshy zip | 0, once deleted | **23 MB each** |
+
+`shrink_glb.py` takes a zip directly — `python3 tools/shrink_glb.py
+art-source/tyrone-t2.zip` pulls the Walking GLB out, shrinks it and writes
+`tyrone-t2.glb`, 23.24 MB → 1.08 MB. So committing zips genuinely works and
+costs no extra effort on the day.
+
+What it costs is permanent. Git keeps every blob it has ever seen, so deleting
+the zip afterwards reclaims nothing: nineteen zips is around 440 MB that every
+clone downloads forever, against about 21 MB for the GLBs alone. And because
+this repo publishes from the branch root, a zip left in the tree is also served
+publicly and counts against the 1 GB Pages limit — so a committed zip has to be
+deleted in the same session it is extracted.
+
+Dragging one file out of a zip that is already open is ten seconds, so prefer
+that. Push zips when it is genuinely easier and accept the history; it is
+annoying rather than fatal, and a one-off rewrite could clean it later.
 
 ### Check before moving on
 

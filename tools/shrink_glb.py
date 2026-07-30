@@ -3,6 +3,13 @@
 
     python3 tools/shrink_glb.py art-source/tyrone.glb
     python3 tools/shrink_glb.py art-source/*.glb --size 512 --inplace
+    python3 tools/shrink_glb.py art-source/tyrone-t2.zip   # straight from Meshy
+
+A Meshy export zip is accepted directly: it holds four animation copies of the
+same character and the game uses one, so the Walking GLB is pulled out and the
+other three are dropped. `tyrone-t2.zip` becomes `tyrone-t2.glb`, about a
+megabyte, and the 23 MB zip should not be committed -- this repo publishes from
+the branch root, so anything left in the tree is served to the public.
 
 Meshy exports a 2048x2048 RGBA PNG per character. Tyrone tier 1 is 6.12 MB and
 5.28 MB of that -- 86% -- is that one image. The mesh, the skin and the walk
@@ -21,18 +28,51 @@ Opaque textures re-encode as JPEG, which is where most of the remaining win
 comes from. A texture that actually uses its alpha channel stays PNG, because
 dropping alpha would punch holes in the model.
 """
-import sys, os, io, json, struct, glob
+import sys, os, io, json, struct, glob, zipfile
 
 from PIL import Image
 
 MAGIC, JSON_CHUNK, BIN_CHUNK = 0x46546C67, 0x4E4F534A, 0x004E4942
 
 
-def read_glb(path):
-    d = open(path, 'rb').read()
-    magic, ver, total = struct.unpack_from('<III', d, 0)
-    if magic != MAGIC:
-        raise ValueError(f'{path} is not a GLB')
+ANIM_PREF = 'walking'
+
+
+def source_bytes(path, prefer=ANIM_PREF):
+    """The GLB bytes for a path that may be a .glb or a Meshy export zip.
+
+    Meshy hands back four animations of the same character -- Walking, Running,
+    RunFast, Run_03 -- and the game only ever uses the walk. Picking it here
+    means the zip can go straight from Downloads into this script without being
+    opened by hand.
+    """
+    if not zipfile.is_zipfile(path):
+        return open(path, 'rb').read(), None
+
+    with zipfile.ZipFile(path) as z:
+        glbs = [n for n in z.namelist()
+                if n.lower().endswith('.glb') and not n.startswith('__MACOSX')]
+        if not glbs:
+            raise ValueError('no .glb inside the zip')
+        hits = [n for n in glbs if prefer in os.path.basename(n).lower()]
+        if len(hits) > 1:
+            # "walking" matching several is ambiguous enough to be worth a stop;
+            # silently taking the first is how the wrong cycle ships.
+            raise ValueError(f'{len(hits)} files match {prefer!r}: '
+                             + ', '.join(os.path.basename(n) for n in hits))
+        if not hits:
+            if len(glbs) > 1:
+                raise ValueError(f'no {prefer!r} animation; zip holds '
+                                 + ', '.join(os.path.basename(n) for n in glbs))
+            hits = glbs
+        return z.read(hits[0]), os.path.basename(hits[0])
+
+
+def read_glb(path, data=None):
+    d = open(path, 'rb').read() if data is None else data
+    if len(d) < 12 or struct.unpack_from('<I', d, 0)[0] != MAGIC:
+        raise ValueError('not a GLB — a Meshy export is a .glb or a zip '
+                         'containing one')
     off, js, bin_ = 12, None, b''
     while off < len(d):
         ln, ty = struct.unpack_from('<II', d, off)
@@ -117,10 +157,18 @@ def resize_image(raw, size, quality, opaque):
     return buf.getvalue(), mime, f'{w}x{h}->{im.size[0]}x{im.size[1]} {mime[6:]}'
 
 
-def shrink(path, out_path, size, quality):
-    js, bin_ = read_glb(path)
+def shrink(path, out_path, size, quality, data=None, always_write=False):
+    """Returns a list of notes, or None when the file was left alone.
+
+    `always_write` is for zip input, where the extracted GLB still has to be
+    written out even if its textures were already small enough to skip.
+    """
+    js, bin_ = read_glb(path, data)
     views = js.get('bufferViews', [])
     if not views:
+        if always_write:
+            open(out_path, 'wb').write(data)
+            return []
         return None
 
     # Replace image payloads first, then rebuild the binary chunk around them.
@@ -142,6 +190,9 @@ def shrink(path, out_path, size, quality):
                      f'{len(raw)/1e6:.2f} -> {len(data)/1e6:.2f} MB')
 
     if not replaced:
+        if always_write:
+            open(out_path, 'wb').write(data)
+            return []
         return None
 
     # Every view is copied into a fresh buffer in order. Views are copied whole
@@ -170,6 +221,7 @@ def shrink(path, out_path, size, quality):
 def main(argv):
     size = 1024
     quality = 90
+    anim = ANIM_PREF
     inplace = False
     paths = []
     it = iter(argv)
@@ -178,24 +230,31 @@ def main(argv):
             size = int(next(it))
         elif a == '--quality':
             quality = int(next(it))
+        elif a == '--anim':
+            anim = next(it).lower()
         elif a == '--inplace':
             inplace = True
         elif a.startswith('--'):
             sys.exit(f'unknown flag {a}')
         else:
-            paths.extend(glob.glob(a) or [a])
+            paths.extend(sorted(glob.glob(a)) or [a])
 
     if not paths:
         sys.exit(__doc__)
 
     before = after = 0
     for p in paths:
-        out = p if inplace else p.replace('.glb', '.small.glb')
+        is_zip = zipfile.is_zipfile(p)
+        # A zip always produces a sibling .glb — that is the whole point of
+        # accepting one — so --inplace has nothing to say about it.
+        out = (os.path.splitext(p)[0] + '.glb' if is_zip
+               else p if inplace else p.replace('.glb', '.small.glb'))
         was = os.path.getsize(p)
         try:
-            notes = shrink(p, out, size, quality)
+            data, picked = source_bytes(p, anim)
+            notes = shrink(p, out, size, quality, data, always_write=is_zip)
         except Exception as e:                        # a bad export should not
-            print(f'{p}: FAILED — {e}')               # stop the rest of a batch
+            print(f'{os.path.basename(p)}: FAILED — {e}')   # stop a whole batch
             continue
         if notes is None:
             print(f'{os.path.basename(p)}: nothing to shrink ({was/1e6:.2f} MB)')
@@ -203,7 +262,8 @@ def main(argv):
             continue
         now = os.path.getsize(out)
         print(f'{os.path.basename(p)}: {was/1e6:.2f} -> {now/1e6:.2f} MB '
-              f'({100 - 100*now/was:.0f}% smaller)')
+              f'({100 - 100*now/was:.0f}% smaller)'
+              + (f'  [{picked} -> {os.path.basename(out)}]' if picked else ''))
         print('\n'.join(notes))
         before += was; after += now
 
