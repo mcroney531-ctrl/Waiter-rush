@@ -5,7 +5,16 @@
 //       node tools/curve.js
 // Prints the earnings curve TIER_UP_C is set against. Re-run it whenever the
 // economy or the spawn ramp moves.
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
+import { existsSync } from 'node:fs';
+
+// Same reason as render_sprites.mjs: a freshly installed playwright pins its
+// own browser build and refuses to start without downloading one, which is slow
+// and pointless when a working Chromium is already on the box.
+const PREINSTALLED = ['/opt/pw-browsers/chromium/chrome-linux/chrome',
+                      '/opt/pw-browsers/chromium-1194/chrome-linux/chrome']
+                     .find(x => existsSync(x));
+const LAUNCH = PREINSTALLED ? { executablePath: PREINSTALLED } : {};
 const B = process.env.BASE || 'http://127.0.0.1:8222';
 const step = async (p, keys, ms) => {
   for (const k of keys) await p.keyboard.down(k);
@@ -16,7 +25,7 @@ const step = async (p, keys, ms) => {
 (async () => {
   const LAG = +(process.env.LAG || 1200);
   const MAXMS = +(process.env.MAXMS || 240000);
-  const br = await chromium.launch({ args: ['--no-sandbox'] });
+  const br = await chromium.launch({ ...LAUNCH, args: ['--no-sandbox'] });
   const p = await br.newPage({ viewport: { width: 1000, height: 700 } });
   await p.route('**', r => {
     const u = r.request().url();

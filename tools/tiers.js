@@ -5,7 +5,16 @@
 //       node tools/tiers.js
 // Needs the tinted stand-ins in .tiertest/ only while real tier art is missing;
 // once tiers 2-4 ship, point TIERS at the real sheets and delete the tints.
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
+import { existsSync } from 'node:fs';
+
+// Same reason as render_sprites.mjs: a freshly installed playwright pins its
+// own browser build and refuses to start without downloading one, which is slow
+// and pointless when a working Chromium is already on the box.
+const PREINSTALLED = ['/opt/pw-browsers/chromium/chrome-linux/chrome',
+                      '/opt/pw-browsers/chromium-1194/chrome-linux/chrome']
+                     .find(x => existsSync(x));
+const LAUNCH = PREINSTALLED ? { executablePath: PREINSTALLED } : {};
 const B = process.env.BASE || 'http://127.0.0.1:8222';
 
 const TIERS = [
@@ -23,7 +32,7 @@ const check = (name, got, want) => {
 };
 
 (async () => {
-  const br = await chromium.launch({ args: ['--no-sandbox'] });
+  const br = await chromium.launch({ ...LAUNCH, args: ['--no-sandbox'] });
   const p = await br.newPage({ viewport: { width: 1000, height: 700 } });
   await p.goto(B + '/probe.html', { waitUntil: 'load' });
   await p.click('#landingStart');
@@ -55,7 +64,8 @@ const check = (name, got, want) => {
   await setScore(99999);
   check('stops at the top tier', await p.evaluate(() => window.__dbg.tier), 3);
 
-  await p.screenshot({ path: 'tier4.png', clip: { x: 0, y: 0, width: 960, height: 640 } });
+  // into the gitignored scratch dir, not the repo root
+  await p.screenshot({ path: '.tiertest/tier4.png', clip: { x: 0, y: 0, width: 960, height: 640 } });
 
   // ---- reset drops back ----
   await p.evaluate(() => { document.getElementById('startBtn').click(); });

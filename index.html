@@ -46,6 +46,20 @@
     text-shadow: 0 2px 0 rgba(0,0,0,0.35);
     z-index: 5;
   }
+  /* Absolute, so it stays out of the HUD's two-child space-between flow — a
+     third flex child would push the score and the lives off the edges. Sits
+     under the lives dots rather than beside them, where nothing else lives.
+     #hud is pointer-events:none, so this has to opt back in. */
+  #muteBtn {
+    position: absolute; top: 56px; right: 18px;
+    pointer-events: auto; cursor: pointer;
+    width: 34px; height: 34px; line-height: 1;
+    font-size: 15px; padding: 0;
+    background: rgba(28,23,18,0.55); color: #F4EEDB;
+    border: 2px solid rgba(244,238,219,0.28); border-radius: 9px;
+    opacity: 0.62; transition: opacity 120ms, border-color 120ms;
+  }
+  #muteBtn:hover, #muteBtn:focus-visible { opacity: 1; border-color: rgba(244,238,219,0.6); }
   #hud .stat { font-size: 20px; letter-spacing: 0.5px; }
   #hud .stat span.label { font-family: 'DM Sans', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; font-weight: 700;}
   #flow {
@@ -265,6 +279,7 @@
       <span class="label">Tables lost</span>
       <div id="lives"></div>
     </div>
+    <button id="muteBtn" type="button" aria-label="Mute" aria-pressed="false">&#128266;</button>
   </div>
 
   <div id="controls-mobile">
@@ -729,6 +744,132 @@
     upperArm:  13,
     foreArm:   12
   };
+
+  // ---------- Sound ----------
+  // Synthesised rather than sampled. Two reasons, and the second is the one
+  // that decided it: there are no audio files to load, so this costs nothing on
+  // first paint and works offline — and a tip sound that is *computed* from how
+  // good the tip was can say "that was a big one" without the player reading a
+  // number, which a single fixed sample cannot.
+  //
+  // Nothing is created until the first real interaction. Browsers block audio
+  // before a gesture, and an AudioContext built at load just starts life
+  // suspended and stays that way.
+  // Everything here has to be judged by ear, so the numbers worth changing are
+  // named rather than buried in the synthesis. At 550px/s over a 34px stride a
+  // footstep lands about five times a second, which is a scurry — if that reads
+  // as busy, STEP_SCUFF and STEP_THUMP are the volume and the cadence follows
+  // the legs, so it cannot be fixed by slowing the sound down.
+  const SFX_MASTER  = 0.9;
+  const STEP_SCUFF  = 0.05;    // the sole
+  const STEP_THUMP  = 0.05;    // the weight behind it
+  const TIP_DRAWER  = 0.10;    // the register opening
+  const TIP_BELL    = 0.16;    // first bell; the rest are relative to it
+
+  let ac = null;
+  let master = null;
+  let noiseBuf = null;
+  let muted = localStorage.getItem('dineo.muted') === '1';
+
+  function initAudio(){
+    if (ac) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;                       // no Web Audio: the game is silent, not broken
+    ac = new Ctx();
+    master = ac.createGain();
+    master.gain.value = muted ? 0 : SFX_MASTER;
+    master.connect(ac.destination);
+    // One second of white noise, made once and replayed. Footsteps fire several
+    // times a second and allocating a buffer per step is pure waste.
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+
+  function setMuted(v){
+    muted = !!v;
+    localStorage.setItem('dineo.muted', muted ? '1' : '0');
+    if (master) master.gain.setTargetAtTime(muted ? 0 : SFX_MASTER, ac.currentTime, 0.02);
+    const b = document.getElementById('muteBtn');
+    if (b){
+      b.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+      b.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+      b.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    }
+  }
+
+  // A short burst of filtered noise. The workhorse behind both sounds.
+  function burst(t, freq, q, peak, decay, type){
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    const f = ac.createBiquadFilter();
+    f.type = type || 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + decay + 0.02);
+  }
+
+  // One decaying tone. `detune` adds a second oscillator slightly off pitch,
+  // which is most of what makes a bell sound like metal rather than a beep.
+  function ding(t, freq, peak, decay, wave){
+    for (const [mult, gain] of [[1, 1], [2.01, 0.32]]){
+      const o = ac.createOscillator();
+      o.type = wave || 'sine';
+      o.frequency.value = freq * mult;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak * gain, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + decay + 0.02);
+    }
+  }
+
+  // Soft shoe on a wooden floor: a click of noise for the sole, a very short
+  // low thump for the weight behind it. Both are randomised a little, because
+  // an identical step every time reads as a machine rather than a runner.
+  function sfxStep(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    const v = 0.85 + Math.random() * 0.3;
+    burst(t, 1500 * v, 0.8, STEP_SCUFF, 0.075);
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(165 * v, t);
+    o.frequency.exponentialRampToValueAtTime(72, t + 0.06);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(STEP_THUMP, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.1);
+  }
+
+  // The register. How much of it plays is the tip itself: a bad delivery gets
+  // the drawer and no bell, a good one gets the rising pair everyone knows, and
+  // flow adds a third note on top. So speed is audible before the number is.
+  function sfxTip(frac, lit){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    burst(t, 2600, 1.4, TIP_DRAWER, 0.05, 'highpass');   // the drawer
+    if (frac <= 0){
+      ding(t + 0.02, 180, TIP_BELL * 0.6, 0.16, 'triangle');   // a flat thunk, no bell
+      return;
+    }
+    ding(t + 0.03, 1318.5, TIP_BELL, 0.28);                       // E6
+    if (frac >= TIP_GOOD) ding(t + 0.10, 1760, TIP_BELL * 1.05, 0.34);  // A6
+    if (lit || frac >= TIP_BIG) ding(t + 0.17, 2637, TIP_BELL * 0.8, 0.42); // E7
+  }
+
+  // Both a button and a key: the button is the only option on a phone, and
+  // reaching for the mouse mid-rush on desktop is not.
+  window.addEventListener('keydown', e => {
+    if (e.key === 'm' || e.key === 'M') setMuted(!muted);
+  });
 
   // ---------- Sprite sheets ----------
   // A sheet is a grid of cells: one row per facing, one column per animation
@@ -1486,6 +1627,7 @@
       const tip = Math.round(frac * TIP_MAX_C * (flowLit ? FLOW_MULT : 1));
       score += DELIVERY_BASE_C + tip;
       tipFloater(table.x, table.barY - 20, tip, waited, flowLit);
+      sfxTip(frac, flowLit);
       deliveries++;
       carried.splice(carried.indexOf(item), 1);
       updateHUD();
@@ -1680,7 +1822,13 @@
       // reads as twitching.
       if (Math.abs(dx) >= Math.abs(dy)) player.facing = dx > 0 ? 'right' : 'left';
       else                              player.facing = dy > 0 ? 'down'  : 'up';
+      const wasHalf = Math.floor(player.walk / Math.PI);
       player.walk += Math.hypot(dx, dy) * speed * dt/1000 / STRIDE_PX;
+      // A footfall every half cycle — two per stride, which is what the walk
+      // animation shows. Driving it off the same phase as the legs rather than
+      // off a timer is what keeps the sound on the foot at any speed, including
+      // the wrong-table slowdown.
+      if (Math.floor(player.walk / Math.PI) !== wasHalf) sfxStep();
     } else {
       // Settle to a standing pose rather than freezing mid-step.
       const rest = Math.round(player.walk / Math.PI) * Math.PI;
@@ -2354,6 +2502,17 @@
   document.getElementById('avatarDone').addEventListener('click', pickerNext);
   document.getElementById('avatarRandom').addEventListener('click', randomiseAvatar);
   document.getElementById('avatarCancel').addEventListener('click', pickerBack);
+
+  // Audio can only start from a gesture, so the first one anywhere unlocks it.
+  // `once` means this costs nothing after that.
+  for (const ev of ['pointerdown', 'keydown']){
+    window.addEventListener(ev, () => { initAudio(); setMuted(muted); }, { once: true });
+  }
+  document.getElementById('muteBtn').addEventListener('click', e => {
+    e.stopPropagation();          // the canvas below should not also act on this
+    setMuted(!muted);
+  });
+  setMuted(muted);                // paint the saved state onto the button
 
   loadSavedAvatar();
   // Kick off the sprite load for every tier at once. Until the images arrive —

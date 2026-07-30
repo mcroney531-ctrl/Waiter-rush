@@ -281,7 +281,7 @@ One real limitation: ES module imports are blocked on `file://`, so opening `ind
 
 **3. Every swatch click re-renders all 114 previews**, since each shows the current selection with one option swapped. That is ~120 ms of generation plus image decode, local and offline, so it is no longer a network concern — but it is the thing to look at first if the picker ever feels sluggish on a weak machine.
 
-**4. Still open from the original brief:** no audio at all; no difficulty feel-tuning pass has happened by *feel* — every value is measured, none is played; the canvas is a fixed 960×640 scaled by CSS rather than a true responsive layout; and the HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
+**4. Still open from the original brief:** audio is two effects, not a soundtrack; no difficulty feel-tuning pass has happened by *feel* — every value is measured, none is played; the canvas is a fixed 960×640 scaled by CSS rather than a true responsive layout; and the HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
 
 ## Verifying your work
 
@@ -505,6 +505,19 @@ Three behaviours worth knowing, all covered by `tiers.js`:
 
 The level-up moment is a bench banner plus an expanding ring at the character's feet. The ring exists because the banner alone announces the reward somewhere the character is not; the banner sits on the bench because **nothing covers the table numbers** — that rule has now bitten three separate features.
 
+## Sound
+
+Two effects, both **synthesised rather than sampled** — there are no audio files, so this costs nothing on first paint and works offline. It also buys something a fixed sample cannot: the tip sound is *computed* from how good the tip was, so speed is audible before the number is read.
+
+- **Footsteps** fire off `player.walk`, the same phase that drives the legs — a footfall every half cycle, two per stride, matching what the animation shows. Driving it off distance rather than a timer is what keeps the sound on the foot at any speed, including the wrong-table slowdown. At 550px/s over a 34px stride that is about five a second.
+- **The register** plays more of itself the better the delivery: drawer only and a flat thunk for no tip, drawer plus one bell for a tip, a rising pair at `TIP_GOOD`, and a third note on top at `TIP_BIG` or in flow.
+
+Nothing is created until the first gesture — browsers block audio before one, and a context built at load just starts suspended and stays there. Mute is a HUD button and the `M` key, persisted in `localStorage`.
+
+Every level worth changing is a named constant at the top of the section (`SFX_MASTER`, `STEP_SCUFF`, `STEP_THUMP`, `TIP_DRAWER`, `TIP_BELL`), because this has to be judged by ear and it was written by someone who could not hear it. Note that footstep *cadence* is not tunable that way — it follows the legs by design, so if it reads as busy the fix is the volume.
+
+`tools/sfx.js` verifies all of it without audio output, by patching the AudioContext prototype and counting the nodes the game builds.
+
 ## Immediate next steps
 
 1. **Get character frames.** Four directions is settled, the sprite pipeline is proven end to end, and the roster is waiting on art. Only side, down and up need drawing — left mirrors right. Tyrone tier 1 is live; tiers 2-4 and the other four species are in production through Meshy.
@@ -512,6 +525,6 @@ The level-up moment is a bench banner plus an expanding ring at the character's 
 3. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
 4. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.
 5. **The picker is now a six-step flow** — head & hair, skin, facial hair, glasses, uniform colour, expression — opening straight into the tutorial with no title screen. If Dine-O Dash happens this is rebuilt over dino options; the flow itself is worth keeping either way. — it works and is verified, but where it sits in the opening journey is up for change.
-6. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; there is no audio at all; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape.
+6. Smaller things, in rough order of how much they cost to leave: the HUD label reads "Tables lost" while the dots deplete as lives remaining; audio covers footsteps and tips but nothing else; the canvas is a fixed 960×640 letterboxed by CSS rather than a real responsive layout, which is why the d-pad overlays the board in landscape.
 
 The art is in: the landing key art, the painted kitchen board and ten plated dishes all landed. The remaining art gap is party-size indication.
