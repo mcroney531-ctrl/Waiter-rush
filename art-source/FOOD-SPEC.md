@@ -13,9 +13,10 @@ icon the game actually draws.
 
 That matters for two reasons:
 
-1. **The camera angle is chosen later, in code.** Do not compose the reference
-   at the angle you want to see in game — compose it so the *shape* is
-   reconstructable. The renderer can shoot the finished model from anywhere.
+1. **The reference is not the final view.** The angle the player sees is chosen
+   later in code and can be changed for the whole set at once. Compose the
+   reference so the *shape* is reconstructable — and shoot all ten identically,
+   for the reason in Camera below.
 2. **Food skips rig and animate.** Unlike the characters, a dish has no
    skeleton and no walk cycle. The Meshy path is Image to 3D → Remesh → export
    GLB, and that is all. Do not run Rig on a burger.
@@ -26,7 +27,8 @@ That matters for two reasons:
 
 ## The one requirement that matters most
 
-**The plate must be pale.**
+**The plate must be pale. This is a must, not a preference — a dark plate is a
+re-roll.**
 
 The first dish came back on dark stone, and it failed. Measured against the
 floor the ticket rail sits on (luminance 68 of 255):
@@ -81,19 +83,90 @@ element and the thing the eye compares. Vary what is on it, not the diameter.
 
 ---
 
+## One dominant shape per dish
+
+The first thing a player perceives is the outline, before colour and long
+before detail. So every dish has to be **reducible to one dominant shape**, and
+that shape has to be different from the other nine.
+
+The test: black the dish out entirely. If it is still identifiable, it works.
+
+| key | dominant shape |
+| --- | --- |
+| `burger` | tall stack, with a fan beside it |
+| `pizza` | fan of triangles |
+| `sub` | two leaning logs |
+| `tacos` | row of arches |
+| `pasta` | dome |
+| `salad` | deep bowl, piled above the rim |
+| `club` | stacked triangles standing on their points |
+| `soup` | wide bowl with a strong rim line |
+| `ribs` | arced rack |
+| `tart` | raised cylinder on a stand |
+
+Note the burger is a stack **plus a fan** rather than a clean cylinder, because
+that is what shipped and it is better for it — the fries give it an asymmetric
+outline nothing else in the set has. Where a dish can carry a distinctive
+secondary element without clutter, it should.
+
+### The set being replaced fails this completely
+
+This is measurable rather than a matter of opinion, so it was measured.
+`tools/foodgrid.py` renders the whole menu at play size in colour, in value and
+as hard silhouettes. The silhouette strip is the one that decides it, and the
+current set produces **ten identical circles.**
+
+The reason is structural, not a drawing problem: they are plates seen from
+above, so the plate *is* the outline and nothing on it ever breaks the rim.
+Every one of those ten dishes is being told apart purely by the colour and
+detail inside a circle — the two channels that die first at 41px, which is the
+size they draw at when carrying two orders.
+
+That is the real argument for rebuilding them in 3D, and it is worth stating
+because it is not "3D looks nicer". **A dish shot from 42° has its food rising
+above the plate rim, so the food gets into the silhouette.** A top-down plate
+can never do that no matter how well it is illustrated. The one 3D dish in the
+set is already the only one with a broken outline.
+
+So this section is not polish on top of the spec. It is the thing the rebuild is
+for, and a dish that comes back as another circle has failed its main job.
+
+---
+
 ## The reference image itself
 
 For Meshy to reconstruct a clean model:
 
 - **Square canvas, one dish, centred**, filling most of the frame.
 - **Plain flat background** — mid grey is ideal. No scene, no table, no cloth.
-- **Three-quarter view from about 40° above.** High enough to read what is on
-  the plate, low enough to show that the food has height.
 - **Even, soft lighting from the upper front-left.** Enough shaping to show
   form, no deep shadow hiding geometry.
 - **No cast shadow on the background.** A baked shadow becomes geometry in the
   reconstruction and then a dark smear on the floor of the game.
 - **No depth of field.** Blur reads as missing detail and comes back as mush.
+
+### Camera: identical on all ten
+
+- **Pitch about 40° above.** High enough to read what is on the plate, low
+  enough to show the food has height.
+- **Yaw about 25° off dead-on, from the front-left.** A flat-on view hides
+  depth; much past 30° starts hiding the front of the dish.
+- **The same on every dish, no exceptions.**
+
+The reason is not the obvious one, and the obvious one is wrong. **This is not
+what makes the icons look like a set** — that comes from the renderer, which
+shoots every model on the same camera with the same light rig and bakes the same
+outline, whatever the reference looked like.
+
+What a fixed reference orientation actually buys is this: Meshy builds the model
+with the reference view facing front, so the reference decides where the model's
+"front" ends up. Shoot all ten the same way and `--yaw 0` means the same thing on
+every one of them, and the whole set renders with a single command. Shoot them
+inconsistently and each dish needs its own angle hunted down by hand.
+
+**The reference angle is not the game angle.** The game currently renders food at
+42° elevation, chosen by looking at a contact sheet, and it can be changed for
+the whole set at any time without touching any art.
 
 ---
 
@@ -136,7 +209,10 @@ Names are the game's internal keys — keep the filenames exactly these:
 
 `burger` is done. The remaining nine:
 
-| key | dish | what gives it height and silhouette |
+Each row says where the **height** comes from; the dominant shape each one has
+to hit is in the silhouette table above.
+
+| key | dish | what gives it height |
 | --- | --- | --- |
 | `pizza` | two or three wedges | wedges propped, not laid flat |
 | `sub` | a long filled roll, cut | halves stacked or leaning |
@@ -180,6 +256,11 @@ Judged in the running game, not on the reference image. A dish succeeds if, at
   same plate, same weight, same world.
 - Nothing on it is detail the player cannot resolve.
 
+Run `python3 tools/foodgrid.py` and it will say so: it flags anything whose edge
+separates from the floor by less than 70, whose aspect falls outside 1.0-1.3, or
+which fills less than 80% of its slot. The silhouette strip it writes is not
+scored — that one still needs a human to look at it and try to name all ten.
+
 ---
 
 ## Prompts
@@ -202,7 +283,11 @@ back its understanding, then generate one dish at a time.
 >
 > - Square canvas, one dish, centred, filling most of the frame.
 > - Plain flat mid-grey background. No table, no cloth, no props, no scene.
-> - Three-quarter view from about 40° above.
+> - **Identical camera on every dish: pitch about 40° above, yaw about 25° off
+>   dead-on from the front-left.** Consistency here matters more than the exact
+>   figures — the 3D tool builds each model facing whatever the reference
+>   showed, so ten different angles means ten models that have to be handled
+>   individually afterwards.
 > - Soft even light from the upper front-left. No cast shadow on the
 >   background, no depth of field, no steam or sparkles — anything atmospheric
 >   becomes solid geometry when this is converted to 3D.
@@ -214,16 +299,23 @@ back its understanding, then generate one dish at a time.
 >   ends up rendering small next to the others.
 > - Two or three large blocks of distinct colour identify the dish. Fine
 >   garnish is fine as texture but must never be what makes it recognisable.
+> - **Each dish has one dominant silhouette, different from the other nine.**
+>   Black the dish out completely and it should still be identifiable. That is
+>   the first thing a player perceives, before colour and long before detail.
 >
 > Does that make sense, and how would you approach it?
 
 ### Step 2 — per dish
 
-> Now the first one: **[dish]**. [One line on what gives it height — e.g.
-> "a deep bowl piled high, not a flat plate."] Same pale stoneware plate, same
-> size and style as the others in the set.
+> Now the first one: **[dish]**. Its dominant silhouette should read as
+> **[shape]**, and the height comes from **[what]**. Same pale stoneware plate,
+> same size and style, same camera as the rest of the set.
 
 Then, for each subsequent dish, keep the thread going so the plate stays
 consistent:
 
-> Same set, same plate, same lighting and angle. Next: **[dish]**. [height note]
+> Same set, same plate, same lighting, same camera. Next: **[dish]** — dominant
+> silhouette **[shape]**, height from **[what]**.
+
+Filling in `[shape]` from the silhouette table each time is the part that keeps
+the ten distinguishable from one another rather than merely well drawn.

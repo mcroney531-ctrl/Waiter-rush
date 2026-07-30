@@ -11,3 +11,8 @@ package-lock.json
 
 # Throwaway tinted stand-ins used to test the tier ladder before real art
 .tiertest/
+
+# Readability grids, regenerated on demand by tools/foodgrid.py
+foodgrid-*.png
+food-contact-*.png
+tiergrid-*.png
