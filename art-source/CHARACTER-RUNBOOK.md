@@ -86,6 +86,11 @@ Never one long prompt — generation takes minutes and a single block loses trac
    case, hyphen, no spaces.
 5. Drop it into `art-source/`.
 
+**Push the single Walking GLB, never the zip.** The zip carries four animation
+copies of the same character and the game uses one of them. This is also the
+answer to "the export is too big to send" — the file that needs to travel is
+about a megabyte, and it travels through git, not through a chat attachment.
+
 ### Check before moving on
 
 Look at the model in Meshy's viewer after the remesh and after the rig:
@@ -110,6 +115,12 @@ Tyrone's four tiers as the first batch is deliberate — see below.
 
 ## Phase 5 — my side
 
+0. `python3 tools/shrink_glb.py art-source/<name>.glb --inplace` before anything
+   else. Meshy ships a 2048² texture per character; the sprite renders at 192px,
+   so that texture is roughly a hundred times more than the render can use.
+   Resized to 1024 and re-encoded, Tyrone went 6.12 MB → 1.08 MB, and the
+   rendered sheet differs from the original by a mean of 0.42/255 with 0.01% of
+   pixels off by more than 8 — measured, not assumed, and invisible.
 1. `node tools/render_sprites.mjs art-source/<name>.glb --name <name>` produces
    the sheet and its config, with the anchor measured from rendered pixels.
 2. I wire it in, walk the character to all twelve stops, and screenshot.
@@ -132,10 +143,13 @@ read, the remaining sixteen are volume with no open questions.
 
 ## Known limits
 
-- **~6 MB per GLB.** Nineteen is around 110 MB in the repo. Fine for GitHub, but
-  if the roster grows past this, source models move to Git LFS or a separate
-  repository. Only the rendered sheets — under 500 KB each — are needed by the
-  game.
+- **File size is a texture problem, not a model problem.** A Meshy GLB is ~6 MB
+  and about 86% of that is one 2048² PNG. The mesh, skin and walk cycle together
+  are under a megabyte. So the fix is always to shrink the texture rather than to
+  reach for LFS, a splitter, or a file-hosting API — after `shrink_glb.py` the
+  roster is around 20 MB total, and nothing is near GitHub's 100 MB per-file
+  limit. Only the rendered sheets, under 500 KB each, are needed by the game
+  itself; the GLBs are kept so a sheet can be re-rendered.
 - **Chrome cannot do the Meshy Scene composition** for the 3D room. That is
   spatial judgement inside a WebGL canvas with no DOM to read. Automate
   deterministic click paths, not spatial work.
