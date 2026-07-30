@@ -147,11 +147,24 @@ Tyrone's four tiers as the first batch is deliberate — see below.
    rendered sheet differs from the original by a mean of 0.42/255 with 0.01% of
    pixels off by more than 8 — measured, not assumed, and invisible.
 1. `node tools/render_sprites.mjs art-source/<name>.glb --name <name>` produces
-   the sheet and its config, with the anchor measured from rendered pixels.
-2. I wire it in, walk the character to all twelve stops, and screenshot.
-3. Then the roster and tier-progression code, which does not exist yet —
-   `PLAYER_SHEET` is currently one constant and needs to become a table of
-   characters and tiers with the tier swapping at tip thresholds.
+   the sheet and its config, with the anchor measured from rendered pixels. It
+   also prints the roster line ready to paste:
+
+   ```
+   roster  { src: 'assets/sprites/tyrone-t1.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 },
+   ```
+
+2. That line goes into `ROSTER` in index.html, in tier order. Everything else
+   about a sheet is shared in `SHEET_BASE`, so a tier really is one line.
+3. I walk the character to all twelve stops and screenshot.
+
+**The roster and tier progression are built.** A character is four tiers of one
+dinosaur; the tier swaps on money earned this shift, at $75 / $200 / $400 —
+set against a measured earnings curve, roughly one promotion every 40-60s. All
+four sheets preload at startup so a promotion never waits on a download, a tier
+whose art is missing is skipped rather than announced, and no art at all falls
+back to the drawn placeholder body. So tiers can land one at a time and the
+game stays playable throughout.
 
 ---
 

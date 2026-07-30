@@ -8,3 +8,6 @@ package-lock.json
 
 # Scratch output from the sprite renderer
 .sprite-stage/
+
+# Throwaway tinted stand-ins used to test the tier ladder before real art
+.tiertest/

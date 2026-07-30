@@ -491,9 +491,23 @@ From the Quaternius trial run, and they apply to any GLB:
 - **Measure the anchor from rendered pixels**, never guess it, or the character floats or sinks. Take the union bounding box across all frames; `anchorY` is its bottom edge over the frame height.
 - **Yaw mapping** for a model facing +Z: 180 = toward camera (down), 90 = right, 0 = away (up), 270 = left. Left mirrors right in the hook, so only three directions need rendering.
 
+## The roster and the tier ladder
+
+Built and tested. `ROSTER` in index.html is characters × tiers; a character is four tiers of the same dinosaur with progressively better kit. Sheet configs are **inline, not fetched** — the game still runs from a `file://` double-click, which a fetch of the sibling `.json` would quietly break. Everything shared lives in `SHEET_BASE`, so a tier is one line and `render_sprites.mjs` prints that line ready to paste.
+
+Promotion is on money earned this shift: `TIER_UP_C = [0, 7500, 20000, 40000]`, so `$75 / $200 / $400`. Those come off a measured curve, not a guess — the lagged bot that stands in for a human earns `$816` over a 240s run of 39 deliveries, crossing `$50` at 25s, `$200` at 81s and `$400` at 146s, which puts a promotion every 40-60s. Re-measure with `curve.js` if the economy or the spawn ramp moves, since they sit upstream of this.
+
+Three behaviours worth knowing, all covered by `tiers.js`:
+
+- **All tiers preload at startup.** A promotion that waited on a download would drop to the placeholder body at the exact moment the game is drawing attention to the character.
+- **A tier with missing art is skipped silently** — no banner, the player keeps what they had, and the next real tier still fires. So tiers can land one at a time.
+- **Promotion is one step per score change**, so a single fat delivery cannot skip a tier nobody got to see.
+
+The level-up moment is a bench banner plus an expanding ring at the character's feet. The ring exists because the banner alone announces the reward somewhere the character is not; the banner sits on the bench because **nothing covers the table numbers** — that rule has now bitten three separate features.
+
 ## Immediate next steps
 
-1. **Get character frames.** Four directions is settled, the sprite hook is built and tested, and Rone is trying the AI sheet generators and DALL·E. Only side, down and up need drawing — left mirrors right. Assembly into the sheet layout is a script to write once the output shape is known, not a constraint on how the art arrives.
+1. **Get character frames.** Four directions is settled, the sprite pipeline is proven end to end, and the roster is waiting on art. Only side, down and up need drawing — left mirrors right. Tyrone tier 1 is live; tiers 2-4 and the other four species are in production through Meshy.
 2. **Play it.** Rone has started. The whole difficulty model is measured, not felt — two minutes on a fresh table at open may be too slack, 550 px/s may be too twitchy, `$5` base against `$10` speed may be the wrong split, and flow at roughly half of deliveries may land differently in the hand than on paper. All are single named constants.
 3. **Party sizes are the one approved item still unbuilt**, waiting on an art decision from Rone: how to show a two-, four- or six-top on a painted board of eight identical tables. Everything else in the approved set is live.
 4. **The score scale is unexamined.** Ninety seconds of peak rush now pays out around `$600`. Per-table the numbers are readable (`$5` base plus up to `$10` of tip, doubled in flow), but the running total gets large fast for an endless high-score game. It may want a different base, or it may be fine — it is Rone's call and a one-constant change either way.

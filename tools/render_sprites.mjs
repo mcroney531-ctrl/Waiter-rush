@@ -228,4 +228,14 @@ console.log(`${NAME}: ${out.animated ? 'clip "' + out.clip + '"' : 'NO ANIMATION
 console.log(`  sheet   ${pngPath.replace(ROOT + '/', '')}  ${CELL * FRAMES}x${CELL * ROWS.length}`);
 console.log(`  drawn   ${drawnW}x${drawnH} inside a ${CELL}px cell`);
 console.log(`  anchor  x ${cfg.anchorX}  y ${cfg.anchorY}   scale ${cfg.scale}`);
+// The roster in index.html keeps sheet configs inline so the game still runs
+// from a file:// double-click. Printing the exact line means adding a tier is a
+// paste rather than a transcription of four measured numbers.
+console.log('  roster  ' +
+  `{ src: '${cfg.src}', scale: ${cfg.scale}, ` +
+  `anchorX: ${cfg.anchorX}, anchorY: ${cfg.anchorY} },`);
+if (cfg.frameW !== 192 || FRAMES !== 8) {
+  console.log(`  ! SHEET_BASE in index.html assumes 192px cells and 8 walk frames; ` +
+              `this is ${cfg.frameW}px / ${FRAMES}. Override them in the roster entry.`);
+}
 if (!out.animated) console.log('  ! export the RIGGED + ANIMATED glb, not the mesh/texture one');
