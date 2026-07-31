@@ -1,0 +1,31 @@
+{
+  "src": "assets/sprites/velo-t4.png",
+  "frameW": 192,
+  "frameH": 192,
+  "scale": 0.76,
+  "anchorX": 0.51,
+  "anchorY": 0.891,
+  "idleFps": 5,
+  "dirs": {
+    "down": {
+      "row": 0
+    },
+    "right": {
+      "row": 1
+    },
+    "left": {
+      "mirror": "right"
+    },
+    "up": {
+      "row": 2
+    }
+  },
+  "walk": {
+    "first": 0,
+    "count": 8
+  },
+  "idle": {
+    "first": 0,
+    "count": 1
+  }
+}

@@ -22,6 +22,7 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     set score(v){score=v; updateHUD();},
     get tier(){return tierIndex;}, get tierArt(){return tierArt.map(t=>!!t.img);},
     get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},
+    setChar(id){loadCharacter(id);}, setTier(n){applyTier(n);}, get roster(){return Object.keys(ROSTER);},
     get sheetOn(){return sheetReady();} };}});
 """
 
@@ -44,6 +45,6 @@ open(DST, 'w').write(s)
 for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'tier', 'tierArt', 'tierNotice',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
-              'steps', 'PASSES', 'BUS', 'setRoster', 'sheetOn'):
+              'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster', 'sheetOn'):
     assert field in DBG, field
 print('probe.html regenerated with', len(DBG.splitlines()), 'lines of handle')

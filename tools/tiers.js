@@ -3,8 +3,8 @@
 // no art is skipped rather than announced, and a reset drops back to tier 1.
 // Run:  python3 tools/mkprobe.py && python3 -m http.server 8222 &
 //       node tools/tiers.js
-// Needs the tinted stand-ins in .tiertest/ only while real tier art is missing;
-// once tiers 2-4 ship, point TIERS at the real sheets and delete the tints.
+// Runs against the real shipped sheets. The missing-art cases below point at
+// paths that deliberately do not exist, which is the whole point of them.
 import { chromium } from 'playwright';
 import { existsSync } from 'node:fs';
 
@@ -18,10 +18,10 @@ const LAUNCH = PREINSTALLED ? { executablePath: PREINSTALLED } : {};
 const B = process.env.BASE || 'http://127.0.0.1:8222';
 
 const TIERS = [
-  { src: 'assets/sprites/tyrone-t1.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 },
-  { src: '.tiertest/tyrone-t2.png',      scale: 0.751, anchorX: 0.542, anchorY: 0.901 },
-  { src: '.tiertest/tyrone-t3.png',      scale: 0.751, anchorX: 0.542, anchorY: 0.901 },
-  { src: '.tiertest/tyrone-t4.png',      scale: 0.751, anchorX: 0.542, anchorY: 0.901 }
+  { src: 'assets/sprites/tyrone-t1.png', scale: 0.743, anchorX: 0.529, anchorY: 0.911 },
+  { src: 'assets/sprites/tyrone-t2.png', scale: 0.739, anchorX: 0.539, anchorY: 0.922 },
+  { src: 'assets/sprites/tyrone-t3.png', scale: 0.739, anchorX: 0.529, anchorY: 0.917 },
+  { src: 'assets/sprites/tyrone-t4.png', scale: 0.756, anchorX: 0.549, anchorY: 0.896 }
 ];
 
 const fail = [];
@@ -64,8 +64,7 @@ const check = (name, got, want) => {
   await setScore(99999);
   check('stops at the top tier', await p.evaluate(() => window.__dbg.tier), 3);
 
-  // into the gitignored scratch dir, not the repo root
-  await p.screenshot({ path: '.tiertest/tier4.png', clip: { x: 0, y: 0, width: 960, height: 640 } });
+  await p.screenshot({ path: '/tmp/tier4.png', clip: { x: 0, y: 0, width: 960, height: 640 } });
 
   // ---- reset drops back ----
   await p.evaluate(() => { document.getElementById('startBtn').click(); });
@@ -75,7 +74,7 @@ const check = (name, got, want) => {
 
   // ---- a gap in the art ----
   const holey = TIERS.slice();
-  holey[1] = { src: '.tiertest/MISSING.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 };
+  holey[1] = { src: 'assets/sprites/MISSING.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 };
   await p.evaluate(t => window.__dbg.setRoster('tyrone', t), holey);
   await p.waitForTimeout(1200);
   check('missing tier reports unloaded', await p.evaluate(() => window.__dbg.tierArt), [true, false, true, true]);
@@ -87,7 +86,7 @@ const check = (name, got, want) => {
 
   // ---- no art at all falls back to the drawn body ----
   await p.evaluate(() => window.__dbg.setRoster('tyrone',
-    [{ src: '.tiertest/NOPE.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 }]));
+    [{ src: 'assets/sprites/NOPE.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 }]));
   await p.waitForTimeout(900);
   check('no art -> placeholder body', await p.evaluate(() => window.__dbg.sheetOn), false);
 
