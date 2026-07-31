@@ -12,6 +12,23 @@
     font-family: 'DinerDisplay';
     src: local('Alfa Slab One');
   }
+  /* Galindo, subset to the fifteen glyphs money is written with — 56 KB of
+     font down to 744 bytes. Self-hosted rather than fetched, so the one
+     typeface the game leans on for a live number cannot arrive late or not at
+     all. SIL Open Font License; the text ships alongside it. */
+  @font-face {
+    font-family: 'Money';
+    src: url('assets/fonts/galindo-money.woff2') format('woff2');
+    font-display: block;
+  }
+  /* Galindo has no tabular figures — its digits run 864 to 1556 units, so "1"
+     is 44% narrower than "0" and a live score visibly twitches every time it
+     changes. There is no `tnum` feature to switch on, so each digit gets its
+     own fixed-width box instead. 0.72em clears the widest ink (0.688em) with
+     a little air. Only applied where a number actually changes; the ladder and
+     the end-of-shift total are written once and would gain nothing. */
+  .money { font-family: 'Money', 'Alfa Slab One', 'Arial Black', sans-serif; }
+  .money i { font-style: normal; display: inline-block; width: 0.72em; text-align: center; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -111,7 +128,7 @@
     letter-spacing: 1px;
   }
   #overlay p { max-width: 440px; line-height: 1.5; font-size: 15px; opacity: 0.9; margin: 6px 0 20px; }
-  #overlay .big-stat { font-family: 'Alfa Slab One', sans-serif; font-size: 40px; color: #2F6F6B; margin: 4px 0 18px; }
+  #overlay .big-stat { font-family: 'Money', 'Alfa Slab One', sans-serif; font-size: 44px; color: #2F6F6B; margin: 4px 0 18px; }
   button.cta {
     font-family: 'Alfa Slab One', sans-serif;
     background: #C1443A; color: #F4EEDB;
@@ -279,7 +296,7 @@
   /* Locked, not hidden — dark enough to read as unearned, light enough that
      you can still see what the outfit is. */
   #avatarLadder .step.locked .sprite { filter: grayscale(0.85) brightness(0.72); }
-  #avatarLadder .tier { font-size: 9px; letter-spacing: 1.2px; opacity: 0.5; }
+  #avatarLadder .tier { font-family: 'Money', inherit; font-size: 10px; letter-spacing: 0.6px; opacity: 0.55; }
   #avatarLadder .cap {
     font-size: 11px; opacity: 0.55; letter-spacing: 1.2px; text-transform: uppercase;
     margin: 2px 0 0;
@@ -330,7 +347,7 @@
   <div id="hud">
     <div class="stat">
       <span class="label">Tips</span>
-      <span id="score">$0.00</span>
+      <span id="score" class="money">$0.00</span>
       <span id="flow"></span>
     </div>
     <div class="stat" style="text-align:right;">
@@ -734,8 +751,45 @@
     return '$' + (cents / 100).toFixed(2);
   }
 
+  // The same string, with every digit in its own fixed-width box. Only used
+  // where the number changes under the player's eye — see the .money rules.
+  function moneyHTML(cents){
+    return money(cents).replace(/\d/g, d => '<i>' + d + '</i>');
+  }
+
+  // Canvas has no equivalent of the digit boxes above, so money drawn on the
+  // board steps the pen by a fixed amount per digit and centres each glyph in
+  // its slot. Punctuation keeps its natural width — only the digits are
+  // swapping under each other, so only the digits need pinning.
+  const MONEY_SLOT = 0.72;      // em, matching the .money i box
+  function moneyMetrics(text, px){
+    let w = 0;
+    for (const ch of text){
+      w += (ch >= '0' && ch <= '9') ? px * MONEY_SLOT : ctx.measureText(ch).width;
+    }
+    return w;
+  }
+  // Draws with the caller's current fill/stroke settings, honouring
+  // ctx.textAlign the way fillText would.
+  function drawMoneyText(text, x, y, px, stroked){
+    const total = moneyMetrics(text, px);
+    let cx = ctx.textAlign === 'center' ? x - total/2
+           : ctx.textAlign === 'right'  ? x - total : x;
+    const prev = ctx.textAlign;
+    ctx.textAlign = 'left';
+    for (const ch of text){
+      const digit = ch >= '0' && ch <= '9';
+      const slot = digit ? px * MONEY_SLOT : ctx.measureText(ch).width;
+      const gx = digit ? cx + (slot - ctx.measureText(ch).width) / 2 : cx;
+      if (stroked) ctx.strokeText(ch, gx, y);
+      ctx.fillText(ch, gx, y);
+      cx += slot;
+    }
+    ctx.textAlign = prev;
+  }
+
   function updateHUD(){
-    document.getElementById('score').textContent = money(score);
+    document.getElementById('score').innerHTML = moneyHTML(score);
     const fl = document.getElementById('flow');
     if (fl){
       fl.textContent = flowLit ? 'FLOW x' + FLOW_MULT
@@ -1618,14 +1672,20 @@
       ctx.lineJoin = 'round';
       ctx.miterLimit = 2;
       ctx.strokeStyle = 'rgba(24,19,14,0.85)';
-      const line = (text, y, px, alpha) => {
+      const line = (text, y, px, alpha, moneyFace) => {
         const prev = ctx.globalAlpha;
         ctx.globalAlpha = alpha;
-        ctx.font = px + ' DM Sans, sans-serif';
+        ctx.font = px + (moneyFace ? " Money, 'Alfa Slab One', sans-serif"
+                                   : ' DM Sans, sans-serif');
         ctx.lineWidth = 4;
-        ctx.strokeText(text, f.x, y);
         ctx.fillStyle = f.colour;
-        ctx.fillText(text, f.x, y);
+        if (moneyFace){
+          // Stepped, so the amount does not jitter as it rises and fades.
+          drawMoneyText(text, f.x, y, parseInt(px, 10), true);
+        } else {
+          ctx.strokeText(text, f.x, y);
+          ctx.fillText(text, f.x, y);
+        }
         ctx.globalAlpha = prev;
       };
       const a = ctx.globalAlpha;
@@ -1634,7 +1694,7 @@
       // a type flag means an absent line simply is not drawn, instead of
       // stroking the word "undefined" onto the floor.
       if (f.top)    line(f.top,    base,                     '900 ' + (f.big ? 13 : 11) + 'px', a);
-      if (f.bottom) line(f.bottom, base + (f.big ? 19 : 17), '900 ' + (f.big ? 20 : 17) + 'px', a);
+      if (f.bottom) line(f.bottom, base + (f.big ? 19 : 17), (f.big ? 22 : 19) + 'px', a, true);
       if (f.secs)   line(f.secs,   base + (f.big ? 33 : 30), '700 10px',                        a * 0.6);
       ctx.restore();
     }
@@ -2644,6 +2704,12 @@
     setMuted(!muted);
   });
   setMuted(muted);                // paint the saved state onto the button
+
+  // Canvas has no font-display: ctx.font with an unloaded family silently
+  // falls back and the first tip of the shift would render in the wrong face.
+  // 744 bytes, so this resolves long before anyone earns a tip — it is here so
+  // that staying true does not depend on that being fast.
+  if (document.fonts && document.fonts.load) document.fonts.load("20px Money");
 
   loadSavedAvatar();
   // Kick off the sprite load for every tier at once. Until the images arrive —
