@@ -2,6 +2,7 @@
 """Food readability grid — the whole menu at the size it is played at.
 
     python3 tools/foodgrid.py
+    python3 tools/foodgrid.py --calibrate     # once the menu is good
 
 The spec asks every dish to be identifiable in silhouette, to separate from a
 dark floor, and to carry similar visual weight to the other nine. None of that
@@ -19,6 +20,7 @@ Alongside them it prints the two numbers worth arguing about: how far each
 dish's outer edge separates from the floor, and how much of its slot it fills.
 Both have thresholds taken from shipped art rather than invented.
 """
+import json
 import os
 import sys
 
@@ -126,6 +128,61 @@ def distinctness(paths):
     return near
 
 
+BASELINE = 'art-source/food-baseline.json'
+
+
+def load_threshold():
+    """The calibrated bar if one has been set, otherwise the provisional guess.
+
+    Once a menu is good, that menu *is* the definition of acceptably distinct
+    for this game — its own worst pair is, by definition, a pair someone looked
+    at and accepted. Deriving the number from it beats re-guessing, and pinning
+    it means a later dish is judged against the set that shipped rather than
+    against a bar that drifted."""
+    try:
+        with open(BASELINE) as f:
+            b = json.load(f)
+        return float(b['threshold']), b
+    except (OSError, KeyError, ValueError):
+        return MAX_SIMILARITY, None
+
+
+def calibrate(near, folder):
+    """Freeze the current set as the reference corpus.
+
+    Refuses if the set does not already pass the provisional bar. Calibrating
+    against a failing menu would do the one thing this tool exists to prevent:
+    quietly certify ten circles and hand every later dish a bar it can clear
+    without being distinguishable from anything.
+    """
+    worst_name, (worst, twin) = max(near.items(), key=lambda kv: kv[1][0])
+    if worst > MAX_SIMILARITY:
+        print(f'\nREFUSING to calibrate: {worst_name} and {twin} overlap {worst:.2f}, '
+              f'above the provisional {MAX_SIMILARITY:.2f}.')
+        print('Fix the set first — a baseline taken from a failing menu certifies it.')
+        return False
+    # A hair above the worst accepted pair, so the corpus itself passes its own
+    # bar and a new dish has to be at least as distinct as the closest existing
+    # pair rather than merely better than the worst imaginable one.
+    thr = round(min(0.95, worst + 0.02), 2)
+    payload = {
+        'threshold': thr,
+        'calibrated_from': folder,
+        'worst_pair': [worst_name, twin, round(worst, 3)],
+        'dishes': {n: [t, round(v, 3)] for n, (v, t) in sorted(near.items())},
+        'note': ('Derived from the shipped menu, not chosen. A new dish is judged '
+                 'against this corpus; re-calibrate only when the menu itself '
+                 'changes, not to make a new dish pass.')
+    }
+    os.makedirs(os.path.dirname(BASELINE), exist_ok=True)
+    with open(BASELINE, 'w') as f:
+        json.dump(payload, f, indent=2)
+        f.write('\n')
+    print(f'\nwrote {BASELINE}: threshold {thr:.2f}, '
+          f'set by {worst_name}/{twin} at {worst:.2f}')
+    return True
+
+
 def strip(icons, mode, title):
     pad, lab, hdr = 12, 16, 30
     cw = SLOT_W + pad
@@ -156,7 +213,7 @@ def strip(icons, mode, title):
     return sheet
 
 
-def main(folder='assets/food'):
+def main(folder='assets/food', do_calibrate=False):
     icons, paths, missing = [], [], []
     for n in ITEMS:
         p = os.path.join(folder, n + '.png')
@@ -177,6 +234,7 @@ def main(folder='assets/food'):
         print('wrote', out)
 
     near = distinctness(paths) if len(paths) > 1 else {}
+    threshold, baseline = load_threshold()
 
     print(f'\n{"dish":8} {"edge L":>7} {"vs floor":>9} {"aspect":>7} {"fill":>6} '
           f'{"nearest":>16}   notes')
@@ -193,7 +251,7 @@ def main(folder='assets/food'):
         if not ASPECT_MIN <= aspect <= ASPECT_MAX:
             notes.append(f'ASPECT {aspect:.2f} outside {ASPECT_MIN}-{ASPECT_MAX}')
         iou, twin = near.get(name, (0.0, None))
-        if twin and iou > MAX_SIMILARITY:
+        if twin and iou > threshold:
             notes.append(f'SAME SHAPE AS {twin.upper()}')
         col = f'{twin[:9]} {iou:.2f}' if twin else ''
         print(f'{name:8} {edge:7.0f} {sep:9.0f} {aspect:7.2f} {fill:6.0%} '
@@ -205,10 +263,19 @@ def main(folder='assets/food'):
               f'(1.00 would be ten copies of one shape)')
     print(f'floor luminance {FLOOR_L:.0f}; carrying two shrinks every dish to '
           f'{CARRY_TWO:.0%}, so read the shape strip at arm\'s length too.')
+    if baseline:
+        print(f'overlap bar {threshold:.2f}, calibrated from '
+              f'{baseline["worst_pair"][0]}/{baseline["worst_pair"][1]}.')
+    else:
+        print(f'overlap bar {threshold:.2f}, provisional — run --calibrate once the '
+              f'menu is good.')
     print('the overlap number is an early warning, not a verdict — the strip is.')
+    if do_calibrate:
+        calibrate(near, folder)
     if missing:
         print('missing:', ', '.join(missing))
 
 
 if __name__ == '__main__':
-    main(sys.argv[1] if len(sys.argv) > 1 else 'assets/food')
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    main(args[0] if args else 'assets/food', '--calibrate' in sys.argv)

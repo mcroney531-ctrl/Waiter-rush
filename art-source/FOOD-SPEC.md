@@ -154,8 +154,35 @@ outline, and only the fries break the rim enough to register. **The bar for the
 new set is well under 0.89, not merely under 0.95.**
 
 Anything above **0.90** is flagged. That threshold is provisional on purpose: it
-currently fails everything shipping, which is correct, and it should be
-tightened once there is a set worth calibrating against.
+currently fails everything shipping, which is correct.
+
+### The finished menu becomes the bar
+
+Once the ten are good, **that menu is the definition of acceptably distinct for
+this game** — its own closest pair is, by construction, a pair someone looked at
+and accepted. So the number stops being a guess:
+
+```
+python3 tools/foodgrid.py --calibrate
+```
+
+writes `art-source/food-baseline.json` with a threshold derived from the set's
+own worst pair, and every later run judges against that instead. A holiday
+special or a new dish months from now is then measured against the menu that
+shipped, rather than against a bar that quietly drifted in the meantime.
+
+Two guards, because the failure mode here is obvious and expensive:
+
+- **It refuses to calibrate a set that does not already pass.** A baseline taken
+  from ten circles would certify them and hand every future dish a bar it can
+  clear while being indistinguishable from everything. Verified by trying it —
+  the current menu is rejected with the offending pair named.
+- **Re-calibrate when the menu changes, never to make a new dish pass.** If a
+  new dish trips the bar, the dish is wrong, not the bar.
+
+The corpus itself needs no separate storage: the shipped art in `assets/food/`
+*is* the corpus, and it is version controlled already. The baseline file holds
+only the number and the evidence behind it.
 
 One thing that was tried and does not work, so it does not get tried again:
 measuring how much of a *single* dish's silhouette sits above the plate rim,
