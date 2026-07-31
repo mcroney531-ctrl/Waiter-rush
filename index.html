@@ -206,16 +206,60 @@
   #avatarOptions::-webkit-scrollbar-thumb {
     background: rgba(244,238,219,0.3); border-radius: 3px;
   }
-  .cast { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
-  .cast button {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    background: rgba(244,238,219,0.05); color: inherit; cursor: pointer;
-    border: 3px solid transparent; border-radius: 14px;
-    padding: 10px 12px 8px; font-family: inherit;
+  /* One character at a time, arrows either side. The cast is five and will not
+     be much more than five, so a hero portrait sells each one far better than
+     a grid of thumbnails ever did — and the arrows make the whole roster
+     reachable without any of it competing for attention. */
+  #avatarStage {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    gap: 10px; flex: none;
   }
-  .cast button:hover { background: rgba(244,238,219,0.11); }
-  .cast button[aria-pressed="true"] {
-    border-color: #E0A72E; background: rgba(224,167,46,0.13);
+  #avatarCard {
+    position: relative; overflow: hidden; flex: none;
+    width: 246px; height: 328px;
+    border-radius: 16px; border: 3px solid rgba(224,167,46,0.55);
+    background: #2a231c;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.5);
+  }
+  #avatarCard img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  /* Incoming portrait slides in from the side you pressed, so the arrows feel
+     like they move along a row rather than swapping a picture in place. */
+  #avatarCard img.enter-left  { animation: slideFromLeft  260ms ease-out; }
+  #avatarCard img.enter-right { animation: slideFromRight 260ms ease-out; }
+  @keyframes slideFromLeft  { from { transform: translateX(-100%); } to { transform: none; } }
+  @keyframes slideFromRight { from { transform: translateX(100%); }  to { transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    #avatarCard img.enter-left, #avatarCard img.enter-right { animation: none; }
+  }
+  /* The name plate rides on the portrait rather than under it, which keeps the
+     card one object and saves the vertical room the ladder needs. */
+  #avatarCard .plate {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 22px 10px 9px;
+    background: linear-gradient(to top, rgba(20,16,12,0.92) 42%, transparent);
+    text-align: center; pointer-events: none;
+  }
+  #avatarCard .who  { display: block; font-weight: 700; font-size: 19px; }
+  #avatarCard .what {
+    display: block; font-size: 10px; letter-spacing: 1.6px;
+    text-transform: uppercase; opacity: 0.6; margin-top: 1px;
+  }
+  .stage-arrow {
+    flex: none; width: 46px; height: 46px; padding: 0; cursor: pointer;
+    background: rgba(244,238,219,0.08); color: #F4EEDB;
+    border: 2px solid rgba(244,238,219,0.28); border-radius: 50%;
+    font-size: 20px; line-height: 1; font-family: inherit;
+    transition: background 120ms, border-color 120ms, transform 120ms;
+  }
+  .stage-arrow:hover, .stage-arrow:focus-visible {
+    background: rgba(224,167,46,0.2); border-color: #E0A72E; transform: scale(1.06);
+  }
+  #avatarCounter {
+    flex: none; margin: 9px 0 0; font-size: 11px;
+    letter-spacing: 2px; opacity: 0.5;
   }
   /* A sprite sheet is a grid of cells, so a thumbnail is the sheet scaled down
      and offset to the cell you want. Nothing is re-exported to make one. */
@@ -223,14 +267,11 @@
     background-repeat: no-repeat; background-color: #4a3e34;
     border-radius: 10px; flex: none;
   }
-  .cast .sprite { width: 104px; height: 104px; }
-  .cast .who { font-weight: 700; font-size: 15px; }
-  .cast .what { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; opacity: 0.55; }
   /* The tier ladder, shown because "what am I working toward" is most of why
      the choice is interesting. */
   #avatarLadder {
     flex: none; display: flex; flex-direction: column; align-items: center;
-    gap: 6px; margin: 18px 0 0; min-height: 88px;
+    gap: 6px; margin: 14px 0 0; min-height: 88px;
   }
   #avatarLadder .row { display: flex; gap: 10px; align-items: flex-end; }
   #avatarLadder .step { display: flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -241,6 +282,7 @@
   #avatarLadder .tier { font-size: 9px; letter-spacing: 1.2px; opacity: 0.5; }
   #avatarLadder .cap {
     font-size: 11px; opacity: 0.55; letter-spacing: 1.2px; text-transform: uppercase;
+    margin: 2px 0 0;
   }
   #avatarWarn {
     max-width: 460px; text-align: center; font-size: 13px;
@@ -259,15 +301,14 @@
   @media (max-width: 620px), (max-height: 720px) {
     #avatarPicker h2 { font-size: 20px; margin-bottom: 2px; }
     #avatarBlurb { font-size: 12px; margin-bottom: 8px; }
-    .cast { gap: 9px; }
-    .cast button { padding: 7px 9px 6px; border-width: 2px; }
-    .cast .sprite { width: 74px; height: 74px; }
-    .cast .who { font-size: 13px; }
-    .cast .what { font-size: 9px; letter-spacing: 1px; }
-    #avatarLadder { margin-top: 10px; min-height: 0; }
+    #avatarCard { width: 198px; height: 264px; }
+    #avatarCard .who { font-size: 17px; }
+    .stage-arrow { width: 40px; height: 40px; font-size: 18px; }
+    #avatarLadder { margin-top: 12px; min-height: 0; }
     #avatarLadder .sprite { width: 44px; height: 44px; }
     #avatarActions { margin-top: 10px; }
   }
+
   .hidden { display: none !important; }
 
   @media (pointer: coarse) {
@@ -330,7 +371,12 @@
     <button class="cta ghost" id="avatarRandom">Random</button>
     <h2>Pick your waiter</h2>
     <p id="avatarBlurb">They all start in an apron. Earn tips and they don't stay that way.</p>
-    <div id="avatarOptions"></div>
+    <div id="avatarStage">
+      <button class="stage-arrow" id="avatarPrev" type="button" aria-label="Previous waiter">&#8592;</button>
+      <div id="avatarCard"></div>
+      <button class="stage-arrow" id="avatarNext" type="button" aria-label="Next waiter">&#8594;</button>
+    </div>
+    <p id="avatarCounter"></p>
     <div id="avatarLadder"></div>
     <p id="avatarWarn" class="hidden">Couldn't load the character art — you'll keep the classic waiter. Everything else works as normal.</p>
     <div id="avatarActions">
@@ -968,16 +1014,10 @@
   // Tiers run low to high: the same dinosaur, better kit each time. A character
   // may ship with fewer than four; the progression simply stops at the last one
   // that exists, so the roster can be filled in as art lands.
+  // Order is the order the carousel walks, and the first entry is where a
+  // new player starts. Kept as the order they joined the cast rather than
+  // alphabetical, so the flagship opens the picker.
   const ROSTER = {
-    bronte: {
-      name: 'Bronte', species: 'Brontosaurus',
-      tiers: [
-        { src: 'assets/sprites/bronte-t1.png', scale: 0.734, anchorX: 0.552, anchorY: 0.922 },
-        { src: 'assets/sprites/bronte-t2.png', scale: 0.714, anchorX: 0.549, anchorY: 0.948 },
-        { src: 'assets/sprites/bronte-t3.png', scale: 0.747, anchorX: 0.544, anchorY: 0.906 },
-        { src: 'assets/sprites/bronte-t4.png', scale: 0.756, anchorX: 0.539, anchorY: 0.896 }
-      ]
-    },
     tyrone: {
       name: 'Tyrone', species: 'T-Rex',
       tiers: [
@@ -985,6 +1025,15 @@
         { src: 'assets/sprites/tyrone-t2.png', scale: 0.739, anchorX: 0.539, anchorY: 0.922 },
         { src: 'assets/sprites/tyrone-t3.png', scale: 0.739, anchorX: 0.529, anchorY: 0.917 },
         { src: 'assets/sprites/tyrone-t4.png', scale: 0.756, anchorX: 0.549, anchorY: 0.896 }
+      ]
+    },
+    velo: {
+      name: 'Velo', species: 'Raptor',
+      tiers: [
+        { src: 'assets/sprites/velo-t1.png', scale: 0.747, anchorX: 0.552, anchorY: 0.906 },
+        { src: 'assets/sprites/velo-t2.png', scale: 0.756, anchorX: 0.526, anchorY: 0.896 },
+        { src: 'assets/sprites/velo-t3.png', scale: 0.739, anchorX: 0.573, anchorY: 0.917 },
+        { src: 'assets/sprites/velo-t4.png', scale: 0.76,  anchorX: 0.51,  anchorY: 0.891 }
       ]
     },
     pip: {
@@ -1005,13 +1054,13 @@
         { src: 'assets/sprites/trixie-t4.png', scale: 0.76,  anchorX: 0.529, anchorY: 0.891 }
       ]
     },
-    velo: {
-      name: 'Velo', species: 'Raptor',
+    bronte: {
+      name: 'Bronte', species: 'Brontosaurus',
       tiers: [
-        { src: 'assets/sprites/velo-t1.png', scale: 0.747, anchorX: 0.552, anchorY: 0.906 },
-        { src: 'assets/sprites/velo-t2.png', scale: 0.756, anchorX: 0.526, anchorY: 0.896 },
-        { src: 'assets/sprites/velo-t3.png', scale: 0.739, anchorX: 0.573, anchorY: 0.917 },
-        { src: 'assets/sprites/velo-t4.png', scale: 0.76,  anchorX: 0.51,  anchorY: 0.891 }
+        { src: 'assets/sprites/bronte-t1.png', scale: 0.734, anchorX: 0.552, anchorY: 0.922 },
+        { src: 'assets/sprites/bronte-t2.png', scale: 0.714, anchorX: 0.549, anchorY: 0.948 },
+        { src: 'assets/sprites/bronte-t3.png', scale: 0.747, anchorX: 0.544, anchorY: 0.906 },
+        { src: 'assets/sprites/bronte-t4.png', scale: 0.756, anchorX: 0.539, anchorY: 0.896 }
       ]
     }
   };
@@ -1287,27 +1336,43 @@
     img.src = entry.src;
   }
 
-  function renderPicker(){
-    const cast = document.createElement('div');
-    cast.className = 'cast';
-    for (const [id, c] of Object.entries(ROSTER)){
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('aria-pressed', id === pickedChar ? 'true' : 'false');
+  // Order matters now that the arrows step through it, so it is read once
+  // rather than re-derived — Object.keys order is stable, but a carousel that
+  // silently reordered itself would be a horrible bug to chase.
+  const CAST = Object.keys(ROSTER);
+
+  function renderPicker(dir){
+    const c = ROSTER[pickedChar];
+    const card = document.getElementById('avatarCard');
+    card.innerHTML = '';
+
+    const img = document.createElement('img');
+    img.src = `assets/portraits/${pickedChar}.jpg`;
+    img.alt = `${c.name}, a ${(c.species || 'dinosaur').toLowerCase()} waiter`;
+    if (dir) img.className = dir === 'next' ? 'enter-right' : 'enter-left';
+    // The portrait is the sell, but it is a separate asset from the sprite and
+    // could be missing while the character is perfectly playable. Falling back
+    // to the sheet keeps the card populated rather than blank.
+    img.onerror = () => {
+      img.remove();
       const art = document.createElement('div');
       art.className = 'sprite';
-      spriteCell(art, c.tiers[0], 104);
-      const who = document.createElement('span');
-      who.className = 'who'; who.textContent = c.name;
-      const what = document.createElement('span');
-      what.className = 'what'; what.textContent = c.species || '';
-      b.append(art, who, what);
-      b.addEventListener('click', () => { pickedChar = id; renderPicker(); });
-      cast.append(b);
-    }
-    const opts = document.getElementById('avatarOptions');
-    opts.innerHTML = '';
-    opts.append(cast);
+      art.style.cssText = 'position:absolute;inset:0;background-position:center;';
+      spriteCell(art, c.tiers[0], 246);
+      card.prepend(art);
+    };
+
+    const plate = document.createElement('div');
+    plate.className = 'plate';
+    const who = document.createElement('span');
+    who.className = 'who'; who.textContent = c.name;
+    const what = document.createElement('span');
+    what.className = 'what'; what.textContent = c.species || '';
+    plate.append(who, what);
+
+    card.append(img, plate);
+    document.getElementById('avatarCounter').textContent =
+      `${CAST.indexOf(pickedChar) + 1} / ${CAST.length}`;
     renderLadder();
   }
 
@@ -1339,11 +1404,20 @@
     box.append(row, cap);
   }
 
+  // Wraps, so the roster is a loop rather than a list with dead ends at both
+  // ends — five characters is short enough that hitting a wall feels broken.
+  function stepChar(delta){
+    const i = CAST.indexOf(pickedChar);
+    pickedChar = CAST[(i + delta + CAST.length) % CAST.length];
+    renderPicker(delta > 0 ? 'next' : 'prev');
+  }
+
   function randomiseAvatar(){
-    const ids = Object.keys(ROSTER);
-    const pool = ids.filter(id => id !== pickedChar);
-    pickedChar = (pool.length ? pool : ids)[Math.floor(Math.random() * (pool.length ? pool.length : ids.length))];
-    renderPicker();
+    if (CAST.length < 2) return;
+    const i = CAST.indexOf(pickedChar);
+    // Never land on the one already showing, and go through stepChar so the
+    // card animates rather than cutting.
+    stepChar(1 + Math.floor(Math.random() * (CAST.length - 1)));
   }
 
   function loadSavedAvatar(){
@@ -1377,10 +1451,10 @@
     // The only way this fails now is a sheet that will not load, and that is
     // already handled: the game falls back to the drawn body. Say so rather
     // than leaving an empty screen.
-    const ok = Object.keys(ROSTER).length > 0;
+    const ok = CAST.length > 0;
     document.getElementById('avatarWarn').classList.toggle('hidden', ok);
-    document.getElementById('avatarRandom').classList.toggle('hidden',
-      Object.keys(ROSTER).length < 2);
+    for (const id of ['avatarRandom', 'avatarPrev', 'avatarNext'])
+      document.getElementById(id).classList.toggle('hidden', CAST.length < 2);
     document.getElementById('avatarPicker').classList.remove('hidden');
     renderPicker();
   }
@@ -2503,6 +2577,15 @@
   document.getElementById('avatarBtn').addEventListener('click', () => openPicker(false));
   document.getElementById('avatarDone').addEventListener('click', commitAvatar);
   document.getElementById('avatarRandom').addEventListener('click', randomiseAvatar);
+  document.getElementById('avatarPrev').addEventListener('click', () => stepChar(-1));
+  document.getElementById('avatarNext').addEventListener('click', () => stepChar(1));
+  // Arrow keys drive the carousel while it is open. Guarded on the picker being
+  // visible, or they would fight the movement keys during a shift.
+  window.addEventListener('keydown', e => {
+    if (document.getElementById('avatarPicker').classList.contains('hidden')) return;
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); stepChar(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); stepChar(1); }
+  });
   document.getElementById('avatarCancel').addEventListener('click', closePicker);
 
   // Audio can only start from a gesture, so the first one anywhere unlocks it.
