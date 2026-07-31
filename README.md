@@ -16,13 +16,20 @@ Controls are arrow keys or WASD on desktop, and an on-screen d-pad on touch devi
 
 ## Your waiter
 
-"Build your waiter" on the title screen opens a character picker backed by [DiceBear](https://www.dicebear.com/)'s HTTP API, which needs no build step or bundler. You pick skin, hair, hair colour, uniform, uniform colour and facial hair from live previews, or hit "Surprise me" to roll the lot. The result is drawn as a circular token in place of the default waiter — which also means the avatar never needs to face a walking direction, so there are no directional sprites to produce.
+"Pick your waiter" opens a character select: the cast of dinosaurs, each shown
+in the apron they start a shift in, with their tier ladder underneath so you can
+see what the outfits cost before you commit. The choice is saved in
+`localStorage` and remembered next time.
 
-The chosen avatar is cached as SVG text in `localStorage`, so after the first pick the game never contacts the network again. If the service is unreachable at any point — offline, blocked by a network policy, service down — the picker says so plainly and the game falls back to the original drawn circle with no other change in behaviour. A player who never opens the picker never makes a request at all.
+Each character is four tiers of the same dinosaur in progressively better kit,
+and the tier changes on money earned during a shift — `$75`, `$200`, `$400`,
+thresholds derived from a measured earnings curve rather than picked. All four
+sheets preload at startup so a promotion never waits on a download.
 
-To retune the options, edit `AVATAR_STYLE` and the `AVATAR_OPTIONS` array near the top of the script. Each entry is a DiceBear option key plus the values offered for it, and the picker UI builds itself from that array. If a value ever stops matching DiceBear's schema for the chosen style, that swatch simply falls back to the style default, which is visible immediately in the picker.
-
-One licensing note: DiceBear's core is MIT, but its individual art styles carry their own licences and several are CC BY 4.0, which requires attribution. Confirm the licence for whichever style you settle on and add a credit line before publishing.
+The art is rendered from rigged 3D models by `tools/render_sprites.mjs`, which
+measures the anchor from the rendered pixels and prints the roster line to paste
+into `ROSTER` in `index.html`. Nothing is fetched at runtime and no third-party
+art ships with the game.
 
 ## Training mode
 
@@ -46,12 +53,10 @@ The repository root *is* the site — there is nothing to build. Any static host
 
 ## Known gaps
 
-These are carried over from the design handoff and are not yet solved:
-
-- The capacity upgrade is not functional. `carryCapacity` flips to 2 after six deliveries, but the pickup and carry logic still only supports a single order — holding two tickets at once needs a real implementation plus UI for two floating tickets above the player.
-- The speed bonus in scoring is a placeholder and reads the table's patience *after* it has already been reset to 1, so it currently adds a flat 20 points to every delivery rather than rewarding speed.
-- There is no audio at all — no delivery ding, no ambient room noise, no angry-table alert.
-- No difficulty tuning pass has happened. The spawn rate curve, the patience drain rate, and the 1.5s ticket fade are first-guess values that have not been playtested.
-- The canvas is a fixed 960×600 internal resolution scaled by CSS. It works, but it is not a true responsive layout and could use a resize handler for varied viewports.
-- A wrong delivery costs nothing beyond a visual bump. That is deliberate for now, but worth a gut-check once the game has actually been played.
-- Each run is fresh in memory with no persistence between sessions, which is probably right for an arcade game but is flagged in case it was not a deliberate call.
+- **The roster is two of five.** Tyrone and Velo are in with all four tiers each; three more species are in production.
+- **Food is being rebuilt in 3D.** Nine of the ten dishes are still the original illustrated plates. Measured in silhouette they are ten near-identical circles, because a top-down plate *is* its own outline — see `art-source/FOOD-SPEC.md` and `tools/foodgrid.py`.
+- **The tier ladder is carried by tier 4.** Silhouette overlap against the tier below runs 0.95 / 0.92 / 0.69 for Tyrone: the first two promotions read by colour, and only the top hat changes the shape.
+- **No level-up animation yet.** The dance clips exist as a plan, not as art.
+- The canvas is a fixed 960×640 internal resolution scaled by CSS. It works, but it is not a true responsive layout, which is why the d-pad overlays the board on short screens.
+- The HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
+- Party sizes — showing a two-, four- or six-top on eight identical painted tables — is designed but unbuilt, waiting on an art decision.

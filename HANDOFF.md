@@ -6,7 +6,7 @@ Read this first. It is the working brief for continuing development, written at 
 
 A build for Articulate E-Learning Challenge #561 ("Online Training for Restaurant Servers & Waiters"). Instead of the usual branching scenario, it is a short Overcooked-style arcade game that trains the "in the weeds" skill of a server's job: holding multiple orders in your head while physically running the floor, under escalating pressure.
 
-Vanilla JS and HTML5 canvas, no build step. `index.html` at the repo root *is* the site; the only other shipped files are `vendor/`, which holds DiceBear's avatar renderer and art set as pre-built static assets (no build step, nothing fetched at runtime).
+Vanilla JS and HTML5 canvas, no build step. `index.html` at the repo root *is* the site, plus `assets/` — the board, the cover, the food icons and the character sprite sheets. No third-party art ships with the game and nothing is fetched at runtime.
 
 The person you are working with is Rone. Working style notes are at the bottom — read them, they change how you should respond.
 
@@ -27,14 +27,15 @@ One file, `index.html`, about 1830 lines: styles, then markup, then the whole ga
 - Colour palette and layout constants, then the ramp/tip/flow/penalty constants as one named block
 - `PASSES` (counter pickup pads), `BUS_STATIONS` (dish returns), and the per-table drop pad geometry
 - `resetGame` / `updateHUD`
-- **Avatar section** — local avatar generation and the picker
+- **Sound** — synthesised effects and the mute gate
+- **Roster** — `ROSTER`, the tier ladder, and the character select
 - Spawning, input, game logic (`tryPickup`/`inPickupZone`, `tryDeliver`, `tryBusPickup`/`tryBusDrop`, `checkAutoInteract`)
 - **Tutorial section** — `TUTORIAL_STEPS` and its step machine
 - `update(dt)` — the single update path for everything
 - Drawing functions, then `render()`
 - `loop` / `beginRun` / `startGame` / `startTutorial`, then event wiring
 
-Canvas is a fixed 960×640 internal resolution scaled by CSS, matching the 3:2 of the painted board. **All geometry is measured off `assets/kitchen.jpg` and expressed as `A(artPixel)`** — see the Board section. Player is a circle of radius 26 moving at `PLAYER_SPEED` (550 px/s).
+Canvas is a fixed 960×640 internal resolution scaled by CSS, matching the 3:2 of the painted board. **All geometry is measured off `assets/board.jpg` and expressed as `A(artPixel)`** — see the Board section. Player is a circle of radius 26 moving at `PLAYER_SPEED` (550 px/s).
 
 ## The core hook, and the rule that protects it
 
@@ -227,59 +228,21 @@ Roughly half the time, losing it hurts, and it is unreachable as a permanent sta
 
 Floaters land wherever the table is, which on this board means over number plaques, `SET DOWN` labels and the ticket rail. They are drawn with a `rgba(24,19,14,0.85)` stroke under the fill, which is what keeps them readable without moving them somewhere less useful. This was a real bug — the `WRONG TABLE` floater was illegible where it collided with the ticket bubble above the right-hand pass, and the two share a column.
 
-## Feature notes
+## Character select
 
-### Tutorial (`986cd49`)
+"Pick your waiter" opens a single-screen character select: the cast, each shown in its tier-1 apron, with the chosen character's tier ladder underneath — every tier greyed except the first, labelled with what it costs. Showing what is locked is the point; it is the reason the choice is interesting rather than cosmetic. The pick is saved to `localStorage` under `dineo.char` and validated against `ROSTER` on load, so a removed or renamed character degrades to the default instead of to a broken render.
 
-Five steps, each gating on the player actually performing the action — nothing advances on a timer. Move → pick up → deliver → meet the patience bar → a three-order practice round with nothing at stake.
+Thumbnails are the sprite sheets themselves, scaled down and offset to one cell with CSS `background-position`. Nothing is exported to make one, so adding a character needs no extra art.
 
-Steps are data in `TUTORIAL_STEPS`: a `hint` label, a `text()` instruction, an optional `enter()` to stage the floor, a `done()` predicate, and an optional `onMiss()` for a table timing out mid-lesson. Adding or reordering a lesson is an edit to that array alone.
+**This replaced the DiceBear/Open Peeps avatar builder, which is gone entirely** — along with `vendor/`, its 448 KB of vendored renderer and art, its six-step flow, the lazy module import and every failure path that came with it. The game now ships no third-party art at all and makes no external requests except two Google Fonts.
 
-Two deliberate choices worth preserving. **Patience drain is off for the first three steps** (`drainEnabled`), so the player learns the pickup, the walk and the fade with no clock running; the timer starts only for the step that is about the timer. And **a timed-out table costs nothing during the tutorial** — it re-stages the order and explains what happened, because that is the moment the mechanic lands and a bad moment to punish someone.
-
-The instruction panel is drawn on-canvas so it scales with the game, and it owns the bottom strip: `update()` clamps the player above `tut.bannerTop` during the tutorial. The tutorial floor is therefore slightly shorter than the real one. Invisible in practice since the tables sit well above it.
-
-The practice round resets `elapsed`, so it runs at the gentle end of the difficulty ramp and is easier than the shift it prepares you for. Whether that is right calibration is unresolved and needs a play, not analysis.
-
-### Drop-off pads (`b4caf06`)
-
-Delivery keys off `inDropZone(t)` — a pad in front of each table, `DROP = { dy: 52, w: 78, h: 38 }` plus `player.size * 0.4` padding — rather than a radius around the table centre. Before this you had to stand on the furniture with nothing on screen saying so.
-
-The zone sits just below table centre, so you enter it as you reach the table's lower half; you do not have to overshoot, but aiming at dead centre no longer registers. The wrong-table bump uses the same zones. See the standing rule above for why the pads never highlight the correct table.
-
-### Countdown (`73bebd6`)
-
-Each waiting table shows seconds remaining beside its meter, in the same green/amber/red thresholds as the bar. `drainRate` was lifted from a local in `update()` to module scope so the renderer can convert patience into seconds. Verified as true elapsed time: 7.63s read 5.59s two seconds later. Hidden while the tutorial has drain off, where a frozen number would imply a clock that is not running. Replaced the hourglass glyph.
-
-### Avatar picker
-
-"Build your waiter" on the title screen opens a picker that generates Open Peeps avatars **in the browser**, from DiceBear's renderer and art set vendored into `vendor/`. Six rows, live previews, a randomiser. The result is drawn as a circular token clipped into the same shape the plain circle used.
-
-A portrait token sidesteps directional sprites entirely — a portrait has no facing to get wrong, so there is no need for four-way character art.
-
-The rows are **derived from the art set at load**, not hand-written. This is the important property and should be preserved: it makes it impossible to name a variant that does not exist, which is exactly how the previous API-backed version broke three times without anyone noticing. If you add a row, read it out of `def.components` / `def.colors` rather than typing values.
-
-**Degradation still matters, but there is much less that can fail.** The picked avatar is cached as SVG text in `localStorage`, so a returning player never loads `vendor/` at all. A player who never opens the picker loads none of it either — the engine is imported lazily on first open. If `vendor/` cannot load (a partial deploy, or `file://`, where module imports are blocked), the picker says so and the game keeps the classic circle.
+The drawn paper-doll body survives as the fallback when no sheet loads, but it no longer depends on any of that: it draws its own head. It is only reachable if a sprite PNG fails outright.
 
 ## Unfinished and unverified — start here
 
-**1. Avatars — rebuilt to run locally. Done.** The picker no longer talks to DiceBear at all. `vendor/dicebear-core.js` (their renderer, MIT) and `vendor/open-peeps.json` (the complete Open Peeps art set, CC0) ship with the game, and avatars are generated in the browser. Output is byte-identical to what their HTTP API returns — verified over 40 random option combinations, all 40 matching once DiceBear's own `<!-- Generated by -->` comment is normalised away.
+**1. Avatars — deleted, replaced by character select.** The DiceBear/Open Peeps builder and `vendor/` are gone; see the Character select section above. Nothing in the old flow survives, so its failure modes (module imports blocked on `file://`, probability-gated components, 114 previews re-rendering on every click) are gone with it. The licensing question is also moot — no third-party art ships.
 
-Why this happened rather than a simple option fix: the API failed *silently* three separate times. It answers 200 for an option name it does not recognise and serves the style default, so a stale major version (9.x when 10.x was current), renamed keys (`top`→`topVariant`, `clothing`→`clothesVariant`), and a probability defaulting to 10 (a chosen beard rendering one seed in ten) all shipped looking like working code. **The rows are now built from the art set itself** — `AVATAR_ROWS` is derived from `def.components` and `def.colors` at load — so a variant that does not exist cannot be named. That bug class is structurally gone, which matters more than the offline capability.
-
-The style changed from `avataaars` to `open-peeps` in the process. Open Peeps has no hair-colour axis (it is painted into each of the 48 head illustrations, which is why `grayBun` and `grayShort` are separate heads), so that row is gone; in exchange the picker gained Expression (30) and Glasses (9), and because generation is local and costs about 1 ms per avatar, **every variant in the art set is offered** rather than a hand-picked handful — 114 swatches across six rows, where the API version could only afford 33. Rows scroll horizontally and open scrolled to the current selection.
-
-Three probability-gated components must stay pinned in `avatarOptions`: `facialHair` (default 10) and `accessories` (default 20) would otherwise ignore an explicit choice, and `mask` (default 5) would put a surgical mask on roughly one waiter in twenty.
-
-Weight: 448 KB in `vendor/`, about 120 KB gzipped. If that ever matters, `pixel-art` is the same architecture for 4 KB of art instead of 92 KB — a one-file swap plus new row wiring.
-
-Verified end to end with the network blocked: the full pick → commit → play flow makes zero external requests, a returning player renders from the cached SVG without loading `vendor/` at all, an unreachable `vendor/` warns in the picker and leaves the game playable on the fallback circle, and stale avataaars saves are ignored rather than half-applied (the localStorage keys moved to `rushhour.peeps.*`).
-
-One real limitation: ES module imports are blocked on `file://`, so opening `index.html` straight off disk shows the picker warning. Over http — GitHub Pages, or any local server — it is fine. The warning text says so.
-
-**2. Licensing — done.** Open Peeps is CC0, so no attribution is required; the credit line in the picker is provenance, not obligation. DiceBear's renderer is MIT, which *does* require retaining the notice — it is at `vendor/CORE-LICENSE.txt`.
-
-**3. Every swatch click re-renders all 114 previews**, since each shows the current selection with one option swapped. That is ~120 ms of generation plus image decode, local and offline, so it is no longer a network concern — but it is the thing to look at first if the picker ever feels sluggish on a weak machine.
+The one lesson worth carrying forward: that API failed *silently* three separate times, answering 200 for option names it did not recognise and serving the style default. The fix was to derive the options from the art set so an invalid value could not be named. **Any future data-driven UI here should be built from the data rather than from a hand-written list**, which is the same reason `ROSTER` drives the picker now.
 
 **4. Still open from the original brief:** audio is two effects, not a soundtrack; no difficulty feel-tuning pass has happened by *feel* — every value is measured, none is played; the canvas is a fixed 960×640 scaled by CSS rather than a true responsive layout; and the HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
 
@@ -342,7 +305,7 @@ Why it is worth doing, in order of weight:
 
 What survives untouched: the kitchen board (a room, no people in it), all ten food plates (human food served by dinosaurs is funnier), dish returns, pickup signs, every mechanic, the tutorial, every tuned number. What changes: the character, the title, and `assets/landing.jpg`, which has human servers in it.
 
-**The one real cost: the avatar picker dies.** Open Peeps is human heads, so DiceBear cannot serve a dinosaur. The replacement is the same step flow over dino species, colour and starting accessory. Upside: `vendor/` goes away and the game ships with no third-party art at all.
+**The avatar picker was the one real cost, and it has been paid.** Open Peeps is human heads, so DiceBear could not serve a dinosaur. It is replaced by a one-screen character select over the roster, `vendor/` is gone, and the game ships with no third-party art at all.
 
 ### Settled: four directions
 

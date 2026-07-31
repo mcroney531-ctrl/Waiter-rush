@@ -170,82 +170,82 @@
      changing at the same time reads as noise rather than as feedback. The
      picker is now a fixed-height column: only the swatch grid scrolls, so the
      preview, the step label and the buttons never leave the screen. */
+  /* Character select. One question — which dinosaur — so the six-step
+     scaffolding the old avatar builder needed (progress dots, step label,
+     scrolling swatch grid) is gone rather than left sitting at one step. */
   #avatarPicker {
     position: absolute; inset: 0; z-index: 30;
     background: #1c1712; color: #F4EEDB;
     display: flex; flex-direction: column; align-items: center;
+    /* Centred as a group rather than top-anchored. With a cast of two the
+       old stretch-to-fill left the ladder stranded at the bottom of the
+       screen, reading as unrelated to the character above it. */
+    justify-content: center;
     padding: 18px; overflow: hidden;
   }
   #avatarPicker h2 {
     font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
-    color: #E0A72E; font-size: clamp(20px, 3.4vw, 28px); margin: 2px 0 10px;
+    color: #E0A72E; font-size: clamp(20px, 3.4vw, 28px); margin: 2px 0 4px;
     flex: none;
   }
-  #avatarPreview {
-    width: 96px; height: 96px; border-radius: 50%;
-    background: #E8E2D5; border: 4px solid #C1443A; flex: none;
+  #avatarBlurb {
+    font-size: 13px; opacity: 0.62; margin: 0 0 14px; text-align: center;
+    flex: none;
   }
   #avatarRandom {
     position: absolute; top: 16px; right: 16px; z-index: 2;
     margin-top: 0; font-size: 13px; padding: 9px 18px;
   }
-  #avatarProgress { display: flex; gap: 6px; margin: 0 0 12px; flex: none; }
-  #avatarProgress i {
-    width: 26px; height: 4px; border-radius: 2px;
-    background: rgba(244,238,219,0.2);
-  }
-  #avatarProgress i.on   { background: rgba(224,167,46,0.5); }
-  #avatarProgress i.here { background: #E0A72E; }
-  #avatarStep {
-    flex: none; text-align: center; margin: 12px 0 8px;
-  }
-  #avatarStep .num {
-    display: block; font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; font-weight: 700; opacity: 0.55;
-  }
-  #avatarStep .name {
-    display: block; font-size: 19px; font-weight: 700; margin-top: 3px;
-  }
-  /* With a single axis on screen the swatches can wrap into a grid you can
-     scan, rather than the horizontal strip 48 heads needed when six rows had
-     to share the page. */
   #avatarOptions {
-    width: 100%; max-width: 640px; flex: 1 1 auto; min-height: 0;
+    width: 100%; max-width: 660px; flex: 0 1 auto; min-height: 0;
     overflow-y: auto; padding: 2px 4px 6px;
     scrollbar-width: thin; scrollbar-color: rgba(244,238,219,0.3) transparent;
-    /* Steps vary from 5 swatches to 48. Short ones centre in the space instead
-       of hugging the top and leaving a hole; `safe` makes the centring give way
-       to normal top-anchored scrolling once the grid is taller than the box,
-       which plain `center` would clip. */
-    display: flex; align-items: flex-start;
-    align-items: safe center; justify-content: center;
+    display: flex; align-items: safe center; justify-content: center;
   }
   #avatarOptions::-webkit-scrollbar { width: 6px; }
   #avatarOptions::-webkit-scrollbar-thumb {
     background: rgba(244,238,219,0.3); border-radius: 3px;
   }
-  .opt-swatches {
-    display: flex; gap: 9px; flex-wrap: wrap; justify-content: center;
-    width: 100%;
+  .cast { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .cast button {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    background: rgba(244,238,219,0.05); color: inherit; cursor: pointer;
+    border: 3px solid transparent; border-radius: 14px;
+    padding: 10px 12px 8px; font-family: inherit;
   }
-  .opt-swatches img {
-    width: 56px; height: 56px; border-radius: 50%; flex: none;
-    background: #E8E2D5; border: 3px solid transparent; cursor: pointer;
+  .cast button:hover { background: rgba(244,238,219,0.11); }
+  .cast button[aria-pressed="true"] {
+    border-color: #E0A72E; background: rgba(224,167,46,0.13);
   }
-  /* Skin and Uniform colour are five choices each. At the grid size the 48-head
-     step needs they read as an afterthought, so short steps get bigger faces. */
-  .opt-swatches.few { gap: 14px; }
-  .opt-swatches.few img { width: 92px; height: 92px; border-width: 4px; }
-  .opt-swatches img.sel { border-color: #E0A72E; }
+  /* A sprite sheet is a grid of cells, so a thumbnail is the sheet scaled down
+     and offset to the cell you want. Nothing is re-exported to make one. */
+  .sprite {
+    background-repeat: no-repeat; background-color: #4a3e34;
+    border-radius: 10px; flex: none;
+  }
+  .cast .sprite { width: 104px; height: 104px; }
+  .cast .who { font-weight: 700; font-size: 15px; }
+  .cast .what { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; opacity: 0.55; }
+  /* The tier ladder, shown because "what am I working toward" is most of why
+     the choice is interesting. */
+  #avatarLadder {
+    flex: none; display: flex; flex-direction: column; align-items: center;
+    gap: 6px; margin: 18px 0 0; min-height: 88px;
+  }
+  #avatarLadder .row { display: flex; gap: 10px; align-items: flex-end; }
+  #avatarLadder .step { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  #avatarLadder .sprite { width: 58px; height: 58px; }
+  /* Locked, not hidden — dark enough to read as unearned, light enough that
+     you can still see what the outfit is. */
+  #avatarLadder .step.locked .sprite { filter: grayscale(0.85) brightness(0.72); }
+  #avatarLadder .tier { font-size: 9px; letter-spacing: 1.2px; opacity: 0.5; }
+  #avatarLadder .cap {
+    font-size: 11px; opacity: 0.55; letter-spacing: 1.2px; text-transform: uppercase;
+  }
   #avatarWarn {
     max-width: 460px; text-align: center; font-size: 13px;
     color: #E0A72E; line-height: 1.45; margin: 12px 0 0;
   }
-  #avatarCredit {
-    max-width: 520px; text-align: center; font-size: 11px;
-    opacity: 0.55; line-height: 1.5; margin: 10px 0 0; flex: none;
-  }
-  #avatarCredit a { color: inherit; }
   #avatarActions {
     display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
     margin: 14px 0 2px; flex: none;
@@ -304,28 +304,22 @@
     <p style="opacity:0.7; font-size:13px;">Desktop: Arrow keys or WASD. Mobile: use the on-screen pad.</p>
     <button class="cta" id="trainBtn">Start Training</button>
     <button class="cta ghost" id="startBtn">Skip to the shift</button>
-    <button class="cta ghost" id="avatarBtn">Build your waiter</button>
+    <button class="cta ghost" id="avatarBtn">Pick your waiter</button>
   </div>
 
   <button id="skipBtn" class="hidden">Skip tutorial</button>
 
   <div id="avatarPicker" class="hidden">
     <button class="cta ghost" id="avatarRandom">Random</button>
-    <h2>Build your waiter</h2>
-    <div id="avatarProgress"></div>
-    <img id="avatarPreview" alt="Your waiter">
-    <div id="avatarStep"><span class="num"></span><span class="name"></span></div>
+    <h2>Pick your waiter</h2>
+    <p id="avatarBlurb">They all start in an apron. Earn tips and they don't stay that way.</p>
     <div id="avatarOptions"></div>
-    <p id="avatarWarn" class="hidden">Couldn't load the avatar art — you'll keep the classic waiter. Everything else works as normal. (If you opened this file directly from disk rather than over the web, that's why.)</p>
+    <div id="avatarLadder"></div>
+    <p id="avatarWarn" class="hidden">Couldn't load the character art — you'll keep the classic waiter. Everything else works as normal.</p>
     <div id="avatarActions">
-      <button class="cta" id="avatarDone">Next</button>
-      <button class="cta ghost" id="avatarCancel">Back</button>
+      <button class="cta" id="avatarDone">Start training</button>
+      <button class="cta ghost" id="avatarCancel">Skip for now</button>
     </div>
-    <p id="avatarCredit">
-      <a href="https://www.openpeeps.com/" target="_blank" rel="noopener">Open Peeps</a> by Pablo Stanley (CC0),
-      drawn in your browser by <a href="https://www.dicebear.com/" target="_blank" rel="noopener">DiceBear</a> (MIT).
-      Both ship with the game — nothing is loaded from anywhere else.
-    </p>
   </div>
 </div>
 
@@ -692,27 +686,8 @@
     }
   }
 
-  // ---------- Avatar ----------
-  // Avatars are generated in the browser by DiceBear's renderer, which is
-  // vendored into vendor/ along with the complete Open Peeps art set. Nothing
-  // is fetched from dicebear.com at any point. Output is byte-identical to
-  // what their HTTP API returns for the same options.
-  //
-  // This replaced the API because the API kept failing silently: it answers
-  // 200 for an option name it does not recognise and serves the style default,
-  // so three separate mistakes (a stale major version, renamed keys, and a
-  // probability that defaults to 10) all shipped looking like working code.
-  // The rows below are now built *from the art set itself*, so a value that
-  // does not exist cannot be named — which is the whole bug class, gone.
-  //
-  // vendor/dicebear-core.js  MIT, see vendor/CORE-LICENSE.txt
-  // vendor/open-peeps.json   Open Peeps by Pablo Stanley, CC0
-  const AVATAR_CORE = './vendor/dicebear-core.js';
-  const AVATAR_ART  = './vendor/open-peeps.json';
-
-  // Open Peeps' own clothing palette is pastel and fights the restaurant
-  // palette, so the uniform row uses the game's colours instead. Colours are
-  // free-form hex, so unlike variant names there is nothing here to mistype.
+  // The uniform palette for the drawn fallback body. Real sprites carry their
+  // own colours; this is only reached when no sheet loads at all.
   const UNIFORM_COLOURS = ['#2f6f6b','#c1443a','#e0a72e','#3c4f5c','#262e33'];
 
   // ---------- Player body (placeholder art) ----------
@@ -725,8 +700,6 @@
   const BODY_SHOE    = '#241d16';
   const BODY_APRON   = '#F4EEDB';
   const SKIN_FALLBACK = '#edb98a';
-  const HEAD_ART_SCALE = 1.75;   // the art is head + shoulders, so it overdraws the head box
-  const HEAD_ART_DROP  = 8;      // and sits low enough for the shoulders to land on the torso
 
   // All offsets are from the player origin, which is still the collision centre.
   // The figure stands on `ground` — the same point the old token's shadow sat
@@ -1143,8 +1116,8 @@
     const f     = face === 'left' ? -1 : 1;      // horizontal sign for side poses
     const s     = Math.sin(player.walk);
     const bob   = -Math.abs(s) * 2.4;            // the body lifts at mid-stride
-    const uni   = (avatarSel.opts && avatarSel.opts.clothingColor) || UNIFORM_COLOURS[0];
-    const skin  = (avatarSel.opts && avatarSel.opts.skinColor) || SKIN_FALLBACK;
+    const uni   = UNIFORM_COLOURS[0];
+    const skin  = SKIN_FALLBACK;
     const uniBack  = shade(uni, -22);
     const legBack  = shade(BODY_TROUSER, -12);
     const shoeBack = shade(BODY_SHOE, -10);
@@ -1225,25 +1198,14 @@
     leg(1);
     arm(1);
 
-    // --- head, the one piece that is real art rather than placeholder
+    // --- head. Drawn rather than composited: this body is only ever reached
+    // when no sprite sheet loaded at all, so it cannot depend on loading art.
     ctx.save();
     ctx.translate(0, B.headY);
-    // Open Peeps heads are drawn in three-quarter profile facing right, so
-    // walking left mirrors them. There is no back-of-head art, so 'up' still
-    // shows a face — the most visible thing real sprites would fix.
-    if (face === 'left') ctx.scale(-1, 1);
-    if (avatarImg && avatarImg.complete && avatarImg.naturalWidth){
-      // The art is head plus a shoulder stub in the chosen uniform colour, so
-      // it is drawn oversized and sunk into the torso: the stub becomes the
-      // shoulders and the seam disappears into a shirt of the same colour.
-      const hw = B.headR * HEAD_ART_SCALE;
-      ctx.drawImage(avatarImg, -hw, -hw + HEAD_ART_DROP, hw*2, hw*2);
-    } else {
-      ctx.fillStyle = COLORS.player;
-      ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2);
-      ctx.strokeStyle = COLORS.playerDark; ctx.lineWidth = 3; ctx.stroke();
-    }
+    ctx.fillStyle = COLORS.player;
+    ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2);
+    ctx.strokeStyle = COLORS.playerDark; ctx.lineWidth = 3; ctx.stroke();
     ctx.restore();
 
     ctx.restore();
@@ -1258,202 +1220,129 @@
       .map(v => v.toString(16).padStart(2, '0')).join('');
   }
 
-  // Bumped from avatarSel/avatarSvg: those hold avataaars picks whose option
-  // names mean nothing to this style, so old saves are ignored rather than
-  // migrated into a shape that cannot render.
-  const AVATAR_STORE_SEL = 'rushhour.peeps.sel';
-  // Bumped again for the body: saves from before it hold a disc-backed head,
-  // which on a drawn torso renders as a cream helmet. Ignoring them costs a
-  // returning player one trip through the picker.
-  const AVATAR_STORE_SVG = 'rushhour.peeps.svg2';
+  // ---------- Character select ----------
+  // One question — which dinosaur — so this is a single screen rather than the
+  // six-step flow the human avatar builder needed. The saved value is a roster
+  // key, which means an unknown or removed character degrades to the default
+  // instead of to a broken render.
+  const CHAR_STORE = 'dineo.char';
 
-  let avatarSel  = { seed: 'rush-hour', opts: {} };
-  let avatarImg  = null;      // rasterised avatar, drawn each frame
-  let avatarObjUrl = null;
-  let avatarEngine = null;    // { Avatar, style } once vendor/ has loaded
-  let AVATAR_ROWS = [];       // derived from the art set, never hand-written
+  let pickedChar = charId;
 
-  // The engine is only loaded when the picker is opened. A player who never
-  // opens it downloads none of it, and a returning player renders from the
-  // cached SVG below without loading it either.
-  async function loadAvatarEngine(){
-    if (avatarEngine) return true;
-    const [mod, def] = await Promise.all([
-      import(AVATAR_CORE),
-      fetch(AVATAR_ART).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    ]);
-    avatarEngine = { Avatar: mod.Avatar, style: new mod.Style(def) };
-    const variants = name => {
-      const v = def.components[name].variants;
-      return Array.isArray(v) ? v.slice() : Object.keys(v);
-    };
-    // Order is the order you are asked, and it is deliberate: the head is the
-    // biggest change to the silhouette so it goes first, and expression is the
-    // finishing touch so it goes last. Adding a row here adds a step.
-    AVATAR_ROWS = [
-      { key: 'headVariant',        label: 'Head & hair',    values: variants('head') },
-      { key: 'skinColor',          label: 'Skin',           values: def.colors.skin.values },
-      { key: 'facialHairVariant',  label: 'Facial hair',    values: [''].concat(variants('facialHair')) },
-      { key: 'accessoriesVariant', label: 'Glasses',        values: [''].concat(variants('accessories')) },
-      { key: 'clothingColor',      label: 'Uniform colour', values: UNIFORM_COLOURS },
-      { key: 'expressionVariant',  label: 'Expression',     values: variants('expression') }
-    ];
-    if (!Object.keys(avatarSel.opts).length) {
-      avatarSel.opts = {
-        skinColor: def.colors.skin.values[1], headVariant: 'short1',
-        clothingColor: UNIFORM_COLOURS[0], expressionVariant: 'smile'
-      };
-    }
-    return true;
-  }
-
-  // Optional components are probability-gated, so naming one is not enough.
-  // facialHair and accessories default to 10 and 20 — a chosen beard would
-  // appear about one seed in ten. mask defaults to 5 and is pinned off, or
-  // roughly one waiter in twenty turns up in a surgical mask.
-  function avatarOptions(overrides){
-    const o = Object.assign({ seed: avatarSel.seed }, avatarSel.opts, overrides || {});
-    // Read the intent before the strip below, which deletes nulls along with
-    // the empty "none" choices and would otherwise swallow the opt-out.
-    const wantsPlate = !(overrides && overrides.backgroundColor === null);
-    for (const k of Object.keys(o)) if (o[k] === '' || o[k] == null) delete o[k];
-    o.facialHairProbability  = o.facialHairVariant  ? 100 : 0;
-    o.accessoriesProbability = o.accessoriesVariant ? 100 : 0;
-    o.maskProbability = 0;
-    // The picker shows each waiter on a cream plate, rounded off by CSS, which
-    // is what makes a wall of swatches readable. On the floor that plate is a
-    // cream square behind the head, so the in-game sprite opts out and gets a
-    // transparent background — the art's own shoulders then meet the torso.
-    if (wantsPlate) o.backgroundColor = '#E8E2D5';
-    return o;
-  }
-
-  function avatarSvgText(overrides){
-    return new avatarEngine.Avatar(avatarEngine.style, avatarOptions(overrides)).toString();
-  }
-  function avatarDataUri(overrides){
-    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(avatarSvgText(overrides))));
-  }
-
-  function applyAvatarSvg(svgText){
-    const blob = new Blob([svgText], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+  // A thumbnail is the sprite sheet itself, scaled down and offset to one cell.
+  // Nothing is exported to make one, so a new character needs no extra art.
+  function spriteCell(el, entry, cell = 96, row = 0, col = 0){
+    const S = SHEET_BASE.frameW;                 // cells are square
+    const k = cell / S;
     const img = new Image();
     img.onload = () => {
-      if (avatarObjUrl) URL.revokeObjectURL(avatarObjUrl);
-      avatarImg = img; avatarObjUrl = url;
+      el.style.backgroundImage = `url(${entry.src})`;
+      el.style.backgroundSize = `${img.naturalWidth * k}px ${img.naturalHeight * k}px`;
+      el.style.backgroundPosition = `${-col * S * k}px ${-row * S * k}px`;
     };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
+    img.src = entry.src;
+  }
+
+  function renderPicker(){
+    const cast = document.createElement('div');
+    cast.className = 'cast';
+    for (const [id, c] of Object.entries(ROSTER)){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', id === pickedChar ? 'true' : 'false');
+      const art = document.createElement('div');
+      art.className = 'sprite';
+      spriteCell(art, c.tiers[0], 104);
+      const who = document.createElement('span');
+      who.className = 'who'; who.textContent = c.name;
+      const what = document.createElement('span');
+      what.className = 'what'; what.textContent = c.species || '';
+      b.append(art, who, what);
+      b.addEventListener('click', () => { pickedChar = id; renderPicker(); });
+      cast.append(b);
+    }
+    const opts = document.getElementById('avatarOptions');
+    opts.innerHTML = '';
+    opts.append(cast);
+    renderLadder();
+  }
+
+  // Every tier the chosen character has, with everything past the first greyed
+  // out. Showing what is locked is the point: it is the reason the choice is
+  // interesting rather than cosmetic.
+  function renderLadder(){
+    const c = ROSTER[pickedChar];
+    const box = document.getElementById('avatarLadder');
+    box.innerHTML = '';
+    if (!c || c.tiers.length < 2) return;
+    const row = document.createElement('div');
+    row.className = 'row';
+    c.tiers.forEach((entry, i) => {
+      const step = document.createElement('div');
+      step.className = 'step' + (i ? ' locked' : '');
+      const art = document.createElement('div');
+      art.className = 'sprite';
+      spriteCell(art, entry, 58);
+      const tier = document.createElement('span');
+      tier.className = 'tier';
+      tier.textContent = i ? money(TIER_UP_C[i]) : 'START';
+      step.append(art, tier);
+      row.append(step);
+    });
+    const cap = document.createElement('p');
+    cap.className = 'cap';
+    cap.textContent = 'earn tips, earn the outfit';
+    box.append(row, cap);
+  }
+
+  function randomiseAvatar(){
+    const ids = Object.keys(ROSTER);
+    const pool = ids.filter(id => id !== pickedChar);
+    pickedChar = (pool.length ? pool : ids)[Math.floor(Math.random() * (pool.length ? pool.length : ids.length))];
+    renderPicker();
   }
 
   function loadSavedAvatar(){
     try {
-      const sel = localStorage.getItem(AVATAR_STORE_SEL);
-      if (sel) {
-        const saved = JSON.parse(sel);
-        avatarSel = { seed: saved.seed || 'rush-hour', opts: saved.opts || {} };
-      }
-      const svg = localStorage.getItem(AVATAR_STORE_SVG);
-      if (svg) applyAvatarSvg(svg);
-    } catch (e) { /* private mode or bad JSON — defaults are fine */ }
+      const saved = localStorage.getItem(CHAR_STORE);
+      if (saved && ROSTER[saved]) charId = saved;
+    } catch (e) { /* private mode — the default is fine */ }
+    pickedChar = charId;
   }
 
-  let pickerStep = 0;       // index into AVATAR_ROWS; one axis per screen
-
-  function renderPicker(){
-    const opt = AVATAR_ROWS[pickerStep];
-    if (!opt) return;
-    document.getElementById('avatarPreview').src = avatarDataUri();
-
-    const prog = document.getElementById('avatarProgress');
-    prog.innerHTML = '';
-    AVATAR_ROWS.forEach((_, i) => {
-      const pip = document.createElement('i');
-      pip.className = i < pickerStep ? 'on' : (i === pickerStep ? 'here' : '');
-      prog.appendChild(pip);
-    });
-
-    const step = document.getElementById('avatarStep');
-    step.querySelector('.num').textContent  = 'Step ' + (pickerStep + 1) + ' of ' + AVATAR_ROWS.length;
-    step.querySelector('.name').textContent = opt.label;
-
-    const wrap = document.getElementById('avatarOptions');
-    wrap.innerHTML = '';
-    const strip = document.createElement('div');
-    strip.className = 'opt-swatches' + (opt.values.length <= 12 ? ' few' : '');
-    let selected = null;
-    for (const v of opt.values){
-      const im = document.createElement('img');
-      im.src = avatarDataUri({ [opt.key]: v });
-      im.alt = '';                       // decorative; the step label carries the meaning
-      im.title = opt.label;
-      if ((avatarSel.opts[opt.key] || '') === v) { im.className = 'sel'; selected = im; }
-      im.addEventListener('click', () => { avatarSel.opts[opt.key] = v; renderPicker(); });
-      strip.appendChild(im);
-    }
-    wrap.appendChild(strip);
-    // 48 heads is more than one screenful, and the current choice is often well
-    // down the grid — without this the step looks like nothing is picked.
-    if (selected) wrap.scrollTop = selected.offsetTop - wrap.clientHeight/2 + selected.offsetHeight/2;
-
-    const last = pickerStep === AVATAR_ROWS.length - 1;
-    document.getElementById('avatarDone').textContent =
-      last ? (pickerFromLanding ? 'Start training' : 'Use this waiter') : 'Next';
-    document.getElementById('avatarCancel').textContent =
-      pickerStep > 0 ? 'Back' : (pickerFromLanding ? 'Skip for now' : 'Cancel');
-  }
-
-  // Forward is either the next question or the end of the flow; back is either
-  // the previous question or out of the picker entirely.
-  function pickerNext(){
-    if (!avatarEngine){ closePicker(); return; }
-    if (pickerStep < AVATAR_ROWS.length - 1){ pickerStep++; renderPicker(); return; }
-    commitAvatar();
-  }
-  function pickerBack(){
-    if (pickerStep > 0 && avatarEngine){ pickerStep--; renderPicker(); return; }
+  function commitAvatar(){
+    charId = pickedChar;
+    loadCharacter(charId);
+    try { localStorage.setItem(CHAR_STORE, charId); }
+    catch (e) { /* private mode — still usable this session */ }
     closePicker();
   }
 
-  // The only thing that can still fail is loading vendor/ itself — a partial
-  // deploy, or opening index.html straight off disk, where module imports are
-  // blocked by the browser. The picker says so and the game keeps the circle.
   // Reached from the landing the picker is part of the opening flow and hands
-  // off to the title screen; reached from the title or the end-of-shift screen
-  // it is a detour that returns where it came from.
+  // off to the tutorial; reached from the title or the end-of-shift screen it
+  // is a detour that returns where it came from.
   let pickerFromLanding = false;
 
-  async function openPicker(fromLanding){
+  function openPicker(fromLanding){
     pickerFromLanding = !!fromLanding;
-    pickerStep = 0;
+    pickedChar = charId;
     document.getElementById('avatarCancel').textContent =
       pickerFromLanding ? 'Skip for now' : 'Cancel';
-    const warn = document.getElementById('avatarWarn');
-    warn.classList.add('hidden');
-    // undo whatever the failure path below may have hidden on a previous open
-    for (const id of ['avatarStep', 'avatarRandom', 'avatarCancel'])
-      document.getElementById(id).classList.remove('hidden');
+    document.getElementById('avatarDone').textContent =
+      pickerFromLanding ? 'Start training' : 'Use this waiter';
+    // The only way this fails now is a sheet that will not load, and that is
+    // already handled: the game falls back to the drawn body. Say so rather
+    // than leaving an empty screen.
+    const ok = Object.keys(ROSTER).length > 0;
+    document.getElementById('avatarWarn').classList.toggle('hidden', ok);
+    document.getElementById('avatarRandom').classList.toggle('hidden',
+      Object.keys(ROSTER).length < 2);
     document.getElementById('avatarPicker').classList.remove('hidden');
-    document.getElementById('avatarOptions').innerHTML = '';
-    try {
-      await loadAvatarEngine();
-      renderPicker();
-    } catch (e) {
-      // No engine means no steps to walk, so the flow collapses to one button
-      // that leaves. Otherwise "Next" would sit there doing nothing.
-      warn.classList.remove('hidden');
-      document.getElementById('avatarProgress').innerHTML = '';
-      document.getElementById('avatarStep').classList.add('hidden');
-      document.getElementById('avatarRandom').classList.add('hidden');
-      document.getElementById('avatarDone').textContent =
-        pickerFromLanding ? 'Start training' : 'Back';
-      document.getElementById('avatarCancel').classList.add('hidden');
-    }
+    renderPicker();
   }
 
   // Leaving the picker from the landing goes straight into training rather than
-  // via the title screen — building the waiter *is* the opening now, and a
+  // via the title screen — picking the waiter *is* the opening now, and a
   // second "press start" between it and the first lesson was a dead beat.
   function closePicker(){
     document.getElementById('avatarPicker').classList.add('hidden');
@@ -1462,29 +1351,6 @@
       document.getElementById('landing').classList.add('hidden');
       startTutorial();
     }
-  }
-
-  function commitAvatar(){
-    if (!avatarEngine) return;
-    const svg = avatarSvgText({ backgroundColor: null });
-    applyAvatarSvg(svg);
-    try {
-      localStorage.setItem(AVATAR_STORE_SVG, svg);
-      localStorage.setItem(AVATAR_STORE_SEL, JSON.stringify(avatarSel));
-    } catch (e) { /* private mode — still usable this session */ }
-    closePicker();
-  }
-
-  // Rolls the step you are looking at, not the whole waiter. Mid-flow a full
-  // reroll would silently undo choices already made on earlier steps.
-  function randomiseAvatar(){
-    if (!avatarEngine) return;
-    const opt = AVATAR_ROWS[pickerStep];
-    if (!opt) return;
-    const pool = opt.values.filter(v => v !== (avatarSel.opts[opt.key] || ''));
-    const from = pool.length ? pool : opt.values;
-    avatarSel.opts[opt.key] = from[Math.floor(Math.random() * from.length)];
-    renderPicker();
   }
 
   // ---------- Spawning ----------
@@ -2591,9 +2457,9 @@
   });
   // wrapped so the click event is not passed through as fromLanding
   document.getElementById('avatarBtn').addEventListener('click', () => openPicker(false));
-  document.getElementById('avatarDone').addEventListener('click', pickerNext);
+  document.getElementById('avatarDone').addEventListener('click', commitAvatar);
   document.getElementById('avatarRandom').addEventListener('click', randomiseAvatar);
-  document.getElementById('avatarCancel').addEventListener('click', pickerBack);
+  document.getElementById('avatarCancel').addEventListener('click', closePicker);
 
   // Audio can only start from a gesture, so the first one anywhere unlocks it.
   // `once` means this costs nothing after that.
