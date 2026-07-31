@@ -251,6 +251,23 @@
     margin: 14px 0 2px; flex: none;
   }
   #avatarActions .cta { margin-top: 0; }
+
+  /* The cast grew from two to five, and at five the cards no longer fit a
+     phone: the last row clipped mid-label, which reads as broken rather than
+     as scrollable. Keyed to height as well as width, because a short laptop
+     window hits the same wall for the same reason. */
+  @media (max-width: 620px), (max-height: 720px) {
+    #avatarPicker h2 { font-size: 20px; margin-bottom: 2px; }
+    #avatarBlurb { font-size: 12px; margin-bottom: 8px; }
+    .cast { gap: 9px; }
+    .cast button { padding: 7px 9px 6px; border-width: 2px; }
+    .cast .sprite { width: 74px; height: 74px; }
+    .cast .who { font-size: 13px; }
+    .cast .what { font-size: 9px; letter-spacing: 1px; }
+    #avatarLadder { margin-top: 10px; min-height: 0; }
+    #avatarLadder .sprite { width: 44px; height: 44px; }
+    #avatarActions { margin-top: 10px; }
+  }
   .hidden { display: none !important; }
 
   @media (pointer: coarse) {
@@ -952,6 +969,15 @@
   // may ship with fewer than four; the progression simply stops at the last one
   // that exists, so the roster can be filled in as art lands.
   const ROSTER = {
+    bronte: {
+      name: 'Bronte', species: 'Brontosaurus',
+      tiers: [
+        { src: 'assets/sprites/bronte-t1.png', scale: 0.734, anchorX: 0.552, anchorY: 0.922 },
+        { src: 'assets/sprites/bronte-t2.png', scale: 0.714, anchorX: 0.549, anchorY: 0.948 },
+        { src: 'assets/sprites/bronte-t3.png', scale: 0.747, anchorX: 0.544, anchorY: 0.906 },
+        { src: 'assets/sprites/bronte-t4.png', scale: 0.756, anchorX: 0.539, anchorY: 0.896 }
+      ]
+    },
     tyrone: {
       name: 'Tyrone', species: 'T-Rex',
       tiers: [
