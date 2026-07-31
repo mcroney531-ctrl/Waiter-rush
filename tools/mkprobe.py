@@ -23,6 +23,12 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get tier(){return tierIndex;}, get tierArt(){return tierArt.map(t=>!!t.img);},
     get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},
     setChar(id){loadCharacter(id);}, setTier(n){applyTier(n);}, get roster(){return Object.keys(ROSTER);},
+    get floaters(){return floaters;}, set hintCooldown(v){hintCooldown=v;},
+    setCap(n){carryCapacity=n;}, forceTicket(side){
+      const t = tables.find(t => t.state === 'idle' && sideOfTable(t) === side) || tables[0];
+      tickets.push({id:ticketIdCounter++, tableId:t.id, icon:'pizza', side:side,
+                    spawnTime:performance.now()});
+      t.state='waiting'; t.patience=1; t.warned=false; },
     get sheetOn(){return sheetReady();} };}});
 """
 
@@ -45,6 +51,7 @@ open(DST, 'w').write(s)
 for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'tier', 'tierArt', 'tierNotice',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
-              'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster', 'sheetOn'):
+              'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
+              'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn'):
     assert field in DBG, field
 print('probe.html regenerated with', len(DBG.splitlines()), 'lines of handle')

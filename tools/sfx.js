@@ -50,7 +50,7 @@ const check = (name, ok, detail) => {
   check('no context before a gesture', await p.evaluate(() => window.__sfx.ctxs) === 0);
 
   await p.click('#landingStart');
-  await p.waitForSelector('.cast button', { timeout: 30000 });   // character select is ready
+  await p.waitForSelector('#avatarCard img', { timeout: 30000 });   // character select is ready
   await p.click('#avatarCancel'); await p.waitForTimeout(300);
   for (const sel of ['#skipBtn', '#startBtn']) {
     const el = await p.$(sel);

@@ -603,6 +603,10 @@
   // Longer than the capacity banner: this one is a reward rather than an
   // instruction, and the point is to look at the character for a moment.
   const TIER_NOTICE_MS = 3000;
+  // Auto-pickup fires every frame you stand on a pad, so a refusal message
+  // needs a gate or it repaints itself into a solid block of text.
+  const HINT_COOLDOWN_MS = 1600;
+  const HINT_LIFE_MS = 1100;
 
   // Delivering to the wrong table used to cost nothing but a visual bump,
   // which meant a player could ignore the memory mechanic and just try tables
@@ -715,6 +719,7 @@
     // with the shift rather than persisting.
     tierNotice = 0;
     warnCooldown = 0;      // a new shift should not start inside the last one's gap
+    hintCooldown = 0;
     applyTier(0);
     lives = 3;
     spawnTimer = 900;
@@ -1573,6 +1578,34 @@
     });
   }
 
+  // Refused-pickup microcopy. Rides above the player in the angry colour, and
+  // says what to do rather than what went wrong — "hands full" is a state the
+  // player can already see from the two plates over their head.
+  //
+  // Nothing here names a table. The rule that nothing may reveal which table a
+  // carried order belongs to applies to failure messages exactly as much as to
+  // pads and arrows, so the copy stays about the *kind* of thing being held.
+  let hintCooldown = 0;
+  function hintFloater(text){
+    if (hintCooldown > 0) return;
+    hintCooldown = HINT_COOLDOWN_MS;
+    // Above whatever is in hand, not just above the head. Carried plates are
+    // drawn from BODY.topY - 14 upward and stand about 48px tall, so a hint at
+    // head height lands in the middle of them. Clamped so it stays on the
+    // canvas when the player is up at the pass.
+    floaters.push({
+      x: player.x, y: Math.max(30, player.y + BODY.topY - 76),
+      colour: COLORS.angry, top: text, big: false,
+      life: HINT_LIFE_MS, max: HINT_LIFE_MS
+    });
+  }
+
+  // What the player is holding decides the advice, since the two have different
+  // destinations and pointing at the wrong one is worse than saying nothing.
+  const fullHandsHint = () => carryingDishes()
+    ? 'Dishes go to the dish return'
+    : 'Deliver what you\'re carrying';
+
   function drawFloaters(){
     for (const f of floaters){
       const k = 1 - f.life / f.max;          // 0 at spawn, 1 at expiry
@@ -1597,9 +1630,12 @@
       };
       const a = ctx.globalAlpha;
       const base = f.y - k * 26;
-      line(f.top,    base,                            '900 ' + (f.big ? 13 : 11) + 'px', a);
-      line(f.bottom, base + (f.big ? 19 : 17),        '900 ' + (f.big ? 20 : 17) + 'px', a);
-      line(f.secs,   base + (f.big ? 33 : 30),        '700 10px',                        a * 0.6);
+      // A hint is one line; a tip is three. Guarding on the text rather than on
+      // a type flag means an absent line simply is not drawn, instead of
+      // stroking the word "undefined" onto the floor.
+      if (f.top)    line(f.top,    base,                     '900 ' + (f.big ? 13 : 11) + 'px', a);
+      if (f.bottom) line(f.bottom, base + (f.big ? 19 : 17), '900 ' + (f.big ? 20 : 17) + 'px', a);
+      if (f.secs)   line(f.secs,   base + (f.big ? 33 : 30), '700 10px',                        a * 0.6);
       ctx.restore();
     }
   }
@@ -1626,11 +1662,15 @@
   const queueFor = side => tickets.filter(tk => tk.side === side);
 
   function tryPickup(){
-    if (handsFull()) return;
     const pass = passUnderPlayer();
     if (!pass) return;
     const queue = queueFor(pass.side);
     if (queue.length === 0) return;
+    // The full-hands check moved below the "is there anything here" checks on
+    // purpose. Standing at an empty pass with both hands full is not a mistake
+    // and should say nothing; reaching for a ticket that is actually sitting
+    // there is, and that is the only moment worth interrupting.
+    if (handsFull()){ hintFloater(fullHandsHint()); return; }
     const t = queue[0];
     tickets.splice(tickets.indexOf(t), 1);
     // orderedAt is when the ticket appeared, not when it was picked up: time
@@ -1643,10 +1683,15 @@
   // Dishes take a carry slot like an order does, so with two slots you can run
   // a plate out and a stack of dirties back on the same trip. That is what the
   // second slot is really for, and it is what a real server does.
+  //
+  // Two stacks of dirties is also allowed now. The old rule was one tray
+  // maximum regardless of capacity, which meant a player who had earned both
+  // hands still had to make two trips to clear two adjacent tables — the
+  // upgrade did not apply to half the job it was supposed to help with.
   function tryBusPickup(){
-    if (handsFull() || carryingDishes()) return;   // one tray is plenty
     for (const t of tables){
       if (t.state === 'dirty' && inDropZone(t)){
+        if (handsFull()){ hintFloater(fullHandsHint()); return; }
         t.state = 'clearing';
         carried.push({ type: 'dishes', tableId: t.id, pickedAt: performance.now() });
         sfxDishUp();
@@ -2006,6 +2051,7 @@
     if (capacityNotice > 0) capacityNotice -= dt;
     if (tierNotice > 0) tierNotice -= dt;
     if (warnCooldown > 0) warnCooldown -= dt;
+    if (hintCooldown > 0) hintCooldown -= dt;
     if (flowFlash > 0) flowFlash -= dt;
     for (const f of floaters) f.life -= dt;
     if (floaters.some(f => f.life <= 0)) floaters = floaters.filter(f => f.life > 0);

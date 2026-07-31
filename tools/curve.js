@@ -34,7 +34,7 @@ const step = async (p, keys, ms) => {
   });
   await p.goto(B + '/probe.html', { waitUntil: 'load' });
   await p.click('#landingStart');
-  await p.waitForSelector('.cast button', { timeout: 30000 });   // character select is ready
+  await p.waitForSelector('#avatarCard img', { timeout: 30000 });   // character select is ready
   // Skipping the picker from the landing drops into the TUTORIAL, not the
   // title screen — so the tutorial has to be skipped before "Skip to the
   // shift" exists. This is the harness breakage that has bitten twice.
