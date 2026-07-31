@@ -6,19 +6,20 @@
 <title>Dine-O Dash</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
+  /* Galindo, the display face for everything: headings, buttons, the HUD, the
+     labels painted on the board, and money. Subset to Basic Latin, which takes
+     56 KB down to 12.7 KB, and self-hosted rather than fetched so the face the
+     whole interface is built on cannot arrive late or not at all. SIL Open
+     Font License; the text ships alongside it.
+
+     One weight only, so nothing here asks for bold — a font-weight on a
+     single-weight family gets synthesised, and a faked bold on a face this
+     heavy turns to mud. */
   @font-face {
-    font-family: 'DinerDisplay';
-    src: local('Alfa Slab One');
-  }
-  /* Galindo, subset to the fifteen glyphs money is written with — 56 KB of
-     font down to 744 bytes. Self-hosted rather than fetched, so the one
-     typeface the game leans on for a live number cannot arrive late or not at
-     all. SIL Open Font License; the text ships alongside it. */
-  @font-face {
-    font-family: 'Money';
-    src: url('assets/fonts/galindo-money.woff2') format('woff2');
+    font-family: 'Galindo';
+    src: url('assets/fonts/galindo.woff2') format('woff2');
     font-display: block;
   }
   /* Galindo has no tabular figures — its digits run 864 to 1556 units, so "1"
@@ -27,7 +28,7 @@
      own fixed-width box instead. 0.72em clears the widest ink (0.688em) with
      a little air. Only applied where a number actually changes; the ladder and
      the end-of-shift total are written once and would gain nothing. */
-  .money { font-family: 'Money', 'Alfa Slab One', 'Arial Black', sans-serif; }
+  .money { font-family: 'Galindo', 'Arial Black', sans-serif; }
   .money i { font-style: normal; display: inline-block; width: 0.72em; text-align: center; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body {
@@ -58,7 +59,7 @@
     display: flex; justify-content: space-between; align-items: flex-start;
     padding: 14px 18px;
     pointer-events: none;
-    font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
+    font-family: 'Galindo', 'Arial Black', sans-serif;
     color: #F4EEDB;
     text-shadow: 0 2px 0 rgba(0,0,0,0.35);
     z-index: 5;
@@ -78,7 +79,7 @@
   }
   #muteBtn:hover, #muteBtn:focus-visible { opacity: 1; border-color: rgba(244,238,219,0.6); }
   #hud .stat { font-size: 20px; letter-spacing: 0.5px; }
-  #hud .stat span.label { font-family: 'DM Sans', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; font-weight: 700;}
+  #hud .stat span.label { font-family: 'Galindo', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; }
   #flow {
     display: block; font-family: 'DM Sans', sans-serif; font-size: 12px;
     font-weight: 900; letter-spacing: 2px; color: #E0A72E; min-height: 15px;
@@ -120,7 +121,7 @@
     text-align: center; z-index: 20; color: #F4EEDB; padding: 24px;
   }
   #overlay h1 {
-    font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
+    font-family: 'Galindo', 'Arial Black', sans-serif;
     font-size: clamp(32px, 7vw, 56px);
     color: #E0A72E;
     text-shadow: 3px 3px 0 #C1443A;
@@ -128,9 +129,9 @@
     letter-spacing: 1px;
   }
   #overlay p { max-width: 440px; line-height: 1.5; font-size: 15px; opacity: 0.9; margin: 6px 0 20px; }
-  #overlay .big-stat { font-family: 'Money', 'Alfa Slab One', sans-serif; font-size: 44px; color: #2F6F6B; margin: 4px 0 18px; }
+  #overlay .big-stat { font-family: 'Galindo', sans-serif; font-size: 44px; color: #2F6F6B; margin: 4px 0 18px; }
   button.cta {
-    font-family: 'Alfa Slab One', sans-serif;
+    font-family: 'Galindo', sans-serif;
     background: #C1443A; color: #F4EEDB;
     border: none; padding: 16px 36px; font-size: 18px;
     border-radius: 10px; cursor: pointer;
@@ -149,7 +150,7 @@
   #skipBtn {
     position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
     right: 20px; z-index: 12;
-    font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 11px;
+    font-family: 'Galindo', sans-serif; font-size: 12px;
     letter-spacing: 1.5px; text-transform: uppercase;
     background: rgba(244,238,219,0.12); color: #F4EEDB;
     border: 2px solid rgba(244,238,219,0.3);
@@ -201,7 +202,7 @@
     padding: 18px; overflow: hidden;
   }
   #avatarPicker h2 {
-    font-family: 'Alfa Slab One', 'Arial Black', sans-serif;
+    font-family: 'Galindo', 'Arial Black', sans-serif;
     color: #E0A72E; font-size: clamp(20px, 3.4vw, 28px); margin: 2px 0 4px;
     flex: none;
   }
@@ -259,9 +260,10 @@
     background: linear-gradient(to top, rgba(20,16,12,0.92) 42%, transparent);
     text-align: center; pointer-events: none;
   }
-  #avatarCard .who  { display: block; font-weight: 700; font-size: 19px; }
+  #avatarCard .who  { display: block; font-family: 'Galindo', sans-serif; font-size: 21px; }
   #avatarCard .what {
-    display: block; font-size: 10px; letter-spacing: 1.6px;
+    display: block; font-family: 'Galindo', sans-serif;
+    font-size: 11px; letter-spacing: 1.4px;
     text-transform: uppercase; opacity: 0.6; margin-top: 1px;
   }
   .stage-arrow {
@@ -275,7 +277,7 @@
     background: rgba(224,167,46,0.2); border-color: #E0A72E; transform: scale(1.06);
   }
   #avatarCounter {
-    flex: none; margin: 9px 0 0; font-size: 11px;
+    flex: none; margin: 9px 0 0; font-family: 'Galindo', sans-serif; font-size: 12px;
     letter-spacing: 2px; opacity: 0.5;
   }
   /* A sprite sheet is a grid of cells, so a thumbnail is the sheet scaled down
@@ -296,7 +298,7 @@
   /* Locked, not hidden — dark enough to read as unearned, light enough that
      you can still see what the outfit is. */
   #avatarLadder .step.locked .sprite { filter: grayscale(0.85) brightness(0.72); }
-  #avatarLadder .tier { font-family: 'Money', inherit; font-size: 10px; letter-spacing: 0.6px; opacity: 0.55; }
+  #avatarLadder .tier { font-family: 'Galindo', inherit; font-size: 10px; letter-spacing: 0.6px; opacity: 0.55; }
   #avatarLadder .cap {
     font-size: 11px; opacity: 0.55; letter-spacing: 1.2px; text-transform: uppercase;
     margin: 2px 0 0;
@@ -499,7 +501,7 @@
     roundRect(ctx, cx - w/2, cy - h/2, w, h, h/2);
     ctx.stroke();
     ctx.fillStyle = COLORS.mustard;
-    ctx.font = '900 ' + (big ? 12 : 11) + 'px DM Sans, sans-serif';
+    ctx.font = (big ? 13 : 12) + 'px Galindo, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('T' + id, cx, cy + (big ? 4 : 4));
   }
@@ -1675,7 +1677,7 @@
       const line = (text, y, px, alpha, moneyFace) => {
         const prev = ctx.globalAlpha;
         ctx.globalAlpha = alpha;
-        ctx.font = px + (moneyFace ? " Money, 'Alfa Slab One', sans-serif"
+        ctx.font = px + (moneyFace ? ' Galindo, sans-serif'
                                    : ' DM Sans, sans-serif');
         ctx.lineWidth = 4;
         ctx.fillStyle = f.colour;
@@ -2176,7 +2178,7 @@
         ctx.setLineDash([]);
         ctx.globalAlpha = 0.42;
         ctx.fillStyle = COLORS.mustard;
-        ctx.font = '900 11px DM Sans, sans-serif';
+        ctx.font = '12px Galindo, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('SET DOWN', 0, 4);
         ctx.globalAlpha = 1;
@@ -2201,7 +2203,7 @@
         roundRect(ctx, -DROP.w/2, -DROP.h/2, DROP.w, DROP.h, 10);
         ctx.stroke();
         ctx.fillStyle = COLORS.mustard;
-        ctx.font = '900 13px DM Sans, sans-serif';
+        ctx.font = '14px Galindo, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('CLEAR', 0, 5);
       }
@@ -2282,7 +2284,7 @@
         }
         if (i === 0){
           ctx.fillStyle = COLORS.mustard;
-          ctx.font = '900 9px DM Sans, sans-serif';
+          ctx.font = '10px Galindo, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText('NEXT UP', slotX, TICKET.base - (box ? box.h : 46) - 6);
         }
@@ -2356,7 +2358,7 @@
     ctx.strokeStyle = COLORS.mustard; ctx.lineWidth = 2.5;
     roundRect(ctx, -w/2 + 3, -h/2 + 3, w - 6, h - 6, 7); ctx.stroke();
     ctx.fillStyle = '#F4EEDB';
-    ctx.font = '900 ' + Math.round(A(40)) + 'px DM Sans, sans-serif';
+    ctx.font = Math.round(A(40)) + 'px Galindo, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(t.id), 0, 1);
@@ -2390,7 +2392,7 @@
                     : secs >= 10 ? secs.toFixed(0)
                     : secs.toFixed(1);
         ctx.textAlign = 'left';
-        ctx.font = '900 15px DM Sans, sans-serif';
+        ctx.font = '16px Galindo, sans-serif';
         ctx.fillStyle = col;
         ctx.fillText(label, barW/2 + 7, 4);
         ctx.textAlign = 'center';
@@ -2532,7 +2534,7 @@
     ctx.strokeStyle = COLORS.mustard; ctx.lineWidth = 3;
     roundRect(ctx, W/2 - w/2, y, w, 44, 10); ctx.stroke();
     ctx.fillStyle = COLORS.mustard;
-    ctx.font = '900 15px DM Sans, sans-serif';
+    ctx.font = '16px Galindo, sans-serif';
     ctx.fillText(title, W/2, y + 20);
     ctx.font = '700 11px DM Sans, sans-serif';
     ctx.fillStyle = '#F4EEDB';
@@ -2574,7 +2576,7 @@
       ctx.globalAlpha = a;
       ctx.textAlign = 'center';
       ctx.fillStyle = COLORS.mustard;
-      ctx.font = '900 26px DM Sans, sans-serif';
+      ctx.font = '28px Galindo, sans-serif';
       ctx.fillText('IN THE FLOW', W/2, top);
       ctx.font = '700 12px DM Sans, sans-serif';
       ctx.fillText('tips x' + FLOW_MULT + ' while you keep it up', W/2, top + 20);
@@ -2608,7 +2610,7 @@
 
     ctx.textAlign = 'left';
     ctx.fillStyle = accent;
-    ctx.font = '900 11px DM Sans, sans-serif';
+    ctx.font = '12px Galindo, sans-serif';
     ctx.fillText(label.toUpperCase(), px + padX, py + 25);
 
     ctx.fillStyle = '#F4EEDB';
@@ -2617,7 +2619,7 @@
 
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(244,238,219,0.45)';
-    ctx.font = '900 11px DM Sans, sans-serif';
+    ctx.font = '12px Galindo, sans-serif';
     ctx.fillText('STEP ' + (tut.index + 1) + ' OF ' + TUTORIAL_STEPS.length,
                  px + panelW - padX, py + 25);
     ctx.restore();
@@ -2706,10 +2708,10 @@
   setMuted(muted);                // paint the saved state onto the button
 
   // Canvas has no font-display: ctx.font with an unloaded family silently
-  // falls back and the first tip of the shift would render in the wrong face.
-  // 744 bytes, so this resolves long before anyone earns a tip — it is here so
-  // that staying true does not depend on that being fast.
-  if (document.fonts && document.fonts.load) document.fonts.load("20px Money");
+  // falls back, so the board's first frame would paint its labels in the
+  // wrong face. 12.7 KB, so this resolves almost immediately — it is here so
+  // that being correct does not depend on that being fast.
+  if (document.fonts && document.fonts.load) document.fonts.load('20px Galindo');
 
   loadSavedAvatar();
   // Kick off the sprite load for every tier at once. Until the images arrive —

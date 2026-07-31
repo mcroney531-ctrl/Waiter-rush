@@ -17,9 +17,9 @@ await p.click('#avatarCancel'); await p.waitForTimeout(300);
 for (const s of ['#skipBtn','#startBtn']) { const e=await p.$(s); if(e&&await e.isVisible()){await e.click();await p.waitForTimeout(350);} }
 await p.waitForTimeout(400);
 
-check('font loaded', await p.evaluate(()=>document.fonts.check('20px Money')));
+check('display font loaded', await p.evaluate(()=>document.fonts.check('20px Galindo')));
 check('score uses the money face',
-  await p.evaluate(()=>getComputedStyle(document.getElementById('score')).fontFamily.includes('Money')));
+  await p.evaluate(()=>getComputedStyle(document.getElementById('score')).fontFamily.includes('Galindo')));
 
 // the whole point: the HUD must not change width as digits change
 const widthAt = v => p.evaluate(n=>{

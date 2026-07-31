@@ -98,16 +98,35 @@ await p.waitForTimeout(220);
 check('two hands full also warns', (await hints()).length === 1);
 
 // ---- an empty pass says nothing ----
-await setup(2, [{ type: 'order', id: 2 }, { type: 'order', id: 4 }]);
+// Spawning is stopped for this one rather than raced against. Orders appear
+// every seven seconds, and a ticket landing at this pass mid-wait makes the
+// refusal correct — which failed the case intermittently rather than never.
+// spawnTicket bails when no table is idle, so parking them all is enough.
 await p.evaluate(() => {
   const d = window.__dbg, s = d.PASSES[0];
+  d.setCap(2);
+  d.tables.forEach(t => { t.state = 'eating'; t.eatTimer = 99999; });
   d.tickets.length = 0;
+  // Hands stay full with orders for tables that are deliberately NOT waiting;
+  // tryDeliver will discard them, which is fine — the case is about a pass
+  // with nothing on it, and an empty-handed player must be silent there too.
+  d.carried.length = 0;
+  d.carried.push({ type: 'dishes', tableId: 1, pickedAt: performance.now() },
+                 { type: 'dishes', tableId: 2, pickedAt: performance.now() });
   d.player.x = s.x; d.player.y = s.y;
+  // Cleared last, and in the same step as everything else. Splitting this
+  // across two evaluates let the game run frames in between with full hands
+  // and a leftover ticket still at the pass, so a hint fired in the gap and
+  // survived into the assertion — which is why this case failed one run in
+  // three rather than never.
+  d.floaters.length = 0;
+  d.hintCooldown = 0;
 });
 await p.waitForTimeout(400);
 check('empty pass stays quiet', (await hints()).length === 0, JSON.stringify(await hints()));
 
 // ---- room in hand: no warning, and the pickup happens ----
+await p.evaluate(() => window.__dbg.tables.forEach(t => { t.state = 'idle'; }));
 await setup(2, [{ type: 'order', id: 2 }]);
 await standAtPass();
 await p.waitForTimeout(300);
