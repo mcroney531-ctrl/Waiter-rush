@@ -16,3 +16,6 @@ package-lock.json
 foodgrid-*.png
 food-contact-*.png
 tiergrid-*.png
+
+# Screenshots written by tools/picker.js
+picker*.png
