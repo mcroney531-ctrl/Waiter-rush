@@ -188,6 +188,7 @@ only the number and the evidence behind it:
 {
   "schema": 1,
   "metric": "iou/normalised-128/alpha-110",
+  "digest": "sha256/name+bytes/16",
   "threshold": 0.91,
   "corpus": "dc27651ba9b1a056",
   "menu_size": 10,
@@ -210,6 +211,17 @@ run, and both catch a way the number can quietly stop meaning anything:
   measure means nothing under another, so changing how the overlap is computed
   invalidates the bar and the run says to re-calibrate rather than silently
   comparing new numbers to an old scale.
+
+- **`digest`** names how `corpus` was computed, and exists because of a bug
+  this caught. Without it, changing the hashing would report *"the menu has
+  changed"* — false, and it sends someone to inspect art that is fine. Now it
+  says the fingerprint method changed and the comparison is unavailable.
+
+Three versions rather than one, each named for what it describes. A single
+catch-all tool version was considered and rejected: it would fire on every
+unrelated edit, and a warning that cries wolf gets ignored along with the real
+ones. It would also duplicate `git_commit`, which already pins the exact code
+more precisely than a hand-maintained number will.
 
 The rest — `generated_at`, `git_commit`, `menu_size`, `worst_pair` — exists to
 answer "why is the bar 0.91 and not 0.87" without archaeology.

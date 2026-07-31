@@ -132,11 +132,18 @@ def distinctness(paths):
 
 
 BASELINE = 'art-source/food-baseline.json'
-SCHEMA = 1
-# Bump whenever the similarity measure itself changes. A threshold derived by
-# one metric means nothing under another, and a stale baseline that still loads
-# silently is worse than no baseline at all — see load_threshold.
-METRIC_VERSION = 'iou/normalised-128/alpha-110'
+
+# Three things in the baseline can independently stop meaning what they say, so
+# each is versioned separately and named after what it actually describes.
+#
+# A single catch-all "tool version" was considered and rejected. It would fire
+# on every unrelated edit — a typo, an extra print — and a warning that cries
+# wolf gets ignored, taking the real ones down with it. It would also duplicate
+# git_commit, which already pins the exact code that produced the file, more
+# precisely than a hand-maintained number ever will.
+SCHEMA = 1                                        # which fields exist
+METRIC_VERSION = 'iou/normalised-128/alpha-110'   # what `threshold` means
+DIGEST_VERSION = 'sha256/name+bytes/16'           # what `corpus` means
 
 
 def corpus_digest(paths):
@@ -194,7 +201,15 @@ def load_threshold(paths):
         warnings.append(
             f'baseline was derived by metric {b.get("metric")!r}, this is '
             f'{METRIC_VERSION!r} — the bar is not comparable, re-calibrate')
-    if b.get('corpus') and b['corpus'] != corpus_digest(paths):
+    # The corpus check is only meaningful if the stored hash was computed the
+    # same way. Without this guard, changing how the digest is built reports
+    # "the menu has changed" — which is false, and sends someone to inspect art
+    # that is fine. Say what actually happened instead.
+    if b.get('digest') != DIGEST_VERSION:
+        warnings.append(
+            f'corpus was fingerprinted by {b.get("digest")!r}, this is '
+            f'{DIGEST_VERSION!r} — cannot tell whether the menu changed')
+    elif b.get('corpus') and b['corpus'] != corpus_digest(paths):
         warnings.append('the menu has changed since the bar was set')
     return thr, b, warnings
 
@@ -220,6 +235,7 @@ def calibrate(near, folder, paths):
     payload = {
         'schema': SCHEMA,
         'metric': METRIC_VERSION,
+        'digest': DIGEST_VERSION,
         'threshold': thr,
         # Provenance, so that "why is the bar 0.91" is answerable later without
         # archaeology. The corpus digest is the load-bearing one; the commit is
