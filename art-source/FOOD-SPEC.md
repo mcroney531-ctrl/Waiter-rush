@@ -182,7 +182,37 @@ Two guards, because the failure mode here is obvious and expensive:
 
 The corpus itself needs no separate storage: the shipped art in `assets/food/`
 *is* the corpus, and it is version controlled already. The baseline file holds
-only the number and the evidence behind it.
+only the number and the evidence behind it:
+
+```json
+{
+  "schema": 1,
+  "metric": "iou/normalised-128/alpha-110",
+  "threshold": 0.91,
+  "corpus": "dc27651ba9b1a056",
+  "menu_size": 10,
+  "generated_at": "2026-07-31T03:33:37+00:00",
+  "git_commit": "6fd46d7...",
+  "git_dirty": false,
+  "worst_pair": ["pasta", "burger", 0.89]
+}
+```
+
+That provenance is not decoration — two of those fields are checked on every
+run, and both catch a way the number can quietly stop meaning anything:
+
+- **`corpus`** is a hash of the art the bar was derived from. If the menu has
+  changed since, the run says so. A commit hash alone would not do this job:
+  calibrating with uncommitted changes records a sha that does not describe the
+  files that were measured, which is why `git_dirty` is recorded too and why
+  the digest is the load-bearing field rather than the commit.
+- **`metric`** names the similarity measure. A threshold derived under one
+  measure means nothing under another, so changing how the overlap is computed
+  invalidates the bar and the run says to re-calibrate rather than silently
+  comparing new numbers to an old scale.
+
+The rest — `generated_at`, `git_commit`, `menu_size`, `worst_pair` — exists to
+answer "why is the bar 0.91 and not 0.87" without archaeology.
 
 One thing that was tried and does not work, so it does not get tried again:
 measuring how much of a *single* dish's silhouette sits above the plate rim,

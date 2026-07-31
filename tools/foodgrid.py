@@ -20,8 +20,11 @@ Alongside them it prints the two numbers worth arguing about: how far each
 dish's outer edge separates from the floor, and how much of its slot it fills.
 Both have thresholds taken from shipped art rather than invented.
 """
+import datetime
+import hashlib
 import json
 import os
+import subprocess
 import sys
 
 import numpy as np
@@ -129,25 +132,74 @@ def distinctness(paths):
 
 
 BASELINE = 'art-source/food-baseline.json'
+SCHEMA = 1
+# Bump whenever the similarity measure itself changes. A threshold derived by
+# one metric means nothing under another, and a stale baseline that still loads
+# silently is worse than no baseline at all — see load_threshold.
+METRIC_VERSION = 'iou/normalised-128/alpha-110'
 
 
-def load_threshold():
+def corpus_digest(paths):
+    """A hash of the art the number was derived from.
+
+    A commit hash alone is not provenance here: calibrating with uncommitted
+    changes records a sha that does not describe the files that were measured.
+    This does, regardless of git state, and it is what answers "was the bar
+    derived from this exact menu" six months later.
+    """
+    h = hashlib.sha256()
+    for name, path in sorted(paths):
+        h.update(name.encode())
+        with open(path, 'rb') as f:
+            h.update(f.read())
+    return h.hexdigest()[:16]
+
+
+def git_context():
+    def run(*a):
+        try:
+            return subprocess.run(a, capture_output=True, text=True,
+                                  timeout=5).stdout.strip() or None
+        except (OSError, subprocess.SubprocessError):
+            return None
+    return {
+        'git_commit': run('git', 'rev-parse', 'HEAD'),
+        # Recorded rather than blocked: the digest is the real identity, but a
+        # dirty tree means the commit above does not describe what was measured.
+        'git_dirty': bool(run('git', 'status', '--porcelain', 'assets/food',
+                              'tools/foodgrid.py')),
+    }
+
+
+def load_threshold(paths):
     """The calibrated bar if one has been set, otherwise the provisional guess.
 
     Once a menu is good, that menu *is* the definition of acceptably distinct
     for this game — its own worst pair is, by definition, a pair someone looked
     at and accepted. Deriving the number from it beats re-guessing, and pinning
     it means a later dish is judged against the set that shipped rather than
-    against a bar that drifted."""
+    against a bar that drifted.
+    """
     try:
         with open(BASELINE) as f:
             b = json.load(f)
-        return float(b['threshold']), b
-    except (OSError, KeyError, ValueError):
-        return MAX_SIMILARITY, None
+        thr = float(b['threshold'])
+    except (OSError, KeyError, ValueError, TypeError):
+        return MAX_SIMILARITY, None, []
+
+    warnings = []
+    if b.get('schema') != SCHEMA:
+        warnings.append(f'baseline schema {b.get("schema")} != {SCHEMA}')
+    if b.get('metric') != METRIC_VERSION:
+        warnings.append(
+            f'baseline was derived by metric {b.get("metric")!r}, this is '
+            f'{METRIC_VERSION!r} — the bar is not comparable, re-calibrate')
+    if b.get('corpus') and b['corpus'] != corpus_digest(paths):
+        warnings.append('the menu has changed since the bar was set')
+    return thr, b, warnings
 
 
-def calibrate(near, folder):
+def calibrate(near, folder, paths):
     """Freeze the current set as the reference corpus.
 
     Refuses if the set does not already pass the provisional bar. Calibrating
@@ -166,8 +218,18 @@ def calibrate(near, folder):
     # pair rather than merely better than the worst imaginable one.
     thr = round(min(0.95, worst + 0.02), 2)
     payload = {
+        'schema': SCHEMA,
+        'metric': METRIC_VERSION,
         'threshold': thr,
+        # Provenance, so that "why is the bar 0.91" is answerable later without
+        # archaeology. The corpus digest is the load-bearing one; the commit is
+        # context and can be misleading on its own if the tree was dirty.
+        'corpus': corpus_digest(paths),
+        'menu_size': len(near),
         'calibrated_from': folder,
+        'generated_at': datetime.datetime.now(datetime.timezone.utc)
+                                .replace(microsecond=0).isoformat(),
+        **git_context(),
         'worst_pair': [worst_name, twin, round(worst, 3)],
         'dishes': {n: [t, round(v, 3)] for n, (v, t) in sorted(near.items())},
         'note': ('Derived from the shipped menu, not chosen. A new dish is judged '
@@ -234,7 +296,7 @@ def main(folder='assets/food', do_calibrate=False):
         print('wrote', out)
 
     near = distinctness(paths) if len(paths) > 1 else {}
-    threshold, baseline = load_threshold()
+    threshold, baseline, warnings = load_threshold(paths)
 
     print(f'\n{"dish":8} {"edge L":>7} {"vs floor":>9} {"aspect":>7} {"fill":>6} '
           f'{"nearest":>16}   notes')
@@ -264,14 +326,16 @@ def main(folder='assets/food', do_calibrate=False):
     print(f'floor luminance {FLOOR_L:.0f}; carrying two shrinks every dish to '
           f'{CARRY_TWO:.0%}, so read the shape strip at arm\'s length too.')
     if baseline:
-        print(f'overlap bar {threshold:.2f}, calibrated from '
-              f'{baseline["worst_pair"][0]}/{baseline["worst_pair"][1]}.')
+        print(f'overlap bar {threshold:.2f}, calibrated {baseline.get("generated_at", "?")} '
+              f'from {baseline["worst_pair"][0]}/{baseline["worst_pair"][1]}.')
+        for w in warnings:
+            print(f'  ! {w}')
     else:
         print(f'overlap bar {threshold:.2f}, provisional — run --calibrate once the '
               f'menu is good.')
     print('the overlap number is an early warning, not a verdict — the strip is.')
     if do_calibrate:
-        calibrate(near, folder)
+        calibrate(near, folder, paths)
     if missing:
         print('missing:', ', '.join(missing))
 
