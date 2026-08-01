@@ -251,13 +251,21 @@ every frame, offset to `t.x - A(50)`. Leave it in and every table has two
 numbers. Deleting it costs the ability to renumber tables from code, which is
 worth nothing here — `tableDefs` is eight fixed ids and always has been.
 
-**The contrast drops, modestly.** Measured by splitting the plaque into ink and
-face: the carved digits run **2.8–3.5:1**, where the card the game draws today
-is **5.0:1** by construction (`#F4EEDB` on `#2F6F6B`). The carved digit is
-physically larger, so side by side it still reads clearly; the card is louder
-because it is a UI element rather than a thing in the room. Keep the digit dark
-against a pale plaque, keep the plaque the lightest thing on the tabletop, and
-judge it at play size rather than on the 1536px render.
+**Which way round the plaque goes decides whether this costs anything.** The
+first painted pass used a pale stone plaque with a dark incised digit and
+measured **2.8–3.5:1**, against **5.0:1** for the card the game draws today
+(`#F4EEDB` on `#2F6F6B`). The first modelled table went the other way — a dark
+slate plaque, rgb (90,77,65) — and a cream digit on that is **7.0:1**, better
+than anything the game has shipped.
+
+So: **dark plaque, light digit.** A dark digit on the same slate is 2.19:1 and
+unusable.
+
+The one thing to watch on a dark plaque is that it separates from the tabletop
+by hue rather than value — measured, the slate against its own wood is 1.08:1,
+which is to say invisible in greyscale. The rim carries it, and at ~60px on
+screen the plaque is large enough that the digit does the work. But it is the
+same failure the Floor colour section warns about, so check it desaturated.
 
 **It does not change the memory mechanic.** The floor labels are permanently
 visible in both versions — they are how you *find* table 6, not how you remember
