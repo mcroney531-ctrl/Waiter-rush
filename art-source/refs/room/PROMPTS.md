@@ -43,7 +43,17 @@ Three details in there are doing real work, so do not trim them:
 
 > The object: a chunky rectangular dining table for four. Thick timber top with a
 > strong flat front edge, carved stone base, simple uncomplicated silhouette.
-> Roughly hip height on a standing person.
+> Roughly hip height on a standing person. Set into the middle of the tabletop,
+> a carved stone plaque with a raised rim — **the plaque is blank, with no number
+> and no marking on it.**
+
+**The plaque must come out blank**, and it is worth re-rolling until it does.
+One table is modelled and placed eight times; the number is stamped onto the
+plaque afterwards, at the eight positions the renderer already knows because it
+put the tables there. Generating eight numbered tables instead means eight
+separately-generated models that do not match each other in anything *but* the
+number — different proportions, different wood, different plaque — which is a
+worse problem than the one it solves.
 
 The three things this has to get right, because the other nine inherit them: a
 **hard horizontal front edge** rather than a soft round-over, a **simple base**

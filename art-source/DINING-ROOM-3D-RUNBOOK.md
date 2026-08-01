@@ -75,7 +75,7 @@ So it makes the kit and the scene is assembled in code:
 
 | piece | notes |
 | --- | --- |
-| `table` | one model, instanced eight times. Chunky rectangle, strong front edge, simple base — see the spec's Scale section. |
+| `table` | one model, instanced eight times, with a **blank** carved plaque in the tabletop. The digit is stamped on at composite time — see below. Chunky rectangle, strong front edge, simple base. |
 | `counter` | **one piece, not a tiled segment.** See below. |
 | `dish-return` | one model, mirrored for the second. |
 | `pass-sign` | the PICK UP marker, ×2. |
@@ -88,6 +88,22 @@ of a tileable model, and the usual trick for hiding a seam — a pillar over the
 join — is the one thing the spec forbids on that edge. A single 6:1 object is
 harder for Meshy to resolve, so if it comes back mushy that is the moment to
 reconsider the approach, not to paper over a join.
+
+### The table numbers
+
+The numbers now live on the tables rather than being drawn as badges over them.
+That does not mean eight table models. Model **one** table with a blank plaque
+and stamp the digits onto the final 1536×1024 image at the eight plaque centres
+— which the renderer knows exactly, because it is the thing that placed the
+tables. Eight generated tables would differ in proportion, wood and plaque shape
+as well as in number, which is a worse problem than the one it solves.
+
+Stamping rather than baking also keeps the numbers editable: changing the floor
+plan later is a re-stamp, not ten more Meshy runs.
+
+`drawTableTag` in `index.html` stays regardless — it also draws the number on
+the order ticket and on a carried plate, which is where the player reads it
+under pressure.
 
 Two Meshy specifics carried over from the food work:
 

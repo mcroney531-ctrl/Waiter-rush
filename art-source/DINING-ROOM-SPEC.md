@@ -223,10 +223,40 @@ Desaturate the image mentally: the cast should still pop.
   floor.
 - **People or other characters.** The cast is drawn separately.
 - **Text or signage that needs to be legible**, other than the PICK UP and DISH
-  RETURN markers. Table numbers are drawn by the game.
+  RETURN markers, and the table numbers — see below.
 - **Motion blur, vignette, lens effects, or a frame/border.**
 - **Chairs at the tables**, unless they are clear of the drop pad floor in front
   of each table.
+
+---
+
+## Table numbers live on the table
+
+Revised. This document originally said table numbers were drawn by the game and
+must not appear in the art, and the code still carries `drawTableTag` for that
+reason. The room now carries a **carved stone plaque set into each tabletop**
+with the number on it, because a number that belongs to the furniture reads as
+part of the restaurant where a floating badge reads as a HUD element pointing at
+it.
+
+Two things that follow, and the second is the one that costs something.
+
+**The plaque is modelled blank and the digit is stamped on afterwards.** One
+table model, placed eight times, numbered at composite time at the eight
+positions the renderer already knows because it placed them. Generating eight
+numbered tables gives eight models that differ in everything *but* the number.
+
+**It is a real contrast drop on the game's most load-bearing information.**
+Measured off the first pass: a carved digit runs 2.6–3.5:1 against its plaque,
+where the drawn badge is 8.25:1 against its own dark pill. The digit is much
+larger, so it still reads — but the entire game is the player holding a table
+number in their head, and this is the one thing on screen that must never be
+ambiguous. Keep the digit dark against a pale plaque, keep the plaque the
+lightest thing on the tabletop, and check it at play size rather than on the
+1536px render.
+
+`drawTableTag` stays either way: it also draws the number on the order ticket
+and on a carried plate, which is where the player actually reads it.
 
 ---
 
