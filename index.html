@@ -1589,14 +1589,26 @@
 
   // A thumbnail is the sprite sheet itself, scaled down and offset to one cell.
   // Nothing is exported to make one, so a new character needs no extra art.
+  //
+  // Raw cells are not uniformly framed -- two renders can carry different
+  // amounts of headroom around the character, which is exactly what scale and
+  // anchorX/Y are measured to correct for (see drawSheetBody). A crop that
+  // ignored them read the difference straight through: a tier with more
+  // padding baked into its render just looked smaller and adrift in its box.
+  // Reusing the same measured values here is what makes every tier read as
+  // one consistent character rather than four different zoom levels.
   function spriteCell(el, entry, cell = 96, row = 0, col = 0){
     const S = SHEET_BASE.frameW;                 // cells are square
-    const k = cell / S;
+    const FIT = 0.88;                            // headroom so nothing touches the frame
+    const scale = entry.scale || 1;
+    const anchorX = entry.anchorX == null ? 0.5 : entry.anchorX;
+    const zoom = (cell * FIT) / (S * scale);
     const img = new Image();
     img.onload = () => {
       el.style.backgroundImage = `url(${entry.src})`;
-      el.style.backgroundSize = `${img.naturalWidth * k}px ${img.naturalHeight * k}px`;
-      el.style.backgroundPosition = `${-col * S * k}px ${-row * S * k}px`;
+      el.style.backgroundSize = `${img.naturalWidth * zoom}px ${img.naturalHeight * zoom}px`;
+      el.style.backgroundPosition =
+        `${cell / 2 - (col + anchorX) * S * zoom}px ${cell / 2 - (row + 0.5) * S * zoom}px`;
     };
     img.src = entry.src;
   }
