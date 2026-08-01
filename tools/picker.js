@@ -128,6 +128,23 @@ plaqueChecks('skipBtn', skipPlaque);
 plaqueChecks('avatarDone', await measure('avatarDone'));
 plaqueChecks('avatarRandom', await measure('avatarRandom'));
 
+// The stage arrows are the same idea with no text at all: the glyph is in the
+// art, so aria-label is the only thing naming them. A missing label leaves a
+// screen reader announcing "button", twice, with no way to tell which is which.
+for (const id of ['avatarPrev', 'avatarNext']) {
+  const v = await measure(id);
+  check(`${id} has its art`, v && v.loaded, v ? v.url : 'missing');
+  check(`${id} is on screen to be pressed`, v && v.w > 0 && v.h > 0, v && `${v.w}x${v.h}`);
+  check(`${id} draws round, not squashed`, v && Math.abs(v.w / v.h - 1) < 0.02,
+        v && `${(v.w / v.h).toFixed(3)}`);
+  const label = await p.evaluate(id => document.getElementById(id).getAttribute('aria-label'), id);
+  check(`${id} is named for a screen reader`, !!label && label.length > 3, label);
+}
+const arrowNames = await p.evaluate(() =>
+  ['avatarPrev', 'avatarNext'].map(id => document.getElementById(id).getAttribute('aria-label')));
+check('the two arrows are named differently', arrowNames[0] !== arrowNames[1],
+      arrowNames.join(' / '));
+
 // The pair in the action row has to share a height or it does not read as a
 // pair -- the two plaques have different aspects, so height is the only
 // dimension that can match.

@@ -332,16 +332,26 @@
     font-size: 11px; letter-spacing: 1.4px;
     text-transform: uppercase; opacity: 0.6; margin-top: 1px;
   }
+  /* Carved stone discs rather than a glyph in a ring. Same trick as the
+     plaques: the arrow is in the art, and the button keeps its aria-label
+     because that is now the only thing naming it. Bigger than the 46px ring
+     they replace -- the fossil detail inside the disc turns to mush much below
+     56, and these are the screen's primary navigation. */
   .stage-arrow {
-    flex: none; width: 46px; height: 46px; padding: 0; cursor: pointer;
-    background: rgba(244,238,219,0.08); color: #F4EEDB;
-    border: 2px solid rgba(244,238,219,0.28); border-radius: 50%;
-    font-size: 20px; line-height: 1; font-family: inherit;
-    transition: background 120ms, border-color 120ms, transform 120ms;
+    flex: none; width: 56px; height: 56px; padding: 0; cursor: pointer;
+    background: transparent no-repeat center / contain;
+    border: 0; font-size: 0; line-height: 0;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    transition: transform 120ms, filter 120ms;
   }
+  #avatarPrev { background-image: url('assets/ui/arrow-left.webp'); }
+  #avatarNext { background-image: url('assets/ui/arrow-right.webp'); }
   .stage-arrow:hover, .stage-arrow:focus-visible {
-    background: rgba(224,167,46,0.2); border-color: #E0A72E; transform: scale(1.06);
+    transform: scale(1.08);
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55)) brightness(1.1);
   }
+  .stage-arrow:active { transform: scale(0.96); }
+  .stage-arrow:focus-visible { outline: 3px solid #E0A72E; outline-offset: 4px; border-radius: 50%; }
   /* 0.5 measured 4.48:1 on a phone -- two hundredths under AA, and only on a
      phone, where the column stacks the counter onto a brighter patch of wall
      than the desktop layout does. */
@@ -392,7 +402,7 @@
     #avatarBlurb { font-size: 12px; margin-bottom: 8px; }
     #avatarCard { width: 198px; height: 264px; }
     #avatarCard .who { font-size: 17px; }
-    .stage-arrow { width: 40px; height: 40px; font-size: 18px; }
+    .stage-arrow { width: 46px; height: 46px; }
     #avatarLadder { margin-top: 12px; min-height: 0; }
     #avatarLadder .sprite { width: 44px; height: 44px; }
     #avatarActions { margin-top: 10px; }
@@ -451,9 +461,9 @@
     <h2>Pick your waiter</h2>
     <p id="avatarBlurb">They all start in an apron. Earn tips and they don't stay that way.</p>
     <div id="avatarStage">
-      <button class="stage-arrow" id="avatarPrev" type="button" aria-label="Previous waiter">&#8592;</button>
+      <button class="stage-arrow" id="avatarPrev" type="button" aria-label="Previous waiter"></button>
       <div id="avatarCard"></div>
-      <button class="stage-arrow" id="avatarNext" type="button" aria-label="Next waiter">&#8594;</button>
+      <button class="stage-arrow" id="avatarNext" type="button" aria-label="Next waiter"></button>
     </div>
     <p id="avatarCounter"></p>
     <div id="avatarLadder"></div>
