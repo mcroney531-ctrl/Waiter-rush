@@ -116,21 +116,38 @@
     padding: 0 20px;
     z-index: 10;
   }
-  .dpad { position: relative; width: 148px; height: 148px; }
+  .dpad { position: relative; width: 172px; height: 172px; isolation: isolate; }
+  /* The same carved discs as the character-select arrows. Up and down are the
+     right-hand disc turned a quarter turn: the decoration on these is scattered
+     fossils rather than an oriented composition, so a rotated ammonite reads as
+     one more fossil rather than as a rotated button. 58px because below about
+     56 the detail inside the disc turns to mush. */
   .dbtn {
-    position: absolute; width: 50px; height: 50px;
-    background: rgba(244,238,219,0.85);
-    border: 3px solid #2B2620;
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: #2B2620; font-weight: 900;
-    box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+    position: absolute; width: 58px; height: 58px;
+    background: transparent no-repeat center / contain;
+    border: 0; font-size: 0; line-height: 0;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6));
   }
-  .dbtn:active { transform: translateY(3px); box-shadow: none; }
-  #btn-up { top: 0; left: 49px; }
-  #btn-down { bottom: 0; left: 49px; }
-  #btn-left { top: 49px; left: 0; }
-  #btn-right { top: 49px; right: 0; }
+  /* Pressed state is a filter, not a transform: transform is what holds the
+     quarter turn on up and down, and translating them would unrotate them. */
+  .dbtn:active { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)) brightness(1.18); }
+  #btn-up    { top: 0;    left: 57px; background-image: url('assets/ui/arrow-right.webp'); transform: rotate(-90deg); }
+  #btn-down  { bottom: 0; left: 57px; background-image: url('assets/ui/arrow-right.webp'); transform: rotate(90deg); }
+  #btn-left  { top: 57px; left: 0;    background-image: url('assets/ui/arrow-left.webp'); }
+  #btn-right { top: 57px; right: 0;   background-image: url('assets/ui/arrow-right.webp'); }
+  /* Only when the pad is actually sitting on the board, which is landscape
+     only -- portrait leaves ~280px of gutter under it. Stone controls on a
+     stone floor stop reading as controls, and this lifts them back off it. In
+     the gutter there is nothing to lift them off, and the scrim would just be
+     a dark disc on a dark background. `over-board` is set from the real
+     rectangles rather than a media query, since whether they overlap depends
+     on the board's scaled height rather than on any breakpoint. */
+  #controls-mobile.over-board .dpad::before {
+    content: ''; position: absolute; inset: -20px; border-radius: 50%; z-index: -1;
+    background: radial-gradient(closest-side,
+      rgba(10,7,4,0.88) 55%, rgba(10,7,4,0.7) 78%, rgba(10,7,4,0) 100%);
+    box-shadow: inset 0 0 0 2px rgba(244,238,219,0.10);
+  }
 
   /* The screens before the shift all stand in the same room: a fossil wall
      with a flagstone floor, shared by the landing, the title/end-of-shift
@@ -432,10 +449,14 @@
 
   <div id="controls-mobile">
     <div class="dpad">
-      <div class="dbtn" id="btn-up">▲</div>
-      <div class="dbtn" id="btn-left">◀</div>
-      <div class="dbtn" id="btn-right">▶</div>
-      <div class="dbtn" id="btn-down">▼</div>
+      <!-- The direction is in the art now. These are divs, not buttons, and were
+           never in the tab order or announced -- the pad duplicates the arrow
+           keys, which are the real control -- so they are marked hidden rather
+           than given labels that would announce four unreachable controls. -->
+      <div class="dbtn" id="btn-up" aria-hidden="true"></div>
+      <div class="dbtn" id="btn-left" aria-hidden="true"></div>
+      <div class="dbtn" id="btn-right" aria-hidden="true"></div>
+      <div class="dbtn" id="btn-down" aria-hidden="true"></div>
     </div>
     <div style="width:1px;"></div>
   </div>
@@ -491,8 +512,27 @@
   const board = document.getElementById('board');
   const scaleHUD = () => board.style.setProperty(
     '--board-scale', (canvas.clientWidth / W).toFixed(4));
-  scaleHUD();
-  new ResizeObserver(scaleHUD).observe(canvas);
+
+  // Whether the d-pad sits on the board or in the gutter below it is not a
+  // breakpoint: it depends on how tall the board scaled to, which depends on
+  // both axes at once. Portrait leaves ~280px of gutter under the board and the
+  // pad never touches it; turn the phone and the gutter is zero and the pad
+  // lands on the floor of the restaurant. So it is read off the two rectangles
+  // rather than guessed at, and the scrim that lifts the controls off the art
+  // is switched on only when there is art under them.
+  const padWrap = document.getElementById('controls-mobile');
+  const placePad = () => {
+    const pad = padWrap.querySelector('.dpad');
+    if (!pad) return;
+    const c = canvas.getBoundingClientRect(), d = pad.getBoundingClientRect();
+    padWrap.classList.toggle('over-board',
+      d.width > 0 && d.right > c.left && d.left < c.right &&
+      d.bottom > c.top && d.top < c.bottom);
+  };
+  const relayout = () => { scaleHUD(); placePad(); };
+  relayout();
+  new ResizeObserver(relayout).observe(canvas);
+  addEventListener('resize', relayout);
 
   const COLORS = {
     floorA: '#E8E2D5',
