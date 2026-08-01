@@ -79,7 +79,7 @@ So it makes the kit and the scene is assembled in code:
 | `counter` | **one piece, not a tiled segment.** See below. |
 | `dish-return` | one model, mirrored for the second. |
 | `pass-sign` | the PICK UP marker, ×2. |
-| `pillar`, `wall-panel`, `pendant-lamp`, `planter`, `fossil-inlay` | level-2 and level-3 dressing. Wall and margin only. |
+| `pillar`, `wall-panel`, `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | level-2 and level-3 dressing. Wall and margin only. |
 
 The counter is modelled as **one long object** rather than a repeating segment
 with caps. A tiled segment is the obvious engineering answer and it is the wrong
@@ -101,9 +101,14 @@ as well as in number, which is a worse problem than the one it solves.
 Stamping rather than baking also keeps the numbers editable: changing the floor
 plan later is a re-stamp, not ten more Meshy runs.
 
-`drawTableTag` in `index.html` stays regardless — it also draws the number on
-the order ticket and on a carried plate, which is where the player reads it
-under pressure.
+**`drawTableNumber` in `index.html` has to be deleted.** It paints a teal card on
+every tabletop every frame at `t.x - A(50)`; leave it in and every table carries
+two numbers. That costs the ability to renumber tables from code, which is worth
+nothing — `tableDefs` is eight fixed ids and always has been.
+
+`drawTableTag` is a different function and stays: it numbers the order ticket
+and the carried plate, which is where the player reads it under pressure, and
+which is the thing that actually fades.
 
 Two Meshy specifics carried over from the food work:
 
@@ -135,17 +140,16 @@ props that do not look like they came from the same room**. Meshy inherits
 whatever style its input image has, so consistency is won or lost before Meshy
 opens.
 
-So generate all ten references **in one session, one after another, with the
-same style sentence pasted into every prompt**, and do not come back a day later
-for the missing one. Paste the Art direction and Style sections of
-`DINING-ROOM-SPEC.md` at the top of each prompt, then the object.
+So generate all ten **in one session, one after another, with the same style
+block pasted into every prompt**, and do not come back a day later for the
+missing one.
 
-Per image: **one object, plain mid-grey background, three-quarter view from
-slightly above, whole object visible, no ground shadow, no props beside it.**
-That is the same framing the food references used and it is what Image to 3D
-wants. A shadow in the reference gets modelled as geometry.
+**The prompts live in `art-source/refs/room/PROMPTS.md`** — a shared style block
+and ten object lines, with a note on each one that carries a decision. They are
+there rather than here so there is one copy to keep current; an earlier draft of
+this file had its own set and they had drifted apart within a day.
 
-Put them all in `art-source/refs/room/` and push before starting Meshy — same
+Save them all into `art-source/refs/room/` and push before opening Meshy — same
 reason as the character runbook's Phase 0: a chat upload dies with its session,
 and these are the source for every re-roll.
 
@@ -153,7 +157,7 @@ and these are the source for every re-roll.
 
 | | |
 | --- | --- |
-| reference | *chunky rectangular dining table, carved stone base, thick timber top with a strong front edge, prehistoric-diner style, three-quarter view* |
+| reference | `PROMPTS.md` §1 — note the plaque has to come out **blank** |
 | Meshy | Image to 3D → **Remesh 15k** → Export GLB |
 | file | `art-source/room/table.glb` |
 
@@ -183,7 +187,7 @@ same wrong proportion.
 
 | | |
 | --- | --- |
-| reference | *long low serving counter, single unbroken horizontal top, carved stone front face with fossil relief, amber trim, straight-on three-quarter view, whole length visible* |
+| reference | `PROMPTS.md` §2 |
 | Meshy | Image to 3D → **Remesh 20k** → Export GLB |
 | file | `art-source/room/counter.glb` |
 
@@ -201,8 +205,8 @@ Same click path, 15k, no rig:
 
 | file | reference |
 | --- | --- |
-| `dish-return.glb` | *stone wash station, deep basin, chunky prehistoric plumbing, three-quarter view* |
-| `pass-sign.glb` | *small hanging sign board with a downward arrow, carved wood and stone frame* |
+| `dish-return.glb` | `PROMPTS.md` §3 |
+| `pass-sign.glb` | `PROMPTS.md` §4 |
 
 Both are mirrored in code for the second copy, so generate one of each.
 
@@ -223,11 +227,12 @@ dressing is in means re-rendering everything.
 
 | file | reference |
 | --- | --- |
-| `pillar.glb` | *carved basalt pillar, fossil-inlaid capital* |
-| `wall-panel.glb` | *stone wall panel with a large fossil relief* |
-| `pendant-lamp.glb` | *hanging lamp, polished amber shade, dark metal fittings* |
-| `planter.glb` | *stone planter with broad prehistoric ferns* |
-| `floor-inlay.glb` | *circular fossil medallion inlaid flush into a stone floor* |
+| `pillar.glb` | `PROMPTS.md` §5 |
+| `wall-panel.glb` | `PROMPTS.md` §6 |
+| `pendant-lamp.glb` | `PROMPTS.md` §7 |
+| `planter.glb` | `PROMPTS.md` §8 |
+| `floor-inlay.glb` | `PROMPTS.md` §9 |
+| `shelf-unit.glb` | `PROMPTS.md` §10 |
 
 Walls and margins only. The walkable floor stays quiet, and `floor-inlay` goes
 in the far left and right margins — never between the table rows, where it
@@ -369,9 +374,8 @@ only. Do them at play size, in the browser, not on the 1536px render.
 2. One Meshy table. Shrink it, render it alone at 34°, drop a character beside
    it, check the height ratio. **Stop here if it does not sit right** — every
    other model inherits this decision.
-3. The counter, as a repeating segment plus two ends. This is the hard one: the
-   spec calls the unbroken serving edge sacred, and a tiled model with a seam
-   fails on the one silhouette that has to be perfect.
+3. The counter, as **one long object**. This is the hard one: the spec calls the
+   unbroken serving edge sacred, and a 6:1 model is where Meshy is weakest.
 4. Dish returns, pass markers.
 5. Assemble and render grey, no dressing. Check the bands. **The room is either
    right or wrong at this point** and no amount of fossil trim changes it.
