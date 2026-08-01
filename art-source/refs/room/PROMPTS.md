@@ -60,6 +60,30 @@ The three things this has to get right, because the other nine inherit them: a
 that will not blur the contact shadow where it meets the floor, and a top surface
 at about **half a character's height**.
 
+### What the first pass taught us
+
+A table draws **144px wide** on the board. The reference is ~1356px wide, so the
+scale is 0.106 — and the spec's 40px motif minimum therefore means **a motif has
+to be 377px in the reference to be resolvable at all.**
+
+Measured on the first table, exactly one element cleared it:
+
+| element | in the reference | on screen | |
+| --- | --- | --- | --- |
+| the slate plaque | 560px | 59.5px | motif |
+| the frieze panel as a whole | 560px | 59.5px | motif |
+| one frieze dinosaur | 190px | 20.2px | texture |
+| amber corner cap | 150px | 15.9px | texture |
+| leg claw emblem | 150px | 15.9px | texture |
+
+So the useful instruction is not "make the ornament bigger". It is: **on a table,
+the plaque is the only thing that can carry identity, and everything else should
+be content to be texture.** Carving that competes with it is effort spent below
+the resolution the board is displayed at — and the frieze in the first pass was
+worse than neutral, because it sat on the front face, which is the one surface
+the spec needs reading as a clean strong horizontal so the player can tell
+whether they are in front of the table or behind it.
+
 ## 2. `counter.png`
 
 > The object: a long low serving counter, about six times wider than it is tall.
