@@ -381,6 +381,7 @@
   .sprite {
     background-repeat: no-repeat; background-color: #4a3e34;
     border-radius: 10px; flex: none;
+    object-fit: cover; object-position: 50% 0%; display: block;
   }
   /* The tier ladder, shown because "what am I working toward" is most of why
      the choice is interesting. */
@@ -1666,13 +1667,28 @@
     c.tiers.forEach((entry, i) => {
       const step = document.createElement('div');
       step.className = 'step' + (i ? ' locked' : '');
-      const art = document.createElement('div');
-      art.className = 'sprite';
-      spriteCell(art, entry, 58);
+
+      // A dedicated tier portrait reads far better at this size than a
+      // cropped walk-cycle frame -- the same trade the hero card already
+      // makes over the drawn body. Not every character has one yet, so a
+      // missing file falls back to the sprite-sheet crop rather than
+      // leaving the step blank.
+      const img = document.createElement('img');
+      img.className = 'sprite';
+      img.alt = '';
+      img.src = `assets/portraits/tiers/${pickedChar}-t${i + 1}.jpg`;
+      img.onerror = () => {
+        img.remove();
+        const art = document.createElement('div');
+        art.className = 'sprite';
+        spriteCell(art, entry, 58);
+        step.prepend(art);
+      };
+
       const tier = document.createElement('span');
       tier.className = 'tier';
       tier.textContent = i ? money(TIER_UP_C[i]) : 'START';
-      step.append(art, tier);
+      step.append(img, tier);
       row.append(step);
     });
     const cap = document.createElement('p');
