@@ -246,17 +246,24 @@ table model, placed eight times, numbered at composite time at the eight
 positions the renderer already knows because it placed them. Generating eight
 numbered tables gives eight models that differ in everything *but* the number.
 
-**It is a real contrast drop on the game's most load-bearing information.**
-Measured off the first pass: a carved digit runs 2.6–3.5:1 against its plaque,
-where the drawn badge is 8.25:1 against its own dark pill. The digit is much
-larger, so it still reads — but the entire game is the player holding a table
-number in their head, and this is the one thing on screen that must never be
-ambiguous. Keep the digit dark against a pale plaque, keep the plaque the
-lightest thing on the tabletop, and check it at play size rather than on the
-1536px render.
+**`drawTableNumber` has to go.** The game draws a teal card on every tabletop
+every frame, offset to `t.x - A(50)`. Leave it in and every table has two
+numbers. Deleting it costs the ability to renumber tables from code, which is
+worth nothing here — `tableDefs` is eight fixed ids and always has been.
 
-`drawTableTag` stays either way: it also draws the number on the order ticket
-and on a carried plate, which is where the player actually reads it.
+**The contrast drops, modestly.** Measured by splitting the plaque into ink and
+face: the carved digits run **2.8–3.5:1**, where the card the game draws today
+is **5.0:1** by construction (`#F4EEDB` on `#2F6F6B`). The carved digit is
+physically larger, so side by side it still reads clearly; the card is louder
+because it is a UI element rather than a thing in the room. Keep the digit dark
+against a pale plaque, keep the plaque the lightest thing on the tabletop, and
+judge it at play size rather than on the 1536px render.
+
+**It does not change the memory mechanic.** The floor labels are permanently
+visible in both versions — they are how you *find* table 6, not how you remember
+it. What fades is the order ticket, and that is drawn by `drawTableTag`, which
+stays: it also numbers a carried plate, which is where the player reads it under
+pressure.
 
 ---
 
