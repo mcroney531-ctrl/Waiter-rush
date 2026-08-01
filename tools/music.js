@@ -1,4 +1,5 @@
-// The menu track: where it plays, where it stops, and who can stop it.
+// The music: which set plays where, how one hands over to the next, and who
+// can stop it.
 //
 //   python3 tools/mkprobe.py && python3 -m http.server 8222 &
 //   node tools/music.js
@@ -84,27 +85,67 @@ async function open(args) {
   s = await state(p);
   check('it keeps playing through character select', s.paused === false, JSON.stringify(s));
 
-  // ...and stops when the shift does start. Long enough for the fade to finish.
+  // ...and hands over to the shift set. The menu track has to be gone before
+  // the shift one starts -- they share one element, so an overlap here would
+  // mean the handover silently cut the menu off mid-fade instead.
   await p.click('#avatarDone');
-  await p.waitForTimeout(1600);
+  await p.waitForTimeout(700);
   s = await state(p);
-  check('it stops when the game starts', s.paused === true, JSON.stringify(s));
-  check('and it stopped by fading, not by cutting', s.volume === 0, `volume ${s.volume}`);
+  check('the menu track is on its way out mid-handover', s.volume < 0.42,
+        `volume ${s.volume}`);
+
+  await p.waitForTimeout(1800);
+  s = await state(p);
+  check('the shift set takes over', /shift-1\.mp3$/.test(s.src), s.src);
+  check('and it is playing', s.paused === false, JSON.stringify(s));
+  check('quieter than the menu, since the effects carry information',
+        s.volume > 0.1 && s.volume <= 0.33, `volume ${s.volume}`);
+  // Two tracks means the element must not loop, or track two never plays.
+  check('the shift set advances rather than looping one track', s.loop === false,
+        `loop ${s.loop}`);
 
   // The end-of-shift screen is a menu screen too. Reached via the real shift,
   // not the tutorial -- the tutorial has drain switched off, so draining a
   // table there does nothing at all.
   await p.evaluate(() => document.getElementById('skipBtn').click());
-  await p.waitForTimeout(600);
+  await p.waitForTimeout(1800);
+  s = await state(p);
+  check('the shift set survives skipping into the real shift',
+        /shift-1\.mp3$/.test(s.src) && s.paused === false, JSON.stringify(s));
   await p.evaluate(() => { window.__dbg.lives = 0;
     window.__dbg.tables.forEach(t => { t.state = 'waiting'; t.patience = 0.001; }); });
   await p.waitForFunction(() => !document.getElementById('overlay').classList.contains('hidden'),
                           null, { timeout: 15000 });
   await p.waitForTimeout(900);
   s = await state(p);
-  check('it comes back on the end-of-shift screen', s.paused === false, JSON.stringify(s));
+  check('the menu set comes back on the end-of-shift screen',
+        s.paused === false && /menu-theme\.mp3$/.test(s.src), JSON.stringify(s));
 
   check('no page errors', errs.length === 0, errs.join(' | '));
+  await br.close();
+}
+
+// ---- the shift playlist wraps ----
+// Track one is 3:29 and track two is eight minutes, so this is driven rather
+// than waited out: fire `ended` and check what the handler does with it.
+{
+  const { br, p } = await open(ALLOW);
+  await p.click('#landingStart');
+  await p.waitForSelector('#avatarCard img', { timeout: 30000 });
+  await p.click('#avatarDone');
+  await p.waitForTimeout(2200);
+  let s = await state(p);
+  check('playlist starts on track one', /shift-1\.mp3$/.test(s.src), s.src);
+
+  await p.evaluate(() => window.__audio[0].dispatchEvent(new Event('ended')));
+  await p.waitForTimeout(400);
+  s = await state(p);
+  check('and ending track one moves to track two', /shift-2\.mp3$/.test(s.src), s.src);
+
+  await p.evaluate(() => window.__audio[0].dispatchEvent(new Event('ended')));
+  await p.waitForTimeout(400);
+  s = await state(p);
+  check('and ending track two wraps back to one', /shift-1\.mp3$/.test(s.src), s.src);
   await br.close();
 }
 

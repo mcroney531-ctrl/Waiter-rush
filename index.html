@@ -1010,25 +1010,48 @@
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
 
-  // ---------- Menu music ----------
-  // An <audio> element rather than the Web Audio graph everything else uses.
-  // The track is 2:05 at 48kHz stereo; decodeAudioData would turn that into
-  // about 48 MB of float PCM before a note played, which is not a trade worth
-  // making on a phone for a menu loop. <audio> streams it and loops it
-  // natively, and the fade is a volume ramp rather than a gain node.
+  // ---------- Music ----------
+  // An <audio> element rather than the Web Audio graph the sound effects use.
+  // These tracks run to eight minutes at 48kHz stereo; decodeAudioData would
+  // turn one of them into ~180 MB of float PCM before a note played, which is
+  // not a trade worth making on a phone. <audio> streams instead, and the fade
+  // is a volume ramp rather than a gain node.
   //
-  // assets/audio/shift-theme.mp3 sits beside it, staged for the shift and not
-  // wired to anything yet. Nothing references it, so nothing downloads it.
-  const MUSIC_VOL = 0.42;         // under the sound effects, which are the game
+  // One element, not two, so a menu-to-shift change is sequential rather than a
+  // crossfade: the old track fades out, pauses, and only then does the new one
+  // start. That leaves about a second of quiet as a shift opens, which suits it.
+  const MUSIC = {
+    // Menu is one track on repeat. The shift is a playlist -- track one runs
+    // 3:29 and a good shift is around three minutes, so most players never
+    // reach track two, and the ones who do have earned eight more minutes.
+    menu:  { vol: 0.42, tracks: ['assets/audio/menu-theme.mp3'] },
+    shift: { vol: 0.32, tracks: ['assets/audio/shift-1.mp3',
+                                 'assets/audio/shift-2.mp3'] },
+  };
   const MUSIC_FADE_MS = 900;
-  let music = null, musicFade = null, musicWanted = false;
+  // Quieter than the menu on purpose: during a shift the effects carry
+  // information -- the tip register, the patience warning, your own footsteps --
+  // and music that competes with them costs the player something real.
+
+  let music = null, musicFade = null;
+  let musicSet = null;      // which set is wanted; null means silence
+  let musicTrack = 0;
 
   function initMusic(){
     if (music) return;
-    music = new Audio('assets/audio/menu-theme.mp3');
-    music.loop = true;
+    music = new Audio();
     music.preload = 'auto';
     music.volume = 0;
+    // A set with several tracks advances instead of looping. Only one src is
+    // ever assigned, so track two is not fetched until track one ends.
+    music.addEventListener('ended', () => {
+      if (!musicSet) return;
+      const set = MUSIC[musicSet];
+      if (set.tracks.length < 2) return;         // single tracks use .loop
+      musicTrack = (musicTrack + 1) % set.tracks.length;
+      music.src = set.tracks[musicTrack];
+      music.play().catch(() => {});
+    });
   }
 
   function rampMusic(to, ms, done){
@@ -1042,23 +1065,33 @@
     }, 30);
   }
 
-  // Called on entering any pre-shift screen. Autoplay is blocked until the page
-  // has had a gesture, so a cold first load will not start here — the gesture
-  // handler below retries once one arrives, which on the landing screen is the
-  // click on START itself.
-  function playMusic(){
-    musicWanted = true;
-    if (muted) return;
+  // Autoplay is blocked until the page has had a gesture, so a cold first load
+  // will not start here -- the gesture handler further down retries whatever
+  // set is wanted, which on the landing screen is the click on START itself.
+  function playMusic(setName){
+    const set = MUSIC[setName];
+    if (!set) return;
+    const already = musicSet === setName && music && !music.paused;
+    musicSet = setName;
+    if (muted || already) return;
     initMusic();
-    music.play().then(() => rampMusic(MUSIC_VOL, MUSIC_FADE_MS)).catch(() => {});
+    musicTrack = 0;
+    music.loop = set.tracks.length === 1;
+    music.src = set.tracks[0];
+    music.volume = 0;
+    music.play().then(() => rampMusic(set.vol, MUSIC_FADE_MS)).catch(() => {});
   }
 
-  // Fades rather than stops, and only pauses once it is actually silent —
-  // pausing on the same tick as the fade starts is just a stop with extra code.
-  function stopMusic(){
-    musicWanted = false;
-    if (!music || music.paused) return;
-    rampMusic(0, MUSIC_FADE_MS, () => { music.pause(); music.currentTime = 0; });
+  // Fades rather than stops, and only pauses once it is actually silent --
+  // pausing on the same tick the fade starts is a stop with extra steps.
+  // `then` runs after that, which is how one set hands over to the next.
+  function stopMusic(then){
+    musicSet = null;
+    if (!music || music.paused){ if (then) then(); return; }
+    rampMusic(0, MUSIC_FADE_MS, () => {
+      music.pause(); music.currentTime = 0;
+      if (then) then();
+    });
   }
 
   function setMuted(v){
@@ -1068,7 +1101,7 @@
     // The mute button owns the music too. Unmuting back onto a menu screen
     // should bring the track back, not leave the button lying about what it did.
     if (muted) { clearInterval(musicFade); musicFade = null; if (music) music.pause(); }
-    else if (musicWanted) playMusic();
+    else if (musicSet) { const s = musicSet; musicSet = null; playMusic(s); }
     const b = document.getElementById('muteBtn');
     if (b){
       b.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
@@ -1696,7 +1729,7 @@
     for (const id of ['avatarRandom', 'avatarPrev', 'avatarNext'])
       document.getElementById(id).classList.toggle('hidden', CAST.length < 2);
     document.getElementById('avatarPicker').classList.remove('hidden');
-    playMusic();
+    playMusic('menu');
     renderPicker();
   }
 
@@ -2143,7 +2176,7 @@
       <button class="cta" id="startBtn">Start the Shift</button>
     `;
     overlay.classList.remove('hidden');
-    playMusic();
+    playMusic('menu');
     document.getElementById('startBtn').addEventListener('click', startGame);
   }
 
@@ -2311,7 +2344,7 @@
       <button class="cta ghost" id="avatarBtn2">Change your waiter</button>
     `;
     overlay.classList.remove('hidden');
-    playMusic();
+    playMusic('menu');
     document.getElementById('startBtn').addEventListener('click', startGame);
     document.getElementById('avatarBtn2').addEventListener('click', () => openPicker(false));
   }
@@ -2891,7 +2924,10 @@
   }
 
   function beginRun(nextMode){
-    stopMusic();          // the shift starts; the menu track fades under it
+    // The menu track fades out first and the shift starts only once it has,
+    // because both share one element. The second of quiet in between is the
+    // shift opening, and it is worth more than a crossfade would be.
+    stopMusic(() => playMusic('shift'));
     resetGame();
     mode = nextMode;
     drainEnabled = true;
@@ -2944,7 +2980,7 @@
       // Autoplay is blocked before a gesture, so the menu asked for music and
       // did not get it. This is the retry, and on a cold load the gesture that
       // gets us here is usually the click on START itself.
-      if (musicWanted) playMusic();
+      if (musicSet) { const s = musicSet; musicSet = null; playMusic(s); }
     }, { once: true });
   }
   document.getElementById('muteBtn').addEventListener('click', e => {
@@ -2969,10 +3005,10 @@
   resetGame();
   render();
 
-  // The landing screen is the first thing shown, so the track is asked for
+  // The landing screen is the first thing shown, so the menu set is asked for
   // here. It will not start until a gesture unlocks audio — see the retry in
   // the pointerdown/keydown handler above.
-  playMusic();
+  playMusic('menu');
 })();
 </script>
 </body>

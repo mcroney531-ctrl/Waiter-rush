@@ -47,7 +47,11 @@ npx serve .
 
 The only external requests are two Google Fonts (Alfa Slab One and DM Sans). Without internet access the game still runs and falls back to a system font stack.
 
-Sound effects are synthesised in Web Audio with no files. The one audio file is `assets/audio/menu-theme.mp3`, which loops under the landing, character select and end-of-shift screens and fades out when a shift starts. Browsers block autoplay until the page has had a gesture, so on a cold first visit the track starts on the first click — usually the one on START itself.
+Sound effects are synthesised in Web Audio with no files. Music is the exception: `assets/audio/menu-theme.mp3` loops under the landing, character select and end-of-shift screens, and `shift-1.mp3` / `shift-2.mp3` play as a playlist during a shift. The menu track fades out before the shift one starts — they share one `<audio>` element, so the handover is sequential rather than a crossfade, and the second of quiet is the shift opening.
+
+Shift music runs quieter than menu music (0.32 against 0.42) because during a shift the effects carry information — the tip register, the patience warning, your own footsteps.
+
+Browsers block autoplay until the page has had a gesture, so on a cold first visit the menu track starts on the first click — usually the one on START itself. `shift-2.mp3` is 11.6 MB but is only fetched once the 3:29 of `shift-1.mp3` has played out, so most shifts never download it.
 
 ## Deploying
 
