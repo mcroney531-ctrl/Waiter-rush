@@ -1012,10 +1012,13 @@
 
   // ---------- Menu music ----------
   // An <audio> element rather than the Web Audio graph everything else uses.
-  // The track is 6.5 minutes at 48kHz stereo; decodeAudioData would turn that
-  // into about 150 MB of float PCM before a note played, which is not a trade
-  // worth making on a phone for a menu loop. <audio> streams it and loops it
+  // The track is 2:05 at 48kHz stereo; decodeAudioData would turn that into
+  // about 48 MB of float PCM before a note played, which is not a trade worth
+  // making on a phone for a menu loop. <audio> streams it and loops it
   // natively, and the fade is a volume ramp rather than a gain node.
+  //
+  // assets/audio/shift-theme.mp3 sits beside it, staged for the shift and not
+  // wired to anything yet. Nothing references it, so nothing downloads it.
   const MUSIC_VOL = 0.42;         // under the sound effects, which are the game
   const MUSIC_FADE_MS = 900;
   let music = null, musicFade = null, musicWanted = false;
