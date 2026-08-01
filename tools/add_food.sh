@@ -6,7 +6,7 @@
 #
 # `key` must be one of the game's FOOD_ITEMS, since index.html loads
 # assets/food/<key>.png by name: pizza sub tacos pasta salad club soup ribs
-# tart burger.
+# tart burger shake.
 #
 # Does the whole chain, because doing it by hand nine times is nine chances to
 # skip the readability check:
@@ -23,7 +23,7 @@ KEY=${2:?usage: add_food.sh <file.glb> <key>}
 ELEV=${ELEV:-42}
 YAW=${YAW:-0}
 
-VALID="pizza sub tacos pasta salad club soup ribs tart burger"
+VALID="pizza sub tacos pasta salad club soup ribs tart burger shake"
 case " $VALID " in *" $KEY "*) ;; *)
   echo "'$KEY' is not one of: $VALID" >&2; exit 1 ;;
 esac

@@ -37,7 +37,7 @@ FLOOR = (87, 63, 43)
 CARRY_TWO = 0.6          # icons shrink to this when carrying two orders
 
 ITEMS = ['pizza', 'sub', 'tacos', 'pasta', 'salad', 'club', 'soup', 'ribs',
-         'tart', 'burger']
+         'tart', 'burger', 'shake']
 
 # Measured off the illustrated set, which is the art this replaces: their outer
 # edge sits about 108 luminance steps off the floor. A bare 3D render on a dark
@@ -48,6 +48,12 @@ MIN_SEPARATION = 70
 # from it is scaled down by whichever side runs out first, so it looks
 # undersized beside the rest even though nothing is wrong with it alone.
 ASPECT_MIN, ASPECT_MAX = 1.0, 1.3
+# Drinks are exempt, and it is the point of them. The band exists because a
+# plate flatter than its slot gets scaled down and looks undersized beside the
+# rest; a glass is tall on purpose, and being the one item on the rail that is
+# taller than it is wide is the only thing on this menu that breaks the
+# every-dish-is-a-circle problem the shape strip keeps flagging.
+TALL = {'shake'}
 MIN_FILL = 0.80          # fraction of the slot's area the dish should cover
 # Provisional, and deliberately so. Across the set being replaced every dish
 # sits 0.95-0.99 against its closest twin — ten circles. The one 3D dish is the
@@ -326,7 +332,10 @@ def main(folder='assets/food', do_calibrate=False):
             notes.append(f'LOW CONTRAST (<{MIN_SEPARATION})')
         if fill < MIN_FILL:
             notes.append(f'SMALL ({icon.width}x{icon.height} of {SLOT_W}x{SLOT_H})')
-        if not ASPECT_MIN <= aspect <= ASPECT_MAX:
+        if name in TALL:
+            if aspect >= 1.0:
+                notes.append(f'ASPECT {aspect:.2f} — a drink that is not tall')
+        elif not ASPECT_MIN <= aspect <= ASPECT_MAX:
             notes.append(f'ASPECT {aspect:.2f} outside {ASPECT_MIN}-{ASPECT_MAX}')
         iou, twin = near.get(name, (0.0, None))
         if twin and iou > threshold:
@@ -338,7 +347,7 @@ def main(folder='assets/food', do_calibrate=False):
     if near:
         mean = np.mean([v for v, _ in near.values()])
         print(f'\nmean overlap with nearest twin: {mean:.2f}  '
-              f'(1.00 would be ten copies of one shape)')
+              f'(1.00 would be {len(icons)} copies of one shape)')
     print(f'floor luminance {FLOOR_L:.0f}; carrying two shrinks every dish to '
           f'{CARRY_TWO:.0%}, so read the shape strip at arm\'s length too.')
     if baseline:

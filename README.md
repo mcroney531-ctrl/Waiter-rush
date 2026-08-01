@@ -53,8 +53,7 @@ The repository root *is* the site — there is nothing to build. Any static host
 
 ## Known gaps
 
-- **The roster is two of five.** Tyrone and Velo are in with all four tiers each; three more species are in production.
-- **Food is being rebuilt in 3D.** Nine of the ten dishes are still the original illustrated plates. Measured in silhouette they are ten near-identical circles, because a top-down plate *is* its own outline — see `art-source/FOOD-SPEC.md` and `tools/foodgrid.py`.
+- **Food is being rebuilt in 3D.** Seven of the eleven menu items are done; `sub`, `pasta`, `club` and `soup` are still the original illustrated plates. Measured in silhouette the ten plates are near-identical circles, because a top-down plate *is* its own outline. Only the milkshake escapes it, by standing up out of its plate — see `art-source/FOOD-SPEC.md` and `tools/foodgrid.py`.
 - **The tier ladder is carried by tier 4.** Silhouette overlap against the tier below runs 0.95 / 0.92 / 0.69 for Tyrone: the first two promotions read by colour, and only the top hat changes the shape.
 - **No level-up animation yet.** The dance clips exist as a plan, not as art.
 - The canvas is a fixed 960×640 internal resolution scaled by CSS. It works, but it is not a true responsive layout, which is why the d-pad overlays the board on short screens.

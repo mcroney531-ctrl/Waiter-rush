@@ -1,6 +1,7 @@
 # Food items — production spec
 
-The brief for the ten dishes. Written after taking one all the way through, so
+The brief for the menu — ten dishes and one drink. Written after taking one all
+the way through, so
 the numbers below are measured off a shipped icon rather than estimated.
 
 ---
@@ -114,11 +115,12 @@ secondary element without clutter, it should.
 This is measurable rather than a matter of opinion, so it was measured.
 `tools/foodgrid.py` renders the whole menu at play size in colour, in value and
 as hard silhouettes. The silhouette strip is the one that decides it, and the
-current set produces **ten identical circles.**
+current set produces **eleven near-identical circles** — ten of them plates and
+only the milkshake breaking the pattern.
 
 The reason is structural, not a drawing problem: they are plates seen from
 above, so the plate *is* the outline and nothing on it ever breaks the rim.
-Every one of those ten dishes is being told apart purely by the colour and
+Every one of those plates is being told apart purely by the colour and
 detail inside a circle — the two channels that die first at 41px, which is the
 size they draw at when carrying two orders.
 
@@ -307,31 +309,38 @@ itself is ordinary diner food; the *world* is prehistoric, the menu is not.
 
 ---
 
-## The ten dishes
+## The menu
 
 Names are the game's internal keys — keep the filenames exactly these:
-`pizza, sub, tacos, pasta, salad, club, soup, ribs, tart, burger`.
+`pizza, sub, tacos, pasta, salad, club, soup, ribs, tart, burger, shake`.
 
-`burger` is done. The remaining nine:
+Done: `burger`, `pizza`, `tacos`, `ribs`, `tart`, `salad`, `shake`. The
+remaining four:
 
 Each row says where the **height** comes from; the dominant shape each one has
 to hit is in the silhouette table above.
 
 | key | dish | what gives it height |
 | --- | --- | --- |
-| `pizza` | two or three wedges | wedges propped, not laid flat |
 | `sub` | a long filled roll, cut | halves stacked or leaning |
-| `tacos` | two or three shells | standing upright in a rack |
 | `pasta` | a twirled nest | a domed mound, not a puddle |
-| `salad` | a piled bowl | a deep bowl — this is the one most at risk of plating flat |
 | `club` | a stacked sandwich, quartered | two quarters standing on their points |
 | `soup` | a filled bowl | a tall bowl with a visible rim, spoon optional |
-| `ribs` | a rack | stacked into a mound |
-| `tart` | a slice or small whole tart | raised on its own stand |
 
-`salad` and `pasta` need the most attention: both are naturally flat, both came
-out shortest in the old set, and both will look undersized on the rail unless
-they are plated with real height.
+`pasta` needs the most attention: it is naturally flat, it came out shortest in
+the old set, and it will look undersized on the rail unless it is plated with
+real height. `salad` had the same risk and cleared it by being served in a deep
+bowl — 1.15 aspect and 95% fill, the best-behaved plate on the menu.
+
+### The drink
+
+`shake` is the one item exempt from the 1.0–1.3 aspect band, and being exempt
+is the point of it. Every plate is a circle seen from above, so the plate *is*
+the outline and the silhouette strip flags all ten against each other no matter
+how different the food is. A glass rises out of its plate and breaks the rim:
+at 0.90 aspect and 0.85 against its nearest twin, `shake` is the only item on
+the rail you can name from its outline alone. If the strip is ever to be
+readable, more of the menu has to leave the plate the way this one does.
 
 ---
 
