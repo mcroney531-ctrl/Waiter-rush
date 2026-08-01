@@ -76,11 +76,18 @@ So it makes the kit and the scene is assembled in code:
 | piece | notes |
 | --- | --- |
 | `table` | one model, instanced eight times. Chunky rectangle, strong front edge, simple base — see the spec's Scale section. |
-| `counter-segment` | tiled left to right. The serving edge must be one unbroken horizontal, so model a segment that repeats without a visible seam. |
-| `counter-end` | left and right caps. |
+| `counter` | **one piece, not a tiled segment.** See below. |
 | `dish-return` | one model, mirrored for the second. |
-| `pass-marker` | the PICK UP sign, ×2. |
+| `pass-sign` | the PICK UP marker, ×2. |
 | `pillar`, `wall-panel`, `pendant-lamp`, `planter`, `fossil-inlay` | level-2 and level-3 dressing. Wall and margin only. |
+
+The counter is modelled as **one long object** rather than a repeating segment
+with caps. A tiled segment is the obvious engineering answer and it is the wrong
+one here: the spec calls the unbroken serving edge sacred, Meshy has no concept
+of a tileable model, and the usual trick for hiding a seam — a pillar over the
+join — is the one thing the spec forbids on that edge. A single 6:1 object is
+harder for Meshy to resolve, so if it comes back mushy that is the moment to
+reconsider the approach, not to paper over a join.
 
 Two Meshy specifics carried over from the food work:
 
@@ -97,6 +104,134 @@ python3 tools/shrink_glb.py art-source/room/table.glb --inplace
 ```
 
 These are background props seen at one fixed size — 1024 maps is generous.
+
+---
+
+## 3b. The Meshy sequence, step by step
+
+Ten models. Roughly a day if the first table goes well, and if it does not, stop
+after the first table.
+
+### Step 0 — one reference sheet, in one DALL·E session
+
+The single biggest risk in this whole job is not model quality, it is **ten
+props that do not look like they came from the same room**. Meshy inherits
+whatever style its input image has, so consistency is won or lost before Meshy
+opens.
+
+So generate all ten references **in one session, one after another, with the
+same style sentence pasted into every prompt**, and do not come back a day later
+for the missing one. Paste the Art direction and Style sections of
+`DINING-ROOM-SPEC.md` at the top of each prompt, then the object.
+
+Per image: **one object, plain mid-grey background, three-quarter view from
+slightly above, whole object visible, no ground shadow, no props beside it.**
+That is the same framing the food references used and it is what Image to 3D
+wants. A shadow in the reference gets modelled as geometry.
+
+Put them all in `art-source/refs/room/` and push before starting Meshy — same
+reason as the character runbook's Phase 0: a chat upload dies with its session,
+and these are the source for every re-roll.
+
+### Step 1 — table first, and stop after it
+
+| | |
+| --- | --- |
+| reference | *chunky rectangular dining table, carved stone base, thick timber top with a strong front edge, prehistoric-diner style, three-quarter view* |
+| Meshy | Image to 3D → **Remesh 15k** → Export GLB |
+| file | `art-source/room/table.glb` |
+
+No Rig. No Animate. Same as food.
+
+Then the checkpoint that decides the whole job:
+
+```
+python3 tools/shrink_glb.py art-source/room/table.glb --inplace
+node tools/render_food.mjs art-source/room/table.glb --name table --contact
+```
+
+`render_food.mjs` is not the room renderer, but it shares the light rig and
+takes an elevation, so it is a free way to look at one prop at the angles that
+matter before `render_room.mjs` exists. Look for:
+
+- the **front edge reading as a hard horizontal** at 34°, not a soft round-over;
+- a **simple base** — ornate legs and irregular silhouettes blur where table
+  ends and floor begins, and that contact shadow is what grounds the character;
+- the top surface landing near **half the character's height**.
+
+If those three are right, the remaining nine are volume. If they are not, re-roll
+the reference — that costs minutes, against a day of models that all share the
+same wrong proportion.
+
+### Step 2 — the counter
+
+| | |
+| --- | --- |
+| reference | *long low serving counter, single unbroken horizontal top, carved stone front face with fossil relief, amber trim, straight-on three-quarter view, whole length visible* |
+| Meshy | Image to 3D → **Remesh 20k** → Export GLB |
+| file | `art-source/room/counter.glb` |
+
+20k rather than 15k: this one object is six times as wide as anything else in
+the kit and carries the silhouette the spec calls sacred. Everything else stays
+at 15k.
+
+Check in Meshy's viewer **before exporting**: is the top edge one straight line
+end to end, or has it gone wavy? A wavy serving edge is a re-roll, not something
+to fix downstream — the entire pickup interaction reads off that line.
+
+### Step 3 — the rest of level 1
+
+Same click path, 15k, no rig:
+
+| file | reference |
+| --- | --- |
+| `dish-return.glb` | *stone wash station, deep basin, chunky prehistoric plumbing, three-quarter view* |
+| `pass-sign.glb` | *small hanging sign board with a downward arrow, carved wood and stone frame* |
+
+Both are mirrored in code for the second copy, so generate one of each.
+
+### Step 4 — assemble grey, before any dressing
+
+Stop and render. Four props, correct positions, no walls, no lamps, no planters.
+
+```
+node tools/render_room.mjs --grid
+python3 tools/board_audit.py
+```
+
+**The room is either right or wrong at this point.** The bands either line up or
+they do not, and no amount of fossil trim changes it. Fixing geometry after the
+dressing is in means re-rendering everything.
+
+### Step 5 — dressing
+
+| file | reference |
+| --- | --- |
+| `pillar.glb` | *carved basalt pillar, fossil-inlaid capital* |
+| `wall-panel.glb` | *stone wall panel with a large fossil relief* |
+| `pendant-lamp.glb` | *hanging lamp, polished amber shade, dark metal fittings* |
+| `planter.glb` | *stone planter with broad prehistoric ferns* |
+| `floor-inlay.glb` | *circular fossil medallion inlaid flush into a stone floor* |
+
+Walls and margins only. The walkable floor stays quiet, and `floor-inlay` goes
+in the far left and right margins — never between the table rows, where it
+competes with the SET DOWN pads the game draws every frame.
+
+Watch the 40px minimum from the spec while placing these: the board displays at
+62.5%, so a motif under about 40px in the render is texture, not a motif. Do not
+spend a re-roll on a carving nobody can resolve.
+
+### Two things that differ from the character pipeline
+
+**Nothing forces the remesh.** The character rigger rejects anything over 300k
+triangles, so the remesh happens whether you remember it or not. There is no rig
+here, so a forgotten remesh sails straight through to a quarter-million-triangle
+table that nothing complains about until the repo is 400 MB.
+
+**Poly count is a repo problem, not a runtime one.** None of these models ship —
+only the rendered `board.jpg` does. So the budget exists to keep clones small
+and the renderer quick, not to keep the game fast. That is why 20k on the
+counter is affordable and why it would not be on a character.
 
 ---
 
