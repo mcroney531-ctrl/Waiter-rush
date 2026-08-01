@@ -15,7 +15,9 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get tables(){return tables;}, get carried(){return carried;}, get tickets(){return tickets;},
     get player(){return player;}, get score(){return score;}, get cleared(){return cleared;},
     get deliveries(){return deliveries;}, get mode(){return mode;}, get flow(){return flowLit;},
-    get streak(){return streak;}, get cap(){return carryCapacity;}, get wrong(){return wrongTurns;},
+    get streak(){return streak;}, set streak(v){streak=v; updateHUD();},
+    set flowLit(v){flowLit=v;},
+    get cap(){return carryCapacity;}, get wrong(){return wrongTurns;},
     get tut(){return tut ? {index:tut.index, practice:!!tut.practice} : null;},
     get steps(){return TUTORIAL_STEPS.length;},
     PASSES:PASSES, BUS:BUS_STATIONS, set elapsed(v){elapsed=v;},
@@ -25,6 +27,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},
     setChar(id){loadCharacter(id);}, setTier(n){applyTier(n);}, get roster(){return Object.keys(ROSTER);},
     get floaters(){return floaters;}, set hintCooldown(v){hintCooldown=v;},
+    SIGN:SIGN, moneyMetrics:(t,px)=>{ctx.save(); ctx.font=px+'px Galindo, sans-serif';
+      const w=moneyMetrics(t,px); ctx.restore(); return w;},
     setCap(n){carryCapacity=n;}, forceTicket(side){
       const t = tables.find(t => t.state === 'idle' && sideOfTable(t) === side) || tables[0];
       tickets.push({id:ticketIdCounter++, tableId:t.id, icon:'pizza', side:side,
@@ -53,6 +57,7 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'lives', 'tier', 'tierArt', 'tierNotice',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
-              'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn'):
+              'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
+              'SIGN', 'moneyMetrics'):
     assert field in DBG, field
 print('probe.html regenerated with', len(DBG.splitlines()), 'lines of handle')

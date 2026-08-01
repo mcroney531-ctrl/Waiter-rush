@@ -22,14 +22,6 @@
     src: url('assets/fonts/galindo.woff2') format('woff2');
     font-display: block;
   }
-  /* Galindo has no tabular figures — its digits run 864 to 1556 units, so "1"
-     is 44% narrower than "0" and a live score visibly twitches every time it
-     changes. There is no `tnum` feature to switch on, so each digit gets its
-     own fixed-width box instead. 0.72em clears the widest ink (0.688em) with
-     a little air. Only applied where a number actually changes; the ladder and
-     the end-of-shift total are written once and would gain nothing. */
-  .money { font-family: 'Galindo', 'Arial Black', sans-serif; }
-  .money i { font-style: normal; display: inline-block; width: 0.72em; text-align: center; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -69,7 +61,9 @@
     width: 960px; height: 640px;
     transform-origin: top left;
     transform: scale(var(--board-scale, 1));
-    display: flex; justify-content: space-between; align-items: flex-start;
+    /* flex-end since the tips sign moved onto the canvas and the lives stat is
+       the only child left. */
+    display: flex; justify-content: flex-end; align-items: flex-start;
     padding: 14px 18px;
     pointer-events: none;
     font-family: 'Galindo', 'Arial Black', sans-serif;
@@ -99,38 +93,7 @@
   }
   #muteBtn:hover, #muteBtn:focus-visible { opacity: 1; border-color: rgba(244,238,219,0.6); }
   #hud .stat { font-size: 20px; letter-spacing: 0.5px; }
-  /* The tips total hangs on its own sign. The art is a framed plank with the
-     ornament — hanging bar, money-bag skull, claws, coins, banknotes — wrapped
-     around it, so the text has to be placed against the plank rather than
-     against the box. Sized to 208x160 so the plank is wide enough for a
-     five-figure total without the digits touching the frame. */
-  #hud .stat.tips {
-    position: relative;
-    background: url('assets/money-sign.png') no-repeat center / contain;
-    width: 208px; height: 160px;
-    text-shadow: 0 2px 3px rgba(0,0,0,0.6);
-  }
-  /* Absolutely placed rather than centred in the box. The plank is not the
-     middle of this image — the hanging bar and skull take the top third, the
-     coins take the bottom — so centring put the total across the skull.
-     The panel runs 0.38 to 0.85 of the height, so its middle is 0.60. Measuring
-     it by "unbroken run of plank colour" gave 0.50 and sat the total up under
-     the claws — the grain lines break the run long before the wood ends. */
-  #hud .stat.tips .plate {
-    position: absolute; left: 0; right: 0; top: 60%;
-    transform: translateY(-50%); text-align: center;
-  }
-  /* The word goes. Two lines do not fit the plank, and a sign carrying coins,
-     banknotes and a money-bag skull does not need to be captioned "Tips". */
-  #hud .stat.tips span.label { display: none; }
-  #hud .stat.tips #score { font-size: 26px; display: block; }
-  #hud .stat.tips #flow { margin-top: 1px; }
   #hud .stat span.label { font-family: 'Galindo', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; }
-  #flow {
-    display: block; font-family: 'DM Sans', sans-serif; font-size: 12px;
-    font-weight: 900; letter-spacing: 2px; color: #E0A72E; min-height: 15px;
-  }
-  #flow.lit { text-shadow: 0 0 12px rgba(224,167,46,0.9); }
   /* flex-end because the label above is right-aligned and the row of stones is
      wider than the words -- left-aligned they hung off the wrong edge. */
   #lives { display: flex; justify-content: flex-end; gap: 5px; margin-top: 4px; }
@@ -403,13 +366,6 @@
   <canvas id="game" width="960" height="640"></canvas>
 
   <div id="hud">
-    <div class="stat tips">
-      <div class="plate">
-        <span class="label">Tips</span>
-        <span id="score" class="money">$0.00</span>
-        <span id="flow"></span>
-      </div>
-    </div>
     <div class="stat" style="text-align:right;">
       <span class="label">Tables lost</span>
       <div id="lives"></div>
@@ -824,17 +780,14 @@
     return '$' + (cents / 100).toFixed(2);
   }
 
-  // The same string, with every digit in its own fixed-width box. Only used
-  // where the number changes under the player's eye — see the .money rules.
-  function moneyHTML(cents){
-    return money(cents).replace(/\d/g, d => '<i>' + d + '</i>');
-  }
-
-  // Canvas has no equivalent of the digit boxes above, so money drawn on the
+  // Galindo has no tabular figures — its digits run 864 to 1556 units, so "1"
+  // is 44% narrower than "0" and a live score visibly twitches every time it
+  // changes. There is no `tnum` feature to switch on, so money drawn on the
   // board steps the pen by a fixed amount per digit and centres each glyph in
-  // its slot. Punctuation keeps its natural width — only the digits are
-  // swapping under each other, so only the digits need pinning.
-  const MONEY_SLOT = 0.72;      // em, matching the .money i box
+  // its slot. 0.72em clears the widest ink (0.688em) with a little air.
+  // Punctuation keeps its natural width — only the digits swap under each
+  // other, so only the digits need pinning.
+  const MONEY_SLOT = 0.72;      // em
   function moneyMetrics(text, px){
     let w = 0;
     for (const ch of text){
@@ -861,14 +814,10 @@
     ctx.textAlign = prev;
   }
 
+  // The tips total and the flow line are painted on the board by drawTipsSign,
+  // so nothing here writes them; this is left with the lives row and the one
+  // job that has to happen on every score change.
   function updateHUD(){
-    document.getElementById('score').innerHTML = moneyHTML(score);
-    const fl = document.getElementById('flow');
-    if (fl){
-      fl.textContent = flowLit ? 'FLOW x' + FLOW_MULT
-                    : (streak > 0 ? '\u2022'.repeat(streak) : '');
-      fl.className = flowLit ? 'lit' : '';
-    }
     // Every path that changes the score ends here, so this is the one place a
     // tier promotion has to be checked from.
     checkTierUp();
@@ -2225,6 +2174,62 @@
     }
   }
 
+  // ---------- The tips sign ----------
+  // Painted on the board rather than laid over it in the DOM. The floor runs to
+  // the left wall and a sprite is much taller than its feet, so a player at the
+  // dish return reaches high enough to stand behind anything hung down there —
+  // as DOM the sign cut them in half. Drawn here, before everything else, they
+  // walk in front of it like they would past any sign on a wall. It also scales
+  // with the board for free, which the DOM version needed a ResizeObserver for.
+  //
+  // The box is measured against the art, not chosen: the sign is 520x400, so
+  // 169x130 holds its aspect, and it hangs low enough on the left wall to clear
+  // the pickup counter without reaching the tables.
+  // textY and flowY are fractions of the sign's height. The bare plank runs
+  // 0.38 to 0.85 and the hanging bar, skull, claws and coins take everything
+  // outside that, so 0.60 is the middle of the wood. Measuring it as the
+  // longest unbroken run of plank colour gave 0.50, which sat the total up
+  // under the claws — the grain lines break the run long before the wood ends.
+  const SIGN = { x: 12, y: 92, w: 169, h: 130, textY: 0.60, flowY: 0.78 };
+  const signImg = new Image();
+  let signReady = false;
+  signImg.onload = () => { signReady = true; };
+  signImg.src = 'assets/money-sign.png';
+
+  function drawTipsSign(){
+    if (!signReady) return;
+    ctx.drawImage(signImg, SIGN.x, SIGN.y, SIGN.w, SIGN.h);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    const cx = SIGN.x + SIGN.w / 2;
+
+    // The plank is mid-tone wood, so the total is cream over a dark outline —
+    // the same treatment the floaters use for the same reason.
+    const px = Math.round(SIGN.w * 0.125);       // 21 at the shipped width
+    ctx.font = px + 'px Galindo, sans-serif';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(24,19,14,0.8)';
+    ctx.fillStyle = '#F7F1E0';
+    drawMoneyText(money(score), cx, SIGN.y + SIGN.h * SIGN.textY, px, true);
+
+    // Flow multiplier, or the streak building toward it. Nothing is drawn on a
+    // cold streak, so the plank is bare most of the shift.
+    const line = flowLit ? 'FLOW x' + FLOW_MULT
+               : (streak > 0 ? '•'.repeat(streak) : '');
+    if (line){
+      ctx.font = '700 ' + Math.round(SIGN.w * 0.065) + 'px DM Sans, sans-serif';
+      ctx.lineWidth = 3;
+      ctx.fillStyle = COLORS.mustard;
+      const fy = SIGN.y + SIGN.h * SIGN.flowY;
+      ctx.strokeText(line, cx, fy);
+      ctx.fillText(line, cx, fy);
+    }
+    ctx.restore();
+  }
+
   // The pads themselves are painted into the board. All the code adds is the
   // highlight for the one you are standing on, plus the CLEAR prompt when a
   // table is waiting to be bussed — a dirty table is public knowledge, so that
@@ -2699,6 +2704,7 @@
   function render(){
     ctx.clearRect(0,0,W,H);
     drawFloor();
+    drawTipsSign();   // scenery: everything below draws over it, the player included
     drawDropZones();
     drawPickupZone();
     drawBusStation();

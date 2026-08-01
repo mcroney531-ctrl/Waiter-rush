@@ -39,110 +39,85 @@ for (const sel of ['#skipBtn', '#startBtn']) {
   if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(350); }
 }
 
-check('the sign image loaded', await p.evaluate(async () => {
-  const url = getComputedStyle(document.querySelector('#hud .stat.tips'))
-                .backgroundImage.slice(5, -2);
-  const img = new Image(); img.src = url;
+// ---- the tips sign ----
+// Drawn on the board, so there is no element to measure. Everything below is
+// derived from SIGN (the box the renderer draws into) and PLANK (the band of
+// that art the text is allowed to touch), which is exactly what the renderer
+// works from.
+const SIGN = await p.evaluate(() => ({ ...window.__dbg.SIGN }));
+console.log('sign box', JSON.stringify(SIGN));
+
+check('the sign art loaded', await p.evaluate(async () => {
+  const img = new Image(); img.src = 'assets/money-sign.png';
   try { await img.decode(); return img.naturalWidth > 0; } catch { return false; }
 }));
+// 520x400 art in a box of another shape would stretch it, and a stretched
+// plank is not the plank PLANK was measured against.
+check('the box keeps the art aspect',
+      Math.abs(SIGN.w / SIGN.h - 520 / 400) < 0.02,
+      `${(SIGN.w / SIGN.h).toFixed(3)} vs 1.300`);
 
-// The plank band in page pixels. `contain` letterboxes the art inside the box,
-// so the band has to be derived from the drawn image, not from the box.
-const band = await p.evaluate(P => {
-  const el = document.querySelector('#hud .stat.tips');
-  const b = el.getBoundingClientRect();
-  const url = getComputedStyle(el).backgroundImage.slice(5, -2);
-  const img = document.createElement('img'); img.src = url;
-  const ar = img.naturalWidth / img.naturalHeight || 1.3;
-  // background-size: contain
-  const w = Math.min(b.width, b.height * ar), h = w / ar;
-  const x0 = b.left + (b.width - w) / 2, y0 = b.top + (b.height - h) / 2;
-  return { top: y0 + h * P.top, bottom: y0 + h * P.bottom,
-           left: x0 + w * P.left, right: x0 + w * P.right };
-}, PLANK);
-
-const totalBox = () => p.evaluate(() => {
-  const r = document.getElementById('score').getBoundingClientRect();
-  // The span is full-width and centred; the ink is what matters.
-  const t = document.getElementById('score').textContent;
-  return { top: r.top, bottom: r.bottom, cx: (r.left + r.right) / 2, text: t,
-           w: r.width };
-});
-
-// A shift can realistically reach four figures; check the widest thing the
-// number can become, not the $0.00 it starts at.
-for (const cents of [0, 7500, 124750, 999999]) {
-  await p.evaluate(c => { window.__dbg.score = c; }, cents);
-  await p.waitForTimeout(80);
-  const t = await totalBox();
-  const inside = t.top >= band.top - 1 && t.bottom <= band.bottom + 1;
-  check(`${t.text} sits on the plank vertically`, inside,
-        `text ${t.top.toFixed(0)}-${t.bottom.toFixed(0)} vs plank ${band.top.toFixed(0)}-${band.bottom.toFixed(0)}`);
-  // width: the ink is centred in a full-width span, so half-width either side
-  const inkL = t.cx - (await p.evaluate(() => {
-    const s = document.getElementById('score');
-    const r = document.createRange(); r.selectNodeContents(s);
-    return r.getBoundingClientRect().width / 2;
-  }));
-  const inkR = t.cx + (t.cx - inkL);
-  check(`${t.text} fits between the frame rails`,
-        inkL >= band.left - 1 && inkR <= band.right + 1,
-        `ink ${inkL.toFixed(0)}-${inkR.toFixed(0)} vs plank ${band.left.toFixed(0)}-${band.right.toFixed(0)}`);
+// A five-figure shift has to fit the wood, not just the box.
+const PX = Math.round(SIGN.w * 0.125);
+const plankW = SIGN.w * (PLANK.right - PLANK.left);
+for (const t of ['$0.00', '$75.00', '$1247.50', '$9999.99']) {
+  const w = await p.evaluate(([t, px]) => window.__dbg.moneyMetrics(t, px), [t, PX]);
+  check(`${t} fits between the frame rails`, w <= plankW,
+        `${w.toFixed(0)}px of ${plankW.toFixed(0)}px plank`);
 }
+// The total is centred at 0.60 of the height with a middle baseline, so its
+// ink runs half a cap height either side. Half the font size is a generous
+// stand-in for that and still has to land inside the wood.
+const textTop = SIGN.textY - (PX / 2) / SIGN.h, textBot = SIGN.textY + (PX / 2) / SIGN.h;
+check('the total sits on the plank vertically',
+      textTop >= PLANK.top && textBot <= PLANK.bottom,
+      `${textTop.toFixed(2)}-${textBot.toFixed(2)} vs plank ${PLANK.top}-${PLANK.bottom}`);
+// The flow line is smaller and sits under the total; same middle baseline.
+const FLOW_PX = Math.round(SIGN.w * 0.065);
+check('the flow line stays on the plank too',
+      SIGN.flowY + (FLOW_PX / 2) / SIGN.h <= PLANK.bottom &&
+      SIGN.flowY - (FLOW_PX / 2) / SIGN.h >= textBot,
+      `${SIGN.flowY} vs total bottom ${textBot.toFixed(2)}, plank bottom ${PLANK.bottom}`);
 
-// The per-minute readout lives under the total and must not run off the plank.
-await p.evaluate(() => {
-  window.__dbg.score = 124750;
-  document.getElementById('flow').textContent = '$182/min';
-});
-await p.waitForTimeout(60);
-const flow = await p.evaluate(() => {
-  const r = document.getElementById('flow').getBoundingClientRect();
-  return { top: r.top, bottom: r.bottom };
-});
-check('the rate line stays on the plank', flow.bottom <= band.bottom + 1,
-      `flow bottom ${flow.bottom.toFixed(0)} vs plank ${band.bottom.toFixed(0)}`);
+// Board furniture it must not sit on. The passes and the dish returns are
+// walk-into targets and the tables carry the numbers the whole game is about;
+// a sign over any of them costs something real.
+const clear = await p.evaluate(S => {
+  const d = window.__dbg;
+  const hits = (b) => !(S.x + S.w <= b.x - b.w/2 || S.x >= b.x + b.w/2 ||
+                        S.y + S.h <= b.y - b.h/2 || S.y >= b.y + b.h/2);
+  return { pass: d.PASSES.filter(hits).length, bus: d.BUS.filter(hits).length,
+           tables: d.tables.filter(t => hits({ x: t.padX, y: t.padY, w: 90, h: 60 })).length };
+}, SIGN);
+check('the sign clears the pickup counters', clear.pass === 0, `${clear.pass} hit`);
+check('the sign clears the dish returns', clear.bus === 0, `${clear.bus} hit`);
+check('the sign clears every set-down pad', clear.tables === 0, `${clear.tables} hit`);
+check('the sign is on the board', SIGN.x >= 0 && SIGN.y >= 0 &&
+      SIGN.x + SIGN.w <= 960 && SIGN.y + SIGN.h <= 640,
+      `${SIGN.x},${SIGN.y} ${SIGN.w}x${SIGN.h}`);
 
-// The sign must not push the lives readout off the board or overlap it.
-const clash = await p.evaluate(() => {
-  const a = document.querySelector('#hud .stat.tips').getBoundingClientRect();
-  const b = document.querySelectorAll('#hud .stat')[1].getBoundingClientRect();
-  return { gap: b.left - a.right };
-});
-check('the sign does not collide with Tables lost', clash.gap > 0, `${clash.gap.toFixed(0)}px gap`);
+// The reason it is painted rather than hung in the DOM. The floor reaches the
+// left wall and a sprite is far taller than its feet, so a player at the dish
+// return stands behind anything down here -- as DOM the sign cut them in half.
+// Park them in the corner and prove their pixels win.
+const canvasPatch = (x, y, w, h) => p.evaluate(([x, y, w, h]) => {
+  const c = document.getElementById('game');
+  return [...c.getContext('2d').getImageData(x, y, w, h).data].join(',');
+}, [x, y, w, h]);
 
-// The whole reason #board exists: a sign this tall hanging off the viewport
-// starts in the letterbox gutter and crosses the board's top edge halfway
-// down. It has to hang inside the board at every window shape.
-for (const [name, vp] of [['desk', { width: 1440, height: 900 }],
-                          ['short', { width: 1280, height: 620 }],
-                          ['phone', { width: 430, height: 844 }]]) {
-  await p.setViewportSize(vp);
-  await p.waitForTimeout(220);
-  const fit = await p.evaluate(() => {
-    const s = document.querySelector('#hud .stat.tips').getBoundingClientRect();
-    const c = document.getElementById('game').getBoundingClientRect();
-    return { top: s.top - c.top, bottom: c.bottom - s.bottom,
-             left: s.left - c.left, right: c.right - s.right,
-             frac: (s.width * s.height) / (c.width * c.height) };
-  });
-  check(`${name}: the sign hangs inside the board`,
-        fit.top >= 0 && fit.left >= 0 && fit.right >= 0 && fit.bottom >= 0,
-        `t${fit.top.toFixed(0)} l${fit.left.toFixed(0)} r${fit.right.toFixed(0)} b${fit.bottom.toFixed(0)}`);
-  // The HUD is in CSS pixels while the board scales, so a small window makes
-  // the sign proportionally larger. A quarter of the board is the line.
-  check(`${name}: the sign does not eat the board`, fit.frac < 0.25,
-        `${(fit.frac * 100).toFixed(0)}% of the board`);
-  // The HUD scale must not reach the mute button. Scaling it with the board
-  // took it to 15px square on a phone.
-  const btn = await p.evaluate(() => {
-    const m = document.getElementById('muteBtn').getBoundingClientRect();
-    return Math.min(m.width, m.height);
-  });
-  check(`${name}: the mute button stays hittable`, btn >= 30, `${btn.toFixed(0)}px`);
-}
-await p.setViewportSize({ width: 1000, height: 760 });
+await p.evaluate(() => { const d = window.__dbg; d.player.x = 9999; d.player.y = 9999; });
 await p.waitForTimeout(200);
+const without = await canvasPatch(SIGN.x, SIGN.y, SIGN.w, SIGN.h);
+await p.evaluate(() => { const d = window.__dbg; d.player.x = -9999; d.player.y = -9999; });
+await p.waitForTimeout(250);
+const withHim = await canvasPatch(SIGN.x, SIGN.y, SIGN.w, SIGN.h);
+const where = await p.evaluate(() => ({ x: window.__dbg.player.x, y: window.__dbg.player.y }));
+check('the player can reach the sign at all',
+      where.x < SIGN.x + SIGN.w && where.y < SIGN.y + SIGN.h + 120,
+      `clamps to ${where.x},${where.y.toFixed(0)}`);
+check('and draws in front of it, not behind', without !== withHim);
+await p.evaluate(() => { const d = window.__dbg; d.player.x = 480; d.player.y = 520; });
+await p.waitForTimeout(150);
 
 // ---- the lives row ----
 // Three carved stones that drain as tables walk. Two states off one asset, so
@@ -182,7 +157,7 @@ check('but it stays in the row', r[1].r.width === r[0].r.width && r[1].r.width >
 // has to line up -- and the whole stat has to stay on the board.
 const lives = await p.evaluate(() => {
   const l = document.getElementById('lives').getBoundingClientRect();
-  const lab = document.querySelector('#hud .stat:not(.tips) span.label').getBoundingClientRect();
+  const lab = document.querySelector('#hud .stat span.label').getBoundingClientRect();
   const c = document.getElementById('game').getBoundingClientRect();
   return { dRight: Math.abs(l.right - lab.right), inside: c.right - l.right, top: l.top - c.top };
 });
@@ -197,6 +172,32 @@ const mute = await p.evaluate(() => {
 check('the mute button clears the stones', mute.gap > 0, `${mute.gap.toFixed(0)}px gap`);
 check('the lives stat stays on the board', lives.inside >= 0 && lives.top >= 0,
       `r${lives.inside.toFixed(0)} t${lives.top.toFixed(0)}`);
+
+// ---- and all of it at the shapes a window actually comes in ----
+// The board scales with the window and the HUD is scaled to match, so the
+// stones stay proportional for free. The mute button is the exception: it is
+// counter-scaled back out, because scaling it with the board took it to 15px
+// square on a phone, which is not a control you can hit with a thumb.
+for (const [name, vp] of [['desk', { width: 1440, height: 900 }],
+                          ['short', { width: 1280, height: 620 }],
+                          ['phone', { width: 430, height: 844 }]]) {
+  await p.setViewportSize(vp);
+  await p.waitForTimeout(220);
+  const m = await p.evaluate(() => {
+    const b = document.getElementById('muteBtn').getBoundingClientRect();
+    const l = document.getElementById('lives').getBoundingClientRect();
+    const c = document.getElementById('game').getBoundingClientRect();
+    return { size: Math.min(b.width, b.height), gap: b.top - l.bottom,
+             frac: (l.width * l.height) / (c.width * c.height),
+             inside: c.right - l.right >= 0 && l.top - c.top >= 0 };
+  });
+  check(`${name}: the mute button stays hittable`, m.size >= 30, `${m.size.toFixed(0)}px`);
+  check(`${name}: it still clears the stones`, m.gap > 0, `${m.gap.toFixed(0)}px gap`);
+  check(`${name}: the stones stay on the board and in proportion`,
+        m.inside && m.frac < 0.05, `${(m.frac * 100).toFixed(1)}% of the board`);
+}
+await p.setViewportSize({ width: 1000, height: 760 });
+await p.waitForTimeout(200);
 
 // Two intact and one spent, so the screenshot shows both states side by side.
 await p.evaluate(() => { window.__dbg.lives = 2; });
