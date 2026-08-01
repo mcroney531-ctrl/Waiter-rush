@@ -112,9 +112,18 @@ which is the thing that actually fades.
 
 Two Meshy specifics carried over from the food work:
 
-- **No rig, no animation.** Same as food, which means **nothing forces the
-  remesh** — do the Remesh 15k step deliberately or you will get a
-  quarter-million-triangle table.
+- **No rig, no animation.** Same as food. That means **nothing forces the
+  remesh**, so it is a judgement call rather than a step — and measured on the
+  first table, the call is usually "skip it". Meshy's Image to 3D output came in
+  at **28,934 triangles and 0.7 MB**, already under any budget that matters for
+  a model that never ships. Check the count before remeshing; the
+  quarter-million-triangle case this step exists for comes from the *character*
+  pipeline, where a rigger is involved.
+- **Image to 3D gives you geometry, not a model.** The first download has zero
+  materials and zero images — through the shared light rig it renders as a white
+  silhouette. **Texture** is a separate step in Meshy and it has to be run. If
+  you also remesh, remesh *first*: the character runbook records the texture
+  smearing when it is applied before a remesh.
 - Everything comes out of Meshy at an arbitrary scale and orientation. Normalise
   on import; do not eyeball it in the scene.
 
