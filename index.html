@@ -2609,33 +2609,6 @@
 
   // The table, its legs and its number are painted into the board. This draws
   // only what changes: the patience meter, the meal clock, and the dishes.
-  // The number plate. It used to be painted into the board art, which meant the
-  // art and the logical table ids could silently disagree — a board saying 3
-  // where the game means 4 would be a miserable bug in a game about remembering
-  // table numbers. Drawing it here makes them the same thing by construction,
-  // and lets the plate be restyled with the room instead of re-generated.
-  function drawTableNumber(t){
-    // On the tabletop, not floating above it. Above the table there is only a
-    // 70px gap to the row behind, which has to hold the patience meter too —
-    // the plate collided with the previous row's tables every time. A number
-    // card sitting on the table is also what a restaurant actually does.
-    const w = A(72), h = A(54);
-    ctx.save();
-    ctx.translate(t.x - A(50), t.y);
-    ctx.fillStyle = 'rgba(0,0,0,0.30)';
-    roundRect(ctx, -w/2 + 3, -h/2 + 4, w, h, 9); ctx.fill();
-    ctx.fillStyle = COLORS.counter || '#22403c';
-    roundRect(ctx, -w/2, -h/2, w, h, 9); ctx.fill();
-    ctx.strokeStyle = COLORS.mustard; ctx.lineWidth = 2.5;
-    roundRect(ctx, -w/2 + 3, -h/2 + 3, w - 6, h - 6, 7); ctx.stroke();
-    ctx.fillStyle = '#F4EEDB';
-    ctx.font = Math.round(A(40)) + 'px Galindo, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(t.id), 0, 1);
-    ctx.textBaseline = 'alphabetic';
-    ctx.restore();
-  }
 
   function drawTable(t){
     ctx.save();
@@ -2704,9 +2677,6 @@
     }
 
     ctx.restore();
-    // Last, so nothing can cover it. The number is how the player identifies
-    // the table, and the whole game is remembering which one a plate is for.
-    drawTableNumber(t);
   }
 
   function drawPlayer(){
