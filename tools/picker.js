@@ -44,7 +44,18 @@ const plaqueChecks = (id, v) => {
         v && v.h > 0 ? `${(v.w / v.h).toFixed(3)} vs art ${v.ar.toFixed(3)}` : 'not visible');
 };
 
-p.on('requestfailed', r => { const u=r.url(); if(!u.includes('fonts.googleapis')) errs.push('404 '+u.split('/').pop()); });
+// A request can fail for two very different reasons and only one is a bug.
+// Pausing the menu track and rewinding it aborts its in-flight range request,
+// which surfaces here as a failure with errorText net::ERR_ABORTED. Reporting
+// that as "404 menu-theme.mp3" sent me looking for a missing file that was
+// serving 200 the whole time, so the reason is now printed and aborts are
+// ignored.
+p.on('requestfailed', r => {
+  const u = r.url(), why = r.failure()?.errorText || 'failed';
+  if (u.includes('fonts.googleapis')) return;
+  if (/ABORTED/i.test(why)) return;
+  errs.push(`${why} ${u.split('/').pop()}`);
+});
 
 await p.goto((process.env.BASE || 'http://localhost:8000') + '/index.html');
 // A saved pick is remembered on open, which is correct and makes position

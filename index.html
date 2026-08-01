@@ -1010,10 +1010,62 @@
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
 
+  // ---------- Menu music ----------
+  // An <audio> element rather than the Web Audio graph everything else uses.
+  // The track is 6.5 minutes at 48kHz stereo; decodeAudioData would turn that
+  // into about 150 MB of float PCM before a note played, which is not a trade
+  // worth making on a phone for a menu loop. <audio> streams it and loops it
+  // natively, and the fade is a volume ramp rather than a gain node.
+  const MUSIC_VOL = 0.42;         // under the sound effects, which are the game
+  const MUSIC_FADE_MS = 900;
+  let music = null, musicFade = null, musicWanted = false;
+
+  function initMusic(){
+    if (music) return;
+    music = new Audio('assets/audio/menu-theme.mp3');
+    music.loop = true;
+    music.preload = 'auto';
+    music.volume = 0;
+  }
+
+  function rampMusic(to, ms, done){
+    if (!music) return;
+    clearInterval(musicFade);
+    const from = music.volume, t0 = performance.now();
+    musicFade = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      music.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+      if (k === 1){ clearInterval(musicFade); musicFade = null; if (done) done(); }
+    }, 30);
+  }
+
+  // Called on entering any pre-shift screen. Autoplay is blocked until the page
+  // has had a gesture, so a cold first load will not start here — the gesture
+  // handler below retries once one arrives, which on the landing screen is the
+  // click on START itself.
+  function playMusic(){
+    musicWanted = true;
+    if (muted) return;
+    initMusic();
+    music.play().then(() => rampMusic(MUSIC_VOL, MUSIC_FADE_MS)).catch(() => {});
+  }
+
+  // Fades rather than stops, and only pauses once it is actually silent —
+  // pausing on the same tick as the fade starts is just a stop with extra code.
+  function stopMusic(){
+    musicWanted = false;
+    if (!music || music.paused) return;
+    rampMusic(0, MUSIC_FADE_MS, () => { music.pause(); music.currentTime = 0; });
+  }
+
   function setMuted(v){
     muted = !!v;
     localStorage.setItem('dineo.muted', muted ? '1' : '0');
     if (master) master.gain.setTargetAtTime(muted ? 0 : SFX_MASTER, ac.currentTime, 0.02);
+    // The mute button owns the music too. Unmuting back onto a menu screen
+    // should bring the track back, not leave the button lying about what it did.
+    if (muted) { clearInterval(musicFade); musicFade = null; if (music) music.pause(); }
+    else if (musicWanted) playMusic();
     const b = document.getElementById('muteBtn');
     if (b){
       b.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
@@ -1641,6 +1693,7 @@
     for (const id of ['avatarRandom', 'avatarPrev', 'avatarNext'])
       document.getElementById(id).classList.toggle('hidden', CAST.length < 2);
     document.getElementById('avatarPicker').classList.remove('hidden');
+    playMusic();
     renderPicker();
   }
 
@@ -2087,6 +2140,7 @@
       <button class="cta" id="startBtn">Start the Shift</button>
     `;
     overlay.classList.remove('hidden');
+    playMusic();
     document.getElementById('startBtn').addEventListener('click', startGame);
   }
 
@@ -2254,6 +2308,7 @@
       <button class="cta ghost" id="avatarBtn2">Change your waiter</button>
     `;
     overlay.classList.remove('hidden');
+    playMusic();
     document.getElementById('startBtn').addEventListener('click', startGame);
     document.getElementById('avatarBtn2').addEventListener('click', () => openPicker(false));
   }
@@ -2833,6 +2888,7 @@
   }
 
   function beginRun(nextMode){
+    stopMusic();          // the shift starts; the menu track fades under it
     resetGame();
     mode = nextMode;
     drainEnabled = true;
@@ -2880,7 +2936,13 @@
   // Audio can only start from a gesture, so the first one anywhere unlocks it.
   // `once` means this costs nothing after that.
   for (const ev of ['pointerdown', 'keydown']){
-    window.addEventListener(ev, () => { initAudio(); setMuted(muted); }, { once: true });
+    window.addEventListener(ev, () => {
+      initAudio(); setMuted(muted);
+      // Autoplay is blocked before a gesture, so the menu asked for music and
+      // did not get it. This is the retry, and on a cold load the gesture that
+      // gets us here is usually the click on START itself.
+      if (musicWanted) playMusic();
+    }, { once: true });
   }
   document.getElementById('muteBtn').addEventListener('click', e => {
     e.stopPropagation();          // the canvas below should not also act on this
@@ -2903,6 +2965,11 @@
   // initial static preview render
   resetGame();
   render();
+
+  // The landing screen is the first thing shown, so the track is asked for
+  // here. It will not start until a gesture unlocks audio — see the retry in
+  // the pointerdown/keydown handler above.
+  playMusic();
 })();
 </script>
 </body>

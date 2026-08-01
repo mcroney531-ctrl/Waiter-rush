@@ -47,6 +47,8 @@ npx serve .
 
 The only external requests are two Google Fonts (Alfa Slab One and DM Sans). Without internet access the game still runs and falls back to a system font stack.
 
+Sound effects are synthesised in Web Audio with no files. The one audio file is `assets/audio/menu-theme.mp3`, which loops under the landing, character select and end-of-shift screens and fades out when a shift starts. Browsers block autoplay until the page has had a gesture, so on a cold first visit the track starts on the first click — usually the one on START itself.
+
 ## Deploying
 
 The repository root *is* the site — there is nothing to build. Any static host works. `netlify.toml` is already configured to publish the root directory with an empty build command, so connecting the repo to Netlify (or dragging the folder into the Netlify UI) deploys it as-is. GitHub Pages works the same way: serve from the repository root.

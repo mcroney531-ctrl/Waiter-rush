@@ -16,7 +16,18 @@ const fail=[]; const check=(n,ok,d)=>{console.log(`${ok?'PASS':'FAIL'}  ${n}${d?
 const br=await chromium.launch({executablePath:EXE,args:['--no-sandbox']});
 const p=await br.newPage({viewport:{width:1000,height:720},deviceScaleFactor:2});
 const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,160)));
-p.on('requestfailed',r=>{const u=r.url(); if(!u.includes('fonts.googleapis'))errs.push('FAILED '+u.split('/').pop());});
+// A request can fail for two very different reasons and only one is a bug.
+// Pausing the menu track and rewinding it aborts its in-flight range request,
+// which surfaces here as a failure with errorText net::ERR_ABORTED. Reporting
+// that as "404 menu-theme.mp3" sent me looking for a missing file that was
+// serving 200 the whole time, so the reason is now printed and aborts are
+// ignored.
+p.on('requestfailed', r => {
+  const u = r.url(), why = r.failure()?.errorText || 'failed';
+  if (u.includes('fonts.googleapis')) return;
+  if (/ABORTED/i.test(why)) return;
+  errs.push(`${why} ${u.split('/').pop()}`);
+});
 await p.goto((process.env.BASE || 'http://127.0.0.1:8222') + '/probe.html');
 await p.click('#landingStart'); await p.waitForSelector('#avatarCard img');
 await p.click('#avatarDone'); await p.waitForTimeout(300);
