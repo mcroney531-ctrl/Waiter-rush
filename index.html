@@ -132,9 +132,19 @@
   #btn-left { top: 49px; left: 0; }
   #btn-right { top: 49px; right: 0; }
 
+  /* The screens before the shift all stand in the same room: a fossil wall
+     with a flagstone floor, shared by the landing, the title/end-of-shift
+     panel and the character select so they read as one place rather than three
+     black rectangles. The art is dimmed in the export rather than veiled here
+     -- see tools/make_backdrop.py, which solves the dimming from the contrast
+     the cream body text and the gold heading need against its brightest pixel.
+     #1c1712 stays underneath as the colour the screen is before the image
+     arrives, and as what shows if it never does. */
+  #landing, #overlay, #avatarPicker {
+    background: #1c1712 url('assets/ui/backdrop.webp') no-repeat center / cover;
+  }
   #overlay {
     position: absolute; inset: 0;
-    background: rgba(28,23,18,0.92);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; z-index: 20; color: #F4EEDB; padding: 24px;
   }
@@ -147,7 +157,16 @@
     letter-spacing: 1px;
   }
   #overlay p { max-width: 440px; line-height: 1.5; font-size: 15px; opacity: 0.9; margin: 6px 0 20px; }
-  #overlay .big-stat { font-family: 'Galindo', sans-serif; font-size: 44px; color: #2F6F6B; margin: 4px 0 18px; }
+  /* Was #2F6F6B, a teal left over from the pre-art palette. Against the fossil
+     wall that is 1.13:1 at the wall's brightest — the shift total, the one
+     number the screen exists to report, effectively invisible. Cream over a
+     dark outline instead, which is how the same number is drawn on the tips
+     sign during the shift. */
+  #overlay .big-stat {
+    font-family: 'Galindo', sans-serif; font-size: 44px; margin: 4px 0 18px;
+    color: #F7F1E0;
+    text-shadow: 0 2px 0 rgba(24,19,14,0.9), 0 0 14px rgba(24,19,14,0.7);
+  }
   button.cta {
     font-family: 'Galindo', sans-serif;
     background: #C1443A; color: #F4EEDB;
@@ -200,7 +219,6 @@
 
   #landing {
     position: absolute; inset: 0; z-index: 25;
-    background: #1c1712;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 18px; padding: 16px;
@@ -238,7 +256,7 @@
      scrolling swatch grid) is gone rather than left sitting at one step. */
   #avatarPicker {
     position: absolute; inset: 0; z-index: 30;
-    background: #1c1712; color: #F4EEDB;
+    color: #F4EEDB;
     display: flex; flex-direction: column; align-items: center;
     /* Centred as a group rather than top-anchored. With a cast of two the
        old stretch-to-fill left the ladder stranded at the bottom of the
@@ -251,8 +269,10 @@
     color: #E0A72E; font-size: clamp(20px, 3.4vw, 28px); margin: 2px 0 4px;
     flex: none;
   }
+  /* 0.62 was quiet enough against flat #1c1712 and lands at 4.29:1 against the
+     fossil wall, which is under AA. The wall took the fading budget. */
   #avatarBlurb {
-    font-size: 13px; opacity: 0.62; margin: 0 0 14px; text-align: center;
+    font-size: 13px; opacity: 0.78; margin: 0 0 14px; text-align: center;
     flex: none;
   }
   /* Was a small ghost button in the top-right corner. It moved into the action
@@ -322,9 +342,12 @@
   .stage-arrow:hover, .stage-arrow:focus-visible {
     background: rgba(224,167,46,0.2); border-color: #E0A72E; transform: scale(1.06);
   }
+  /* 0.5 measured 4.48:1 on a phone -- two hundredths under AA, and only on a
+     phone, where the column stacks the counter onto a brighter patch of wall
+     than the desktop layout does. */
   #avatarCounter {
     flex: none; margin: 9px 0 0; font-family: 'Galindo', sans-serif; font-size: 12px;
-    letter-spacing: 2px; opacity: 0.5;
+    letter-spacing: 2px; opacity: 0.6;
   }
   /* A sprite sheet is a grid of cells, so a thumbnail is the sheet scaled down
      and offset to the cell you want. Nothing is re-exported to make one. */
