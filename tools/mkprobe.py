@@ -20,6 +20,7 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get steps(){return TUTORIAL_STEPS.length;},
     PASSES:PASSES, BUS:BUS_STATIONS, set elapsed(v){elapsed=v;},
     set score(v){score=v; updateHUD();},
+    get lives(){return lives;}, set lives(v){lives=v; updateHUD();},
     get tier(){return tierIndex;}, get tierArt(){return tierArt.map(t=>!!t.img);},
     get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},
     setChar(id){loadCharacter(id);}, setTier(n){applyTier(n);}, get roster(){return Object.keys(ROSTER);},
@@ -49,7 +50,7 @@ open(DST, 'w').write(s)
 
 # prove every field the tests read is actually present
 for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
-              'tier', 'tierArt', 'tierNotice',
+              'lives', 'tier', 'tierArt', 'tierNotice',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn'):

@@ -1,10 +1,9 @@
-// The tips sign: does the total actually land on the plank, at every width a
-// shift can produce?
+// The HUD: the tips sign and the lives row, checked against the board.
 //
 //   python3 tools/mkprobe.py && python3 -m http.server 8222 &
-//   node tools/moneysign.js
+//   node tools/hud.js
 //
-// The check is geometric, not visual. The sign art is a fixed image, so the
+// The checks are geometric, not visual. The sign art is a fixed image, so the
 // plank occupies a known band of it; the total has to sit inside that band and
 // inside the frame horizontally. A screenshot is written too, because a number
 // can be inside the box and still look wrong sitting on a claw.
@@ -134,14 +133,79 @@ for (const [name, vp] of [['desk', { width: 1440, height: 900 }],
   // the sign proportionally larger. A quarter of the board is the line.
   check(`${name}: the sign does not eat the board`, fit.frac < 0.25,
         `${(fit.frac * 100).toFixed(0)}% of the board`);
+  // The HUD scale must not reach the mute button. Scaling it with the board
+  // took it to 15px square on a phone.
+  const btn = await p.evaluate(() => {
+    const m = document.getElementById('muteBtn').getBoundingClientRect();
+    return Math.min(m.width, m.height);
+  });
+  check(`${name}: the mute button stays hittable`, btn >= 30, `${btn.toFixed(0)}px`);
 }
 await p.setViewportSize({ width: 1000, height: 760 });
 await p.waitForTimeout(200);
 
+// ---- the lives row ----
+// Three carved stones that drain as tables walk. Two states off one asset, so
+// the risk is not a missing image but a `lost` class that changes nothing --
+// which looks like a life you did not lose.
+check('the stone icon loaded', await p.evaluate(async () => {
+  const url = getComputedStyle(document.querySelector('.life'))
+                .backgroundImage.slice(5, -2);
+  const img = new Image(); img.src = url;
+  try { await img.decode(); return img.naturalWidth > 0; } catch { return false; }
+}));
+
+const row = () => p.evaluate(() => [...document.querySelectorAll('#lives .life')]
+  .map(e => ({ lost: e.classList.contains('lost'),
+               filter: getComputedStyle(e).filter,
+               opacity: getComputedStyle(e).opacity,
+               r: e.getBoundingClientRect() })));
+
+let r = await row();
+check('three stones', r.length === 3, `${r.length}`);
+check('all three start intact', r.every(s => !s.lost));
+check('they sit in a row', r[0].r.top === r[2].r.top && r[0].r.left < r[2].r.left);
+
+await p.evaluate(() => { window.__dbg.lives = 1; });
+await p.waitForTimeout(80);
+r = await row();
+check('losing tables spends stones from the right',
+      !r[0].lost && r[1].lost && r[2].lost,
+      r.map(s => s.lost ? 'x' : 'o').join(''));
+check('a spent stone actually looks spent',
+      r[1].filter !== r[0].filter && +r[1].opacity < +r[0].opacity,
+      `${r[1].opacity} vs ${r[0].opacity}`);
+check('but it stays in the row', r[1].r.width === r[0].r.width && r[1].r.width > 0,
+      `${r[1].r.width}px`);
+
+// The row hangs under a right-aligned label, so its right edge is the one that
+// has to line up -- and the whole stat has to stay on the board.
+const lives = await p.evaluate(() => {
+  const l = document.getElementById('lives').getBoundingClientRect();
+  const lab = document.querySelector('#hud .stat:not(.tips) span.label').getBoundingClientRect();
+  const c = document.getElementById('game').getBoundingClientRect();
+  return { dRight: Math.abs(l.right - lab.right), inside: c.right - l.right, top: l.top - c.top };
+});
+check('the stones line up with their label', lives.dRight < 2, `${lives.dRight.toFixed(1)}px out`);
+// The mute button parks under this stat. Stones are twice the height the dots
+// were, and the button's old offset put it on top of the third one.
+const mute = await p.evaluate(() => {
+  const m = document.getElementById('muteBtn').getBoundingClientRect();
+  const l = document.getElementById('lives').getBoundingClientRect();
+  return { gap: m.top - l.bottom, size: Math.min(m.width, m.height) };
+});
+check('the mute button clears the stones', mute.gap > 0, `${mute.gap.toFixed(0)}px gap`);
+check('the lives stat stays on the board', lives.inside >= 0 && lives.top >= 0,
+      `r${lives.inside.toFixed(0)} t${lives.top.toFixed(0)}`);
+
+// Two intact and one spent, so the screenshot shows both states side by side.
+await p.evaluate(() => { window.__dbg.lives = 2; });
+await p.waitForTimeout(80);
+
 mkdirSync('art-source/shots', { recursive: true });
-await p.screenshot({ path: 'art-source/shots/money-sign.png',
+await p.screenshot({ path: 'art-source/shots/hud.png',
                      clip: { x: 0, y: 0, width: 1000, height: 300 } });
-console.log('wrote art-source/shots/money-sign.png');
+console.log('wrote art-source/shots/hud.png');
 
 console.log(errs.length ? '\nPAGE ERRORS: ' + errs.join(' | ') : '\nno page errors');
 console.log(fail.length ? `${fail.length} FAILED: ${fail.join(', ')}` : 'all checks passed');

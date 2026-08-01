@@ -79,15 +79,15 @@
   }
   /* Absolute, so it stays out of the HUD's two-child space-between flow — a
      third flex child would push the score and the lives off the edges. Sits
-     under the lives dots rather than beside them, where nothing else lives.
+     under the lives stones rather than beside them, where nothing else lives.
      #hud is pointer-events:none, so this has to opt back in. */
   /* Counter-scaled out of the HUD's transform. The anchor still scales, so the
-     button stays tucked under the lives dots at every size, but the button
+     button stays tucked under the lives stones at every size, but the button
      itself does not: scaling with the board took it to 15px square on a phone,
      which is a control you cannot hit with a thumb. Labels scale, controls
      do not. */
   #muteBtn {
-    position: absolute; top: 56px; right: 18px;
+    position: absolute; top: 74px; right: 18px;
     transform: scale(calc(1 / var(--board-scale, 1)));
     transform-origin: top right;
     pointer-events: auto; cursor: pointer;
@@ -131,9 +131,18 @@
     font-weight: 900; letter-spacing: 2px; color: #E0A72E; min-height: 15px;
   }
   #flow.lit { text-shadow: 0 0 12px rgba(224,167,46,0.9); }
-  #lives { display: flex; gap: 6px; margin-top: 2px; }
-  .life-dot { width: 14px; height: 14px; border-radius: 50%; background: #C1443A; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.3); }
-  .life-dot.lost { background: rgba(255,255,255,0.15); }
+  /* flex-end because the label above is right-aligned and the row of stones is
+     wider than the words -- left-aligned they hung off the wrong edge. */
+  #lives { display: flex; justify-content: flex-end; gap: 5px; margin-top: 4px; }
+  .life {
+    width: 30px; height: 30px;
+    background: url('assets/tables-lost.png') no-repeat center / contain;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.55));
+  }
+  /* One asset, two states. A spent stone is the same carving drained of
+     colour and light rather than a second image to keep in sync — and it stays
+     visible, so the row still reads as three even when two are gone. */
+  .life.lost { filter: grayscale(1) brightness(0.38); opacity: 0.45; }
 
   #controls-mobile {
     /* safe-area keeps the pad clear of the home indicator on notched phones */
@@ -867,7 +876,7 @@
     livesEl.innerHTML = '';
     for (let i=0;i<3;i++){
       const d = document.createElement('div');
-      d.className = 'life-dot' + (i < lives ? '' : ' lost');
+      d.className = 'life' + (i < lives ? '' : ' lost');
       livesEl.appendChild(d);
     }
   }

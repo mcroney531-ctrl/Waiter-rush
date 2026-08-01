@@ -58,5 +58,5 @@ The repository root *is* the site — there is nothing to build. Any static host
 - **The tier ladder is carried by tier 4.** Silhouette overlap against the tier below runs 0.95 / 0.92 / 0.69 for Tyrone: the first two promotions read by colour, and only the top hat changes the shape.
 - **No level-up animation yet.** The dance clips exist as a plan, not as art.
 - The canvas is a fixed 960×640 internal resolution scaled by CSS. It works, but it is not a true responsive layout, which is why the d-pad overlays the board on short screens.
-- The HUD label reads "Tables lost" while the dots deplete as lives remaining, so label and indicator point in opposite directions.
+- The HUD label reads "Tables lost" while the three carved stones deplete as lives remaining, so label and indicator still point in opposite directions. Flipping the stones to light up as tables walk would settle it.
 - Party sizes — showing a two-, four- or six-top on eight identical painted tables — is designed but unbuilt, waiting on an art decision.
