@@ -165,16 +165,38 @@
   button.cta.ghost:hover { border-color: rgba(244,238,219,0.7); }
   button.cta.ghost:active { transform: translateY(2px); box-shadow: none; }
 
+  /* Carved buttons. The label is painted into the art, so the element carries
+     no visible text — but it keeps its text node, clipped, because that is what
+     a screen reader and a "find on page" both read. A background-image button
+     with an empty label is a button with no name.
+     Height is the dimension set, never width: the three plaques have different
+     aspects (1.76, 1.80, 2.23) and it is a shared height that makes two of them
+     sitting together read as a pair. */
+  button.plaque {
+    display: block; border: 0; padding: 0; cursor: pointer;
+    background: transparent no-repeat center / contain;
+    width: auto;
+    text-indent: -9999px; overflow: hidden; white-space: nowrap;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5));
+    transition: transform 90ms ease, filter 90ms ease;
+  }
+  button.plaque:hover, button.plaque:focus-visible {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 9px 16px rgba(0,0,0,0.55)) brightness(1.07);
+  }
+  button.plaque:active { transform: translateY(2px); filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+  /* text-indent puts the label off-screen, so the usual focus ring would have
+     nothing to sit on if the button were not explicitly sized. */
+  button.plaque:focus-visible { outline: 3px solid #E0A72E; outline-offset: 5px; border-radius: 10px; }
+  .plaque.start { aspect-ratio: 1.763; background-image: url('assets/ui/start.webp'); }
+  .plaque.random { aspect-ratio: 1.803; background-image: url('assets/ui/random.webp'); }
+  .plaque.skip { aspect-ratio: 2.230; background-image: url('assets/ui/skip-tutorial.webp'); }
+
   #skipBtn {
     position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
     right: 20px; z-index: 12;
-    font-family: 'Galindo', sans-serif; font-size: 12px;
-    letter-spacing: 1.5px; text-transform: uppercase;
-    background: rgba(244,238,219,0.12); color: #F4EEDB;
-    border: 2px solid rgba(244,238,219,0.3);
-    padding: 10px 15px; border-radius: 8px; cursor: pointer;
+    height: clamp(40px, 7vh, 56px);
   }
-  #skipBtn:hover { background: rgba(244,238,219,0.22); border-color: rgba(244,238,219,0.55); }
 
   #landing {
     position: absolute; inset: 0; z-index: 25;
@@ -191,14 +213,19 @@
        contain rather than cover because the DINE-O DASH title is painted into
        the top edge of the art: any vertical crop cuts the game's own name off. */
     max-width: min(100%, 1536px);
-    max-height: calc(100vh - 118px);
-    max-height: calc(100dvh - 118px);
+    /* Reserves the START plaque's tallest size plus the column gap and the
+       page padding. At the old 118px the cover ate the room and flex shrank
+       the plaque to 68px -- a carved sign the size of a postage stamp. */
+    max-height: calc(100vh - 190px);
+    max-height: calc(100dvh - 190px);
     width: auto; height: auto;
     object-fit: contain;
     border-radius: 10px;
     box-shadow: 0 18px 50px rgba(0,0,0,0.55);
   }
-  #landingStart { font-size: 20px; padding: 16px 46px; }
+  /* The front door, so it gets the biggest the art will carry without
+     outgrowing the cover it sits under. */
+  #landingStart { flex: none; height: clamp(84px, 14vh, 132px); }
 
   /* One question per screen. Six axes laid out at once meant every swatch on
      the page redrew whenever any one of them was clicked, because each swatch
@@ -228,10 +255,11 @@
     font-size: 13px; opacity: 0.62; margin: 0 0 14px; text-align: center;
     flex: none;
   }
-  #avatarRandom {
-    position: absolute; top: 16px; right: 16px; z-index: 2;
-    margin-top: 0; font-size: 13px; padding: 9px 18px;
-  }
+  /* Was a small ghost button in the top-right corner. It moved into the action
+     row when it got its own plaque: a carved sign floating in a corner reads as
+     decoration rather than as a control, and beside START it reads as the other
+     way through the screen — which is what it is. */
+  #avatarActions .plaque { height: clamp(52px, 9vh, 74px); }
   #avatarOptions {
     width: 100%; max-width: 660px; flex: 0 1 auto; min-height: 0;
     overflow-y: auto; padding: 2px 4px 6px;
@@ -326,7 +354,8 @@
     color: #E0A72E; line-height: 1.45; margin: 12px 0 0;
   }
   #avatarActions {
-    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+    align-items: center;
     margin: 14px 0 2px; flex: none;
   }
   #avatarActions .cta { margin-top: 0; }
@@ -352,12 +381,6 @@
     #controls-mobile { display: flex; }
   }
 
-  /* The title and a top-right corner button do not fit on one line on a phone.
-     Drop the title below the button rather than shrinking either. */
-  @media (max-width: 560px) {
-    #avatarPicker h2 { margin-top: 44px; }
-    #avatarRandom { font-size: 12px; padding: 7px 14px; }
-  }
 </style>
 </head>
 <body>
@@ -387,7 +410,7 @@
   <div id="landing">
     <img id="landingArt" src="assets/landing.jpg"
          alt="Dine-O Dash — a dinosaur diner mid-rush, waiters running plates through the chaos">
-    <button class="cta" id="landingStart">Start</button>
+    <button class="plaque start" id="landingStart" type="button">Start</button>
   </div>
 
   <div id="overlay" class="hidden">
@@ -399,10 +422,9 @@
     <button class="cta ghost" id="avatarBtn">Pick your waiter</button>
   </div>
 
-  <button id="skipBtn" class="hidden">Skip tutorial</button>
+  <button id="skipBtn" class="plaque skip hidden" type="button">Skip tutorial</button>
 
   <div id="avatarPicker" class="hidden">
-    <button class="cta ghost" id="avatarRandom">Random</button>
     <h2>Pick your waiter</h2>
     <p id="avatarBlurb">They all start in an apron. Earn tips and they don't stay that way.</p>
     <div id="avatarStage">
@@ -414,8 +436,9 @@
     <div id="avatarLadder"></div>
     <p id="avatarWarn" class="hidden">Couldn't load the character art — you'll keep the classic waiter. Everything else works as normal.</p>
     <div id="avatarActions">
-      <button class="cta" id="avatarDone">Start training</button>
-      <button class="cta ghost" id="avatarCancel">Skip for now</button>
+      <button class="plaque start" id="avatarDone" type="button">Start training</button>
+      <button class="plaque random" id="avatarRandom" type="button">Random</button>
+      <button class="cta ghost hidden" id="avatarCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1525,10 +1548,18 @@
   function openPicker(fromLanding){
     pickerFromLanding = !!fromLanding;
     pickedChar = charId;
-    document.getElementById('avatarCancel').textContent =
-      pickerFromLanding ? 'Skip for now' : 'Cancel';
-    document.getElementById('avatarDone').textContent =
-      pickerFromLanding ? 'Start training' : 'Use this waiter';
+    // The primary button says two different things depending on how you got
+    // here, and only one of them is "start" — a carved START plaque cannot
+    // read "Use this waiter". So the plaque is the opening flow's button and
+    // the detour keeps a plain one.
+    const done = document.getElementById('avatarDone');
+    done.textContent = pickerFromLanding ? 'Start training' : 'Use this waiter';
+    done.className = pickerFromLanding ? 'plaque start' : 'cta';
+    // Skipping and starting land on the same dinosaur — the picker opens on the
+    // current one — so from the landing the plaque is the only way out it
+    // needs. The detour still needs a way back that changes nothing.
+    document.getElementById('avatarCancel').textContent = 'Cancel';
+    document.getElementById('avatarCancel').classList.toggle('hidden', pickerFromLanding);
     // The only way this fails now is a sheet that will not load, and that is
     // already handled: the game falls back to the drawn body. Say so rather
     // than leaving an empty screen.

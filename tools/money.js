@@ -19,7 +19,7 @@ const errs=[]; p.on('pageerror',e=>errs.push(String(e).slice(0,160)));
 p.on('requestfailed',r=>{const u=r.url(); if(!u.includes('fonts.googleapis'))errs.push('FAILED '+u.split('/').pop());});
 await p.goto((process.env.BASE || 'http://127.0.0.1:8222') + '/probe.html');
 await p.click('#landingStart'); await p.waitForSelector('#avatarCard img');
-await p.click('#avatarCancel'); await p.waitForTimeout(300);
+await p.click('#avatarDone'); await p.waitForTimeout(300);
 for (const s of ['#skipBtn','#startBtn']) { const e=await p.$(s); if(e&&await e.isVisible()){await e.click();await p.waitForTimeout(350);} }
 await p.waitForTimeout(400);
 

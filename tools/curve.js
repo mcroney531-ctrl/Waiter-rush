@@ -38,7 +38,7 @@ const step = async (p, keys, ms) => {
   // Skipping the picker from the landing drops into the TUTORIAL, not the
   // title screen — so the tutorial has to be skipped before "Skip to the
   // shift" exists. This is the harness breakage that has bitten twice.
-  await p.click('#avatarCancel'); await p.waitForTimeout(300);
+  await p.click('#avatarDone'); await p.waitForTimeout(300);
   for (const sel of ['#skipBtn', '#startBtn']) {
     const el = await p.$(sel);
     if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(350); }

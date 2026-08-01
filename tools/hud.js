@@ -33,7 +33,7 @@ p.on('pageerror', e => errs.push(String(e).slice(0, 160)));
 await p.goto(B + '/probe.html', { waitUntil: 'load' });
 await p.click('#landingStart');
 await p.waitForSelector('#avatarCard img', { timeout: 30000 });
-await p.click('#avatarCancel'); await p.waitForTimeout(300);
+await p.click('#avatarDone'); await p.waitForTimeout(300);
 for (const sel of ['#skipBtn', '#startBtn']) {
   const el = await p.$(sel);
   if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(350); }

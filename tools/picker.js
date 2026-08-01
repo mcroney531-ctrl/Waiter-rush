@@ -16,6 +16,34 @@ const check = (n, ok, d) => { console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:'
 const br = await chromium.launch({ executablePath: EXE, args:['--no-sandbox'] });
 const p = await br.newPage({ viewport:{width:1000,height:760}, deviceScaleFactor:2 });
 const errs=[]; p.on('pageerror', e=>errs.push(String(e).slice(0,160)));
+
+// Plaque buttons are sized by height with aspect-ratio, so a wrong aspect in
+// the CSS crops or letterboxes the art without erroring. Each has to be
+// measured while it is on screen, which for the landing and the tutorial skip
+// is not the same moment as for the picker's own pair.
+const measure = id => p.evaluate(async id => {
+  const e = document.getElementById(id);
+  if (!e) return null;
+  const url = getComputedStyle(e).backgroundImage.slice(5, -2);
+  let loaded = false, ar = 0;
+  if (url && url !== 'none') {
+    const img = new Image(); img.src = url;
+    try { await img.decode(); loaded = img.naturalWidth > 0;
+          ar = img.naturalWidth / img.naturalHeight; } catch {}
+  }
+  const b = e.getBoundingClientRect();
+  return { url: url.split('/').pop(), loaded, ar, w: +b.width.toFixed(0),
+           h: +b.height.toFixed(0), name: e.textContent.trim() };
+}, id);
+const plaqueChecks = (id, v) => {
+  check(`${id} has its art`, v && v.loaded, v ? v.url : 'missing');
+  check(`${id} keeps an accessible name`, v && v.name.length > 0, v && v.name);
+  check(`${id} is on screen to be pressed`, v && v.w > 0 && v.h > 0, v && `${v.w}x${v.h}`);
+  check(`${id} draws at the art's aspect`,
+        v && v.h > 0 && Math.abs(v.w / v.h - v.ar) < 0.02,
+        v && v.h > 0 ? `${(v.w / v.h).toFixed(3)} vs art ${v.ar.toFixed(3)}` : 'not visible');
+};
+
 p.on('requestfailed', r => { const u=r.url(); if(!u.includes('fonts.googleapis')) errs.push('404 '+u.split('/').pop()); });
 
 await p.goto((process.env.BASE || 'http://localhost:8000') + '/index.html');
@@ -23,6 +51,7 @@ await p.goto((process.env.BASE || 'http://localhost:8000') + '/index.html');
 // assertions non-deterministic across runs. Start from a clean profile.
 await p.evaluate(() => localStorage.clear());
 await p.reload();
+const landingPlaque = await measure('landingStart');
 await p.click('#landingStart');
 await p.waitForSelector('#avatarCard img', { timeout: 10000 });
 
@@ -78,6 +107,7 @@ check('picker closes into the tutorial',
                       && document.getElementById('landing').classList.contains('hidden')));
 check('saved to localStorage',
   await p.evaluate(() => localStorage.getItem('dineo.char')) === who.toLowerCase());
+const skipPlaque = await measure('skipBtn');
 
 // and it sticks across a reload
 await p.reload();
@@ -88,6 +118,43 @@ check('reload remembers the pick', await nameOf() === who, await nameOf());
 // random never leaves you on the same one
 await p.click('#avatarRandom'); await p.waitForTimeout(150);
 check('random changes the pick', await nameOf() !== who, await nameOf());
+
+// --- the carved buttons ---
+// A background-image button with its label clipped out of view is one CSS typo
+// away from being an invisible box with no accessible name, and one 404 away
+// from being an invisible box full stop. Neither shows up as a page error.
+plaqueChecks('landingStart', landingPlaque);
+plaqueChecks('skipBtn', skipPlaque);
+plaqueChecks('avatarDone', await measure('avatarDone'));
+plaqueChecks('avatarRandom', await measure('avatarRandom'));
+
+// The pair in the action row has to share a height or it does not read as a
+// pair -- the two plaques have different aspects, so height is the only
+// dimension that can match.
+const [pDone, pRand] = [await measure('avatarDone'), await measure('avatarRandom')];
+check('START and RANDOM line up', pDone.h === pRand.h, `${pDone.h} vs ${pRand.h}`);
+
+// --- the primary button says two different things ---
+// From the landing it starts the game, so it can wear a plaque that says
+// START. Reached as a detour from the title it means "use this waiter", which
+// no plaque reading START can say, so it falls back to a text button -- and
+// the detour keeps a Cancel, which the opening flow does not need.
+const mode = () => p.evaluate(() => {
+  const q = id => { const e = document.getElementById(id);
+                    return { txt: e.textContent.trim(), cls: e.className,
+                             shown: !e.classList.contains('hidden') }; };
+  return { done: q('avatarDone'), cancel: q('avatarCancel') };
+});
+let m = await mode();
+check('from the landing the primary is a plaque', m.done.cls.includes('plaque'), m.done.cls);
+check('and there is no Cancel to press', !m.cancel.shown);
+
+await p.evaluate(() => document.getElementById('avatarBtn').click());
+await p.waitForTimeout(400);
+m = await mode();
+check('as a detour it is a text button', !m.done.cls.includes('plaque'), m.done.cls);
+check('and it says what it does', /use this waiter/i.test(m.done.txt), m.done.txt);
+check('and Cancel comes back', m.cancel.shown && /cancel/i.test(m.cancel.txt), m.cancel.txt);
 
 console.log(errs.length ? '\nPAGE ERRORS: ' + errs.join(' | ') : '\nno page errors');
 console.log(fail.length ? `${fail.length} FAILED` : 'all checks passed');

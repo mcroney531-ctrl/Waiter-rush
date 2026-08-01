@@ -51,7 +51,7 @@ const check = (name, ok, detail) => {
 
   await p.click('#landingStart');
   await p.waitForSelector('#avatarCard img', { timeout: 30000 });   // character select is ready
-  await p.click('#avatarCancel'); await p.waitForTimeout(300);
+  await p.click('#avatarDone'); await p.waitForTimeout(300);
   for (const sel of ['#skipBtn', '#startBtn']) {
     const el = await p.$(sel);
     if (el && await el.isVisible()) { await el.click(); await p.waitForTimeout(350); }
