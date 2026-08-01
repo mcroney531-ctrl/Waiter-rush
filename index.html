@@ -49,13 +49,26 @@
     display: flex; align-items: center; justify-content: center;
   }
   canvas {
+    display: block;
     background: #E8E2D5;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     image-rendering: pixelated;
     max-width: 100vw; max-height: 100vh;
   }
+  /* Shrink-wraps the canvas so the HUD can hang off the board rather than off
+     the viewport. #wrap is the whole window, so a HUD anchored to it floats in
+     the letterbox gutter above the board — fine for small text, wrong for the
+     tips sign, which then started in the black and crossed the board's top
+     edge halfway down. Anchored here it hangs from the board like a sign. */
+  #board { position: relative; }
+  /* Laid out at the canvas's own 960x640 and scaled by whatever CSS did to the
+     canvas (see scaleHUD), so the HUD keeps its proportion to the board rather
+     than to the window. */
   #hud {
-    position: absolute; top: 0; left: 0; right: 0;
+    position: absolute; top: 0; left: 0;
+    width: 960px; height: 640px;
+    transform-origin: top left;
+    transform: scale(var(--board-scale, 1));
     display: flex; justify-content: space-between; align-items: flex-start;
     padding: 14px 18px;
     pointer-events: none;
@@ -68,8 +81,15 @@
      third flex child would push the score and the lives off the edges. Sits
      under the lives dots rather than beside them, where nothing else lives.
      #hud is pointer-events:none, so this has to opt back in. */
+  /* Counter-scaled out of the HUD's transform. The anchor still scales, so the
+     button stays tucked under the lives dots at every size, but the button
+     itself does not: scaling with the board took it to 15px square on a phone,
+     which is a control you cannot hit with a thumb. Labels scale, controls
+     do not. */
   #muteBtn {
     position: absolute; top: 56px; right: 18px;
+    transform: scale(calc(1 / var(--board-scale, 1)));
+    transform-origin: top right;
     pointer-events: auto; cursor: pointer;
     width: 34px; height: 34px; line-height: 1;
     font-size: 15px; padding: 0;
@@ -79,6 +99,32 @@
   }
   #muteBtn:hover, #muteBtn:focus-visible { opacity: 1; border-color: rgba(244,238,219,0.6); }
   #hud .stat { font-size: 20px; letter-spacing: 0.5px; }
+  /* The tips total hangs on its own sign. The art is a framed plank with the
+     ornament — hanging bar, money-bag skull, claws, coins, banknotes — wrapped
+     around it, so the text has to be placed against the plank rather than
+     against the box. Sized to 208x160 so the plank is wide enough for a
+     five-figure total without the digits touching the frame. */
+  #hud .stat.tips {
+    position: relative;
+    background: url('assets/money-sign.png') no-repeat center / contain;
+    width: 208px; height: 160px;
+    text-shadow: 0 2px 3px rgba(0,0,0,0.6);
+  }
+  /* Absolutely placed rather than centred in the box. The plank is not the
+     middle of this image — the hanging bar and skull take the top third, the
+     coins take the bottom — so centring put the total across the skull.
+     The panel runs 0.38 to 0.85 of the height, so its middle is 0.60. Measuring
+     it by "unbroken run of plank colour" gave 0.50 and sat the total up under
+     the claws — the grain lines break the run long before the wood ends. */
+  #hud .stat.tips .plate {
+    position: absolute; left: 0; right: 0; top: 60%;
+    transform: translateY(-50%); text-align: center;
+  }
+  /* The word goes. Two lines do not fit the plank, and a sign carrying coins,
+     banknotes and a money-bag skull does not need to be captioned "Tips". */
+  #hud .stat.tips span.label { display: none; }
+  #hud .stat.tips #score { font-size: 26px; display: block; }
+  #hud .stat.tips #flow { margin-top: 1px; }
   #hud .stat span.label { font-family: 'Galindo', sans-serif; font-size: 11px; display:block; letter-spacing: 2px; opacity: 0.75; text-transform: uppercase; }
   #flow {
     display: block; font-family: 'DM Sans', sans-serif; font-size: 12px;
@@ -344,19 +390,23 @@
 </head>
 <body>
 <div id="wrap">
+  <div id="board">
   <canvas id="game" width="960" height="640"></canvas>
 
   <div id="hud">
-    <div class="stat">
-      <span class="label">Tips</span>
-      <span id="score" class="money">$0.00</span>
-      <span id="flow"></span>
+    <div class="stat tips">
+      <div class="plate">
+        <span class="label">Tips</span>
+        <span id="score" class="money">$0.00</span>
+        <span id="flow"></span>
+      </div>
     </div>
     <div class="stat" style="text-align:right;">
       <span class="label">Tables lost</span>
       <div id="lives"></div>
     </div>
     <button id="muteBtn" type="button" aria-label="Mute" aria-pressed="false">&#128266;</button>
+  </div>
   </div>
 
   <div id="controls-mobile">
@@ -410,6 +460,18 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
+
+  // The HUD is DOM on top of a canvas that CSS scales to fit the window, so it
+  // does not scale with what it labels. That was survivable while the HUD was
+  // two lines of small text; the tips sign is 208x160 and ate 27% of the board
+  // on a phone. Laying the HUD out at the canvas's own 960x640 and scaling it
+  // by the same factor CSS applied keeps it a constant fraction of the board
+  // at every window size, which is the only thing that reads as part of the art.
+  const board = document.getElementById('board');
+  const scaleHUD = () => board.style.setProperty(
+    '--board-scale', (canvas.clientWidth / W).toFixed(4));
+  scaleHUD();
+  new ResizeObserver(scaleHUD).observe(canvas);
 
   const COLORS = {
     floorA: '#E8E2D5',

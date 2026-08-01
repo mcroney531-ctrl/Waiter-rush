@@ -19,3 +19,6 @@ tiergrid-*.png
 
 # Screenshots written by tools/picker.js
 picker*.png
+
+# HUD screenshots written by tools/moneysign.js
+art-source/shots/
