@@ -82,9 +82,15 @@ check('tier one is unlocked, rest greyed',
 check('ladder labels the thresholds',
   (await p.evaluate(() => [...document.querySelectorAll('#avatarLadder .tier')].map(e=>e.textContent).join(' ')))
     === 'START $75.00 $200.00 $400.00');
+// A thumbnail is either a dedicated tier portrait (an <img>, once that art
+// exists for the character) or the sprite-sheet crop it falls back to (a div
+// painted via backgroundImage) -- see spriteCell()/renderLadder(). Resolved
+// means whichever one is showing actually loaded, not which path was taken.
 check('ladder thumbnails resolved',
   await p.evaluate(() => [...document.querySelectorAll('#avatarLadder .sprite')]
-                          .every(e => e.style.backgroundImage.includes('sprites/'))));
+                          .every(e => e.tagName === 'IMG'
+                            ? (e.complete && e.naturalWidth > 0)
+                            : e.style.backgroundImage.includes('sprites/'))));
 await p.screenshot({ path:'picker.png' });
 
 // --- the arrows walk the roster and wrap ---
