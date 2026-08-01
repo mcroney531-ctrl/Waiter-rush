@@ -86,11 +86,17 @@ check('ladder labels the thresholds',
 // exists for the character) or the sprite-sheet crop it falls back to (a div
 // painted via backgroundImage) -- see spriteCell()/renderLadder(). Resolved
 // means whichever one is showing actually loaded, not which path was taken.
-check('ladder thumbnails resolved',
-  await p.evaluate(() => [...document.querySelectorAll('#avatarLadder .sprite')]
-                          .every(e => e.tagName === 'IMG'
-                            ? (e.complete && e.naturalWidth > 0)
-                            : e.style.backgroundImage.includes('sprites/'))));
+// Waited for rather than sampled. waitForSelector above only waits on the hero
+// portrait; the four ladder thumbnails are still in flight behind it, so
+// asserting immediately raced them and failed roughly one cold run in four.
+const laddersResolved = () => p.waitForFunction(() =>
+  [...document.querySelectorAll('#avatarLadder .sprite')].length > 0 &&
+  [...document.querySelectorAll('#avatarLadder .sprite')]
+    .every(e => e.tagName === 'IMG'
+      ? (e.complete && e.naturalWidth > 0)
+      : e.style.backgroundImage.includes('sprites/')),
+  null, { timeout: 8000 }).then(() => true).catch(() => false);
+check('ladder thumbnails resolved', await laddersResolved());
 await p.screenshot({ path:'picker.png' });
 
 // --- the arrows walk the roster and wrap ---
