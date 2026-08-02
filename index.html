@@ -698,13 +698,20 @@
   // 69 seconds while patience kept easing off until four minutes, which meant
   // orders were arriving at their fastest while the meters still looked calm.
   //
-  // The opening is deliberately generous: two minutes on a fresh table is
-  // long enough that nothing is lost while you learn the floor, and the
-  // squeeze arrives slowly enough to feel like a shift filling up rather than
-  // a difficulty setting.
-  const RUSH_PEAK_MS    = 600000;  // how long the full ramp takes (10 min)
-  const PATIENCE_START_S = 120;    // seconds a fresh table gives you at open
-  const PATIENCE_END_S   = 18;     // ...and once the rush has fully arrived
+  // The opening is deliberately generous but not floaty: 80 seconds on a
+  // fresh table is long enough that nothing is lost while you learn the
+  // floor, without the dead calm two full minutes gave most of the shift.
+  //
+  // RUSH_PEAK_MS used to be ten minutes, and that was the real reason the
+  // shift felt easy throughout, not just at open: a good shift runs about
+  // three minutes (see the shift-1 music track length), so most runs never
+  // left the gentle first third of a ten-minute ramp. Every other axis below
+  // (spawn gap, eat time, queue cap, wave depth) keys off this same clock, so
+  // shortening it alone pulls the whole shift tighter in real time without
+  // re-picking any of their endpoints.
+  const RUSH_PEAK_MS    = 270000;  // how long the full ramp takes (4:30)
+  const PATIENCE_START_S = 80;     // seconds a fresh table gives you at open
+  const PATIENCE_END_S   = 15;     // ...and once the rush has fully arrived
   const SPAWN_START_MS  = 7000;    // average gap between orders at open
   // Floor stays above the 2.74s counter-to-table round trip on purpose. Drop
   // it below that and orders arrive faster than one carry slot can clear
