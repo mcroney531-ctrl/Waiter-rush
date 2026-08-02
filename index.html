@@ -715,12 +715,21 @@
   // re-picking any of their endpoints.
   const RUSH_PEAK_MS    = 270000;  // how long the full ramp takes (4:30)
   const PATIENCE_START_S = 80;     // seconds a fresh table gives you at open
-  const PATIENCE_END_S   = 15;     // ...and once the rush has fully arrived
+  // Measured on two real playthroughs (PC and mobile, different input
+  // methods, nearly identical results): both cleared the entire 0-4:30 ramp
+  // with zero tables lost, then lost their first table 10-45s into peak.
+  // That is a cliff, not a ramp -- the shift was flat-easy for ~95% of its
+  // length and the peak itself was not sharp enough to bite quickly once
+  // reached. PATIENCE_END_S 15->11 tightens the peak itself, since the
+  // problem was not that peak arrived too late.
+  const PATIENCE_END_S   = 11;
   const SPAWN_START_MS  = 7000;    // average gap between orders at open
-  // Floor stays above the 2.74s counter-to-table round trip on purpose. Drop
-  // it below that and orders arrive faster than one carry slot can clear
-  // them no matter how well you play — see the carry-two note in HANDOFF.md.
-  const SPAWN_FLOOR_MS  = 3400;
+  // 3400->2800 (17.6->21.4 orders/min at peak). The 2.74s-round-trip floor
+  // this used to be pinned against is stale: that was measured before
+  // PLAYER_SPEED went to 550px/s, and the real round trip is now ~1.1s, so
+  // there is real slack below the old number -- see the same playthrough
+  // data noted at PATIENCE_END_S.
+  const SPAWN_FLOOR_MS  = 2800;
 
   // Real services arrive in surges, not on a slider. The ramp above still sets
   // the baseline; this swings the spawn gap either side of it so a party lands,
@@ -728,7 +737,9 @@
   // the "rush intensity" axis — late waves hit harder and the lulls between
   // them stop being long enough to fully recover in.
   const WAVE_PERIOD_MS = 42000;
-  const WAVE_DEPTH_START = 0.18, WAVE_DEPTH_END = 0.55;
+  // END 0.55->0.65: deeper swings so peak reads as real spikes rather than a
+  // flat-hard plateau -- see the playthrough note at PATIENCE_END_S.
+  const WAVE_DEPTH_START = 0.18, WAVE_DEPTH_END = 0.65;
   function waveFactor(){
     const depth = lerp(WAVE_DEPTH_START, WAVE_DEPTH_END, rushProgress());
     const phase = (Math.sin(elapsed / WAVE_PERIOD_MS * Math.PI * 2 - Math.PI/2) + 1) / 2;
@@ -785,7 +796,10 @@
   const FLOW_STREAK_NEEDED = 3;    // consecutive fast ones to light it
   const FLOW_MULT = 2;
 
-  const EAT_START_MS = 22000, EAT_END_MS = 12000;
+  // END 12000->9500: faster late-shift turnover so bussing pressure stacks
+  // on top of delivery pressure at peak instead of arriving on its own
+  // schedule -- see the playthrough note at PATIENCE_END_S.
+  const EAT_START_MS = 22000, EAT_END_MS = 9500;
   const eatMs = () => lerp(EAT_START_MS, EAT_END_MS, rushProgress());
 
   // Money is held in whole cents so a shift's total never drifts the way a
