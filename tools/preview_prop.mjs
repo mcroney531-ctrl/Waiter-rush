@@ -35,7 +35,8 @@ const ROOT = resolve(HERE, '..');
 const args = process.argv.slice(2);
 const glbArg = args.find(a => !a.startsWith('--'));
 if (!glbArg) {
-  console.error('usage: node tools/preview_prop.mjs <model.glb> [--with <character>] [--elev 34]');
+  console.error('usage: node tools/preview_prop.mjs <model.glb> [--with <character>] '
+              + '[--textured] [--elev 34]');
   process.exit(1);
 }
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i === -1 ? d : args[i + 1]; };
@@ -45,6 +46,9 @@ const NAME  = basename(GLB, extname(GLB));
 const ELEV  = +opt('elev', 34);          // matches render_sprites.mjs
 const WITH  = opt('with', null);
 const CELL  = +opt('cell', 460);
+// Clay is the default because the first download out of Meshy has no material
+// at all. Once Texture has been run, --textured shows what actually ships.
+const TEXTURED = args.includes('--textured');
 const YAWS  = [0, 90, 180, 270];
 
 const STAGE = join(ROOT, '.prop-stage');
@@ -80,6 +84,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CELL = ${CELL}, YAWS = ${JSON.stringify(YAWS)}, WITH = ${WITH ? 'true' : 'false'};
+const TEXTURED = ${TEXTURED};
 const sheet = document.createElement('canvas');
 sheet.width = CELL * YAWS.length; sheet.height = CELL;
 const sctx = sheet.getContext('2d');
@@ -111,7 +116,15 @@ function uprightGuess(size){
 const out = {};
 const g = await load('model.glb');
 let root = g.scene;
-root.traverse(o => { if (o.isMesh) { o.material = CLAY; o.geometry.computeVertexNormals(); } });
+// computeVertexNormals is only safe on the clay path: it discards the shading
+// normals the exporter wrote, which is what makes an untextured mesh readable,
+// and would flatten a textured one's baked detail.
+root.traverse(o => {
+  if (!o.isMesh) return;
+  if (TEXTURED) { out.materialCount = (out.materialCount || 0) + 1; return; }
+  o.material = CLAY;
+  o.geometry.computeVertexNormals();
+});
 
 let box = new THREE.Box3().setFromObject(root);
 let size = box.getSize(new THREE.Vector3());
@@ -206,4 +219,5 @@ if (out.characterHeight != null) {
   console.log(`  character       ${out.characterHeight} tall`);
   console.log(`  table / char    ${(out.tableTopVsCharacter * 100).toFixed(0)}%  (the spec wants ~50%)`);
 }
+console.log(`  shown as        ${TEXTURED ? 'its own textures' : 'neutral clay'}`);
 console.log(`  wrote           art-source/shots/prop-${NAME}.png`);
