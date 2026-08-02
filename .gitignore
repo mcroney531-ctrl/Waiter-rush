@@ -22,3 +22,8 @@ picker*.png
 
 # HUD screenshots written by tools/moneysign.js
 art-source/shots/
+
+# Compiled bytecode cache, regenerated every time a tools/*.py script runs.
+# One of these got swept into a commit by accident and re-dirtied the tree
+# on every whatis.py/shrink_glb.py run after that.
+__pycache__/
