@@ -358,7 +358,9 @@ The Dine-O Dash dining room replaced the painted `kitchen.jpg`. Two things moved
 
 Verified by walking the character to all twelve stops — both pickups, all eight tables, both dish returns. `groundtest.js` in the scratch pattern does this and is worth rebuilding whenever the board changes.
 
-**This board is interim.** It will be replaced by a 3D room composed in Meshy Scene. The spec asks for matching proportions specifically so the geometry above is mapped once rather than twice.
+**This board is interim.** It will be replaced by a room assembled from Meshy props and rendered by `tools/render_room.mjs`. The spec asks for matching proportions specifically so the geometry above is mapped once rather than twice. Start at `art-source/ROOM-BRIEF.md`.
+
+*Meshy Scene was the original plan for this and has been ruled out.* It is an image generator steered by a rough 3D layout — the panel names its model, Nano Banana — not a camera projection. It cannot promise pixel-exact placement or a 1536×1024 orthographic frame, and every render would reinterpret the room rather than project it, which loses the entire reason for doing this in 3D: that a table lands at y 620 because the code put it there.
 
 ## Character production spec (Dine-O Dash)
 
