@@ -2898,14 +2898,14 @@
 
     ctx.save();
     ctx.font = '500 15px DM Sans, sans-serif';
-    const padX = 20, panelW = W - 48;
+    // Top-centre rather than the full-width bottom bar this replaced: 200-760
+    // clears the tips sign (ends x181) on the left and the lives stones on
+    // the right, with room below before the ticket rail starts (~y190) even
+    // at four wrapped lines, the longest any step gets at this width.
+    const padX = 20, panelW = 560;
     const lines = wrapText(body, panelW - padX*2 - 104);
-    // Tight on purpose: the front-row SET DOWN pads sit at padY 855 art-px
-    // (534 canvas-px), only ~106 canvas-px above the bottom edge, so this
-    // panel has to fit under them without overlapping the pad or its label --
-    // see the note where R2 is defined. Flush to the edge, minimal chrome.
     const panelH = 44 + lines.length * 19;
-    const px = 24, py = H - panelH - 6;
+    const px = 200, py = 14;
     tut.bannerTop = py;
 
     // Lifts the pad off the floor rather than letting it read as flat paint.
