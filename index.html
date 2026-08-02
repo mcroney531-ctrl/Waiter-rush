@@ -2860,6 +2860,12 @@
     }
   }
 
+  // A waiter's own order pad rather than a UI box -- cream paper, dark ink,
+  // a punched spiral top. The room is already dense with carved wood and
+  // stone (tables, counter, both signs, the tips board), so another
+  // wood-toned panel would just be one more thing in that material fighting
+  // for the same visual slot. Paper separates by value instead: light on a
+  // dark warm floor, rather than trying to out-carve everything else.
   function drawTutorialBanner(){
     if (mode !== 'tutorial' || !tut) return;
     const step = TUTORIAL_STEPS[tut.index];
@@ -2875,26 +2881,42 @@
     ctx.font = '500 16px DM Sans, sans-serif';
     const padX = 22, panelW = W - 48;
     const lines = wrapText(body, panelW - padX*2 - 110);
-    const panelH = 48 + lines.length * 22;
+    const panelH = 58 + lines.length * 22;
     const px = 24, py = H - panelH - 16;
     tut.bannerTop = py;
 
-    ctx.fillStyle = 'rgba(28,23,18,0.86)';
-    roundRect(ctx, px, py, panelW, panelH, 12); ctx.fill();
-    ctx.strokeStyle = accent; ctx.lineWidth = 3;
-    roundRect(ctx, px, py, panelW, panelH, 12); ctx.stroke();
+    // Lifts the pad off the floor rather than letting it read as flat paint.
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    roundRect(ctx, px + 3, py + 5, panelW, panelH, 8); ctx.fill();
+
+    ctx.fillStyle = '#F4EEDB';
+    roundRect(ctx, px, py, panelW, panelH, 8); ctx.fill();
+
+    // Spiral binding punched through the top edge -- the steno-pad tell,
+    // and the one purely decorative touch here.
+    ctx.fillStyle = 'rgba(43,38,32,0.32)';
+    for (let x = px + 22; x < px + panelW - 12; x += 26){
+      ctx.beginPath();
+      ctx.arc(x, py, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = accent; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px + padX, py + 32); ctx.lineTo(px + panelW - padX, py + 32);
+    ctx.stroke();
 
     ctx.textAlign = 'left';
     ctx.fillStyle = accent;
     ctx.font = '12px Galindo, sans-serif';
     ctx.fillText(label.toUpperCase(), px + padX, py + 25);
 
-    ctx.fillStyle = '#F4EEDB';
+    ctx.fillStyle = COLORS.text;
     ctx.font = '500 16px DM Sans, sans-serif';
-    lines.forEach((ln, i) => ctx.fillText(ln, px + padX, py + 48 + i*22));
+    lines.forEach((ln, i) => ctx.fillText(ln, px + padX, py + 56 + i*22));
 
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(244,238,219,0.45)';
+    ctx.fillStyle = 'rgba(43,38,32,0.5)';
     ctx.font = '12px Galindo, sans-serif';
     ctx.fillText('STEP ' + (tut.index + 1) + ' OF ' + TUTORIAL_STEPS.length,
                  px + panelW - padX, py + 25);
