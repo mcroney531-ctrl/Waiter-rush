@@ -23,9 +23,13 @@
     font-display: block;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  /* The same fossil-wall room as the pre-shift screens (see #landing below),
+     showing in the letterbox gutter around the board during the shift itself
+     -- previously flat #1c1712 there, which read as falling out of the room
+     the moment a shift started rather than the game taking place in it. */
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
-    background: #1c1712;
+    background: #1c1712 url('assets/ui/backdrop.webp') no-repeat center / cover;
     font-family: 'DM Sans', 'Segoe UI', sans-serif;
     touch-action: none;
   }
@@ -992,6 +996,7 @@
   const DISH_CLINK   = 0.07;   // lifting a stack of dirties
   const DISH_CLATTER = 0.10;   // dropping them in the return
   const WARN_LEVEL   = 0.10;   // a table running out of patience
+  const TUT_BELL     = 0.13;   // the counter bell on a new tutorial message
   // How low patience gets before the table is announced, and the shortest gap
   // between announcements. Eight tables can cross the line together; without
   // the gap that is eight overlapping copies of the same sound.
@@ -1243,6 +1248,16 @@
     const t = ac.currentTime;
     ding(t,        622.25, WARN_LEVEL, 0.20, 'triangle');   // D#5
     ding(t + 0.13, 466.16, WARN_LEVEL, 0.30, 'triangle');   // A#4
+  }
+
+  // The counter bell -- the "ding" you'd tap to call a waiter over, played on
+  // every new tutorial message: a fresh step, a miss note, a success line.
+  // Only ever heard during the tutorial, so it can ring a beat longer than
+  // anything else here (0.42s) and not wear out its welcome the way it would
+  // if it fired mid-shift.
+  function sfxTutorialBell(){
+    if (!ac || muted) return;
+    ding(ac.currentTime, 1975.5, TUT_BELL, 0.42, 'sine');   // B6
   }
 
   // Both a button and a key: the button is the only option on a phone, and
@@ -2116,6 +2131,7 @@
       onMiss(){
         tut.note = 'They walked. On a real shift that costs a life — here we just run it again.';
         tut.noteTimer = 2600;
+        sfxTutorialBell();
         spawnTicket(3);
       },
       success: () => 'Out before the bar emptied. That is the whole game.'
@@ -2156,6 +2172,7 @@
       onMiss(){
         tut.note = 'Lost one. It costs you nothing here — keep going.';
         tut.noteTimer = 2200;
+        sfxTutorialBell();
       },
       success: () => 'Service. You are ready for the floor.'
     }
@@ -2169,6 +2186,7 @@
     tut.missed = false;
     const step = TUTORIAL_STEPS[i];
     if (step && step.enter) step.enter();
+    sfxTutorialBell();
   }
 
   function updateTutorial(dt){
@@ -2197,6 +2215,7 @@
     if (step.done()){
       tut.successMsg = step.success();
       tut.successTimer = 1700;
+      sfxTutorialBell();
     }
   }
 
@@ -2878,16 +2897,20 @@
     const accent = showNote ? COLORS.mustard : (showSuccess ? COLORS.happy : COLORS.counterTop);
 
     ctx.save();
-    ctx.font = '500 16px DM Sans, sans-serif';
-    const padX = 22, panelW = W - 48;
-    const lines = wrapText(body, panelW - padX*2 - 110);
-    const panelH = 58 + lines.length * 22;
-    const px = 24, py = H - panelH - 16;
+    ctx.font = '500 15px DM Sans, sans-serif';
+    const padX = 20, panelW = W - 48;
+    const lines = wrapText(body, panelW - padX*2 - 104);
+    // Tight on purpose: the front-row SET DOWN pads sit at padY 855 art-px
+    // (534 canvas-px), only ~106 canvas-px above the bottom edge, so this
+    // panel has to fit under them without overlapping the pad or its label --
+    // see the note where R2 is defined. Flush to the edge, minimal chrome.
+    const panelH = 44 + lines.length * 19;
+    const px = 24, py = H - panelH - 6;
     tut.bannerTop = py;
 
     // Lifts the pad off the floor rather than letting it read as flat paint.
     ctx.fillStyle = 'rgba(0,0,0,0.32)';
-    roundRect(ctx, px + 3, py + 5, panelW, panelH, 8); ctx.fill();
+    roundRect(ctx, px + 3, py + 4, panelW, panelH, 8); ctx.fill();
 
     ctx.fillStyle = '#F4EEDB';
     roundRect(ctx, px, py, panelW, panelH, 8); ctx.fill();
@@ -2903,23 +2926,23 @@
 
     ctx.strokeStyle = accent; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(px + padX, py + 32); ctx.lineTo(px + panelW - padX, py + 32);
+    ctx.moveTo(px + padX, py + 22); ctx.lineTo(px + panelW - padX, py + 22);
     ctx.stroke();
 
     ctx.textAlign = 'left';
     ctx.fillStyle = accent;
-    ctx.font = '12px Galindo, sans-serif';
-    ctx.fillText(label.toUpperCase(), px + padX, py + 25);
+    ctx.font = '11px Galindo, sans-serif';
+    ctx.fillText(label.toUpperCase(), px + padX, py + 16);
 
     ctx.fillStyle = COLORS.text;
-    ctx.font = '500 16px DM Sans, sans-serif';
-    lines.forEach((ln, i) => ctx.fillText(ln, px + padX, py + 56 + i*22));
+    ctx.font = '500 15px DM Sans, sans-serif';
+    lines.forEach((ln, i) => ctx.fillText(ln, px + padX, py + 39 + i*19));
 
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(43,38,32,0.5)';
-    ctx.font = '12px Galindo, sans-serif';
+    ctx.font = '11px Galindo, sans-serif';
     ctx.fillText('STEP ' + (tut.index + 1) + ' OF ' + TUTORIAL_STEPS.length,
-                 px + panelW - padX, py + 25);
+                 px + panelW - padX, py + 16);
     ctx.restore();
   }
 
