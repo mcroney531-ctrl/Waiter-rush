@@ -39,7 +39,7 @@ Three details in there are doing real work, so do not trim them:
 
 ---
 
-## 1. `table.png` — do this one first
+## 1. `table.png` — **done**, shipped as `art-source/room/table.glb`
 
 > The object: a chunky rectangular dining table for four. Thick timber top with a
 > strong flat front edge, carved stone base, simple uncomplicated silhouette.
@@ -84,15 +84,40 @@ worse than neutral, because it sat on the front face, which is the one surface
 the spec needs reading as a clean strong horizontal so the player can tell
 whether they are in front of the table or behind it.
 
+### The near edge has to be painted, not lit
+
+The finding that changes every prompt below. The shared key light sits at
+`(-4,7,6)`, which is only **0.10 apart in dot product** between a horizontal top
+surface and a vertical front face. So at the camera's 34 degrees, a top and a
+front carrying the same material render at nearly the same value and merge into
+one mass — the table's front edge survives only as a thin highlight along its
+chamfer, and no ambient or shadow setting separates them, because the key is too
+frontal to.
+
+The spec asks for a readable near edge on anything the player can stand in front
+of. That has to come from the art. **Where a prop has a top surface meeting a
+front face, ask for the front face to read darker than the top** — and where it
+matters most, ask for a light edge or trim along the join.
+
+---
+
 ## 2. `counter.png`
 
 > The object: a long low serving counter, about six times wider than it is tall.
-> One single unbroken horizontal top surface running the full width. Carved stone
-> front face with fossil relief and amber trim. Straight-on three-quarter view
-> with the whole length visible.
+> One single unbroken horizontal top surface running the full width, in pale
+> lit timber. Carved stone front face below it, clearly darker in value than the
+> top, with fossil relief and amber trim, and a bright narrow strip of trim along
+> the join where the top meets the front. Straight-on three-quarter view with the
+> whole length visible.
 
 The unbroken top edge is the whole point — see the spec's "counter silhouette is
 sacred". If it comes back wavy or broken, re-roll rather than continuing.
+
+This is the prop the near-edge finding matters most for. The whole pickup
+interaction reads off where the counter meets the floor and where its serving
+edge is, and it is a 6:1 object, which is where Meshy is weakest. It is also the
+one prop that gets **Remesh 20k** — everything else goes through untouched at
+whatever generate produces, which was ~29k for the table.
 
 ## 3. `dish-return.png`
 
