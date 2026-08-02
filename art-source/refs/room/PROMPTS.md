@@ -116,8 +116,12 @@ sacred". If it comes back wavy or broken, re-roll rather than continuing.
 This is the prop the near-edge finding matters most for. The whole pickup
 interaction reads off where the counter meets the floor and where its serving
 edge is, and it is a 6:1 object, which is where Meshy is weakest. It is also the
-one prop that gets **Remesh 20k** — everything else goes through untouched at
-whatever generate produces, which was ~29k for the table.
+only prop a remesh was ever specified for — and that instruction has since been
+withdrawn. See the runbook's step 2: 20k was written when the plan was to remesh
+everything at 15k, so it meant "more than the others"; against the 28,934
+triangles Image to 3D actually produces it is a 30% decimation, on the one object
+whose defining feature is a long straight edge. **No remesh.** Everything in the
+kit now goes through at whatever generate produces.
 
 ### What the reference measured
 

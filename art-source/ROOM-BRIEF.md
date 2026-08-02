@@ -131,9 +131,12 @@ job worth doing. Runbook §6 specifies it.
 - **The counter is one long object**, not a tiled segment with caps. The seam
   would land on the silhouette the spec calls sacred, and the usual fix — a
   pillar over the join — is the one thing forbidden on that edge.
-- **No rig, no animation on props**, so nothing forces a remesh. The table came
-  out of Image-to-3D at 28,934 triangles, which is already fine. Only the
-  counter gets Remesh 20k, because it is the one carrying the sacred edge.
+- **No rig, no animation on props, and therefore no remesh on anything.** The
+  table came out of Image-to-3D at 28,934 triangles, which is already fine. The
+  counter's old "Remesh 20k" instruction has been withdrawn — 20k was written
+  when the plan was to remesh everything at 15k, so it read as *more*; against
+  what generate actually produces it is a 30% decimation, and the object whose
+  defining feature is a long straight edge is the last one to decimate.
 
 ---
 
@@ -142,8 +145,12 @@ job worth doing. Runbook §6 specifies it.
 **1. Counter through Meshy.** The reference is approved and committed at
 `art-source/refs/room/counter.png`.
 
-> Image to 3D → **Remesh 20k** → *stop and look at the top edge in Meshy's
-> viewer* → Texture → Export GLB.
+> Image to 3D → **no remesh** → *stop and look at the top edge in Meshy's
+> viewer* → Texture → Export GLB. No Rig, no Animate.
+
+Skipping the remesh is free and reversible. If the edge comes back wavy, re-run
+*with* Remesh 20k as a repair attempt — retopology is the only lever that might
+straighten it, and doing it first makes a bad edge unattributable.
 
 The viewer check is not optional and is the only place it can be caught. The
 reference's serving edge wanders 1.6px across 1493px of length — 0.1% — so it is

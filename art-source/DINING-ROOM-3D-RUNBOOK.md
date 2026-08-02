@@ -167,7 +167,7 @@ and these are the source for every re-roll.
 | | |
 | --- | --- |
 | reference | `PROMPTS.md` §1 — note the plaque has to come out **blank** |
-| Meshy | Image to 3D → **Remesh 15k** → Export GLB |
+| Meshy | Image to 3D → Export GLB. **No remesh** — see below |
 | file | `art-source/room/table.glb` |
 
 No Rig. No Animate. Same as food.
@@ -197,12 +197,24 @@ same wrong proportion.
 | | |
 | --- | --- |
 | reference | `PROMPTS.md` §2 |
-| Meshy | Image to 3D → **Remesh 20k** → Export GLB |
+| Meshy | Image to 3D → Export GLB. **No remesh** |
 | file | `art-source/room/counter.glb` |
 
-20k rather than 15k: this one object is six times as wide as anything else in
-the kit and carries the silhouette the spec calls sacred. Everything else stays
-at 15k.
+This step used to say **Remesh 20k**, on the reasoning that this object is six
+times as wide as anything else in the kit and carries the silhouette the spec
+calls sacred, so it deserved more triangles than the 15k everything else was
+getting. That reasoning died with the table and the number outlived it.
+
+Image to 3D produced **28,934 triangles** unprompted. So 20k is not "more than
+the others", it is a **30% decimation** — and the one object whose defining
+feature is a long straight edge is the last place to spend a decimation, because
+a retopologiser redistributes vertices and that edge is where you would see it.
+
+Skip it. The asymmetry decides this rather than confidence about what Meshy's
+remesher would do: skipping is free and reversible, and if the edge does come
+back wavy, re-running *with* Remesh 20k is the natural repair attempt, since
+retopology is the only lever that might straighten it. Remesh first and a bad
+edge is unattributable — generate or decimation, no way to tell.
 
 Check in Meshy's viewer **before exporting**: is the top edge one straight line
 end to end, or has it gone wavy? A wavy serving edge is a re-roll, not something
@@ -210,7 +222,7 @@ to fix downstream — the entire pickup interaction reads off that line.
 
 ### Step 3 — the rest of level 1
 
-Same click path, 15k, no rig:
+Same click path, no remesh, no rig:
 
 | file | reference |
 | --- | --- |
@@ -260,8 +272,9 @@ table that nothing complains about until the repo is 400 MB.
 
 **Poly count is a repo problem, not a runtime one.** None of these models ship —
 only the rendered `board.jpg` does. So the budget exists to keep clones small
-and the renderer quick, not to keep the game fast. That is why 20k on the
-counter is affordable and why it would not be on a character.
+and the renderer quick, not to keep the game fast. That is why a 29k prop is
+affordable here and would not be on a character, and why the honest answer to
+"should I remesh this" is almost always no.
 
 ---
 
