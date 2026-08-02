@@ -101,7 +101,7 @@ matters most, ask for a light edge or trim along the join.
 
 ---
 
-## 2. `counter.png`
+## 2. `counter.png` — **reference approved**, saved beside this file
 
 > The object: a long low serving counter, about six times wider than it is tall.
 > One single unbroken horizontal top surface running the full width, in pale
@@ -118,6 +118,75 @@ interaction reads off where the counter meets the floor and where its serving
 edge is, and it is a 6:1 object, which is where Meshy is weakest. It is also the
 one prop that gets **Remesh 20k** — everything else goes through untouched at
 whatever generate produces, which was ~29k for the table.
+
+### What the reference measured
+
+The object is 1493 × 425 in the frame. Both long edges of the timber slab were
+traced per column and fitted to a line; the residual is what "unbroken" means
+numerically:
+
+| | residual std | worst | |
+| --- | --- | --- | --- |
+| serving edge | **1.6px** | 37px | over 1300 columns |
+| back edge | 4.0px | 24px | over 1300 columns |
+
+1.6px of wander across 1493px of length is 0.1%. The silhouette is sacred and
+this one is straight.
+
+Two earlier attempts at that measurement were wrong in opposite directions and
+are worth writing down, because every other long prop will need the same trace.
+Taking the **largest contiguous run** of timber per column tracked one *plank*,
+not the slab, because the painted seams between planks break the run — it
+reported 8px of wobble that was really the run hopping between boards. Taking
+the **outermost timber pixel** per column fell through into the amber trim,
+whose lit chips keep enough blue to pass a warm-colour test — 72px. What works
+is walking down from the back edge and stopping at the first gap wider than a
+seam (7px), which steps over plank lines and stops at the trim.
+
+The rest of the brief, checked:
+
+- **top against front face: 4.79:1 in value** (mean rgb 218,149,81 against
+  62,53,43). The table managed almost none of this, and it is the whole reason
+  the near edge survives a key light that cannot separate the two surfaces.
+- **bright trim along the join** — present, continuous, full length.
+- **no ground shadow** — 173 pixels outside the object differ from the
+  background at all, and only faintly. Nothing for Image to 3D to fuse to the base.
+- **ornament clears the 40px minimum**, which on the table only the plaque did.
+  A counter draws roughly 494px on screen against a table's 144, so the scale
+  from reference to screen is 0.33 rather than 0.106:
+
+  | element | in the reference | on screen | |
+  | --- | --- | --- | --- |
+  | plesiosaur skeleton | 430px | 142px | motif |
+  | triceratops skull | 190px | 63px | motif |
+  | ammonite spiral | 180px | 60px | motif |
+  | amber diamond | 65px | 22px | texture |
+
+  So the counter is the opposite case to the table: it is big enough on screen
+  to carry three separate motifs, and the small amber inlays correctly fall back
+  to being surface texture.
+
+### It is nearer 5.4:1 than 6:1, and that is a layout consequence
+
+Measured at mid-span the vertical faces are 249px (18px of slab edge, 231px of
+stone) against 1493px of length — 6.0:1 as drawn. But the drawing's camera
+compresses the vertical faces and foreshortens the length by different amounts,
+and undoing both lands the true proportion at about **5.4:1**.
+
+That is not a re-roll, it is a decision for `render_room.mjs`. The spec fixes the
+counter's height, not its length: a top surface at half a 208px character is
+about 104 art px off the floor, so a 5.4:1 counter runs **~560 art px** where the
+painted board's counter runs 790. Options, best first:
+
+1. **Place it at 560–600px and let the wall either side get dressed.** The spec
+   asks for one continuous serving edge with a pickup position at each end and
+   clear floor beneath — a 560px counter centred in a 1536px room satisfies all
+   of that, and gives the shelf unit and the pass sign somewhere to live.
+2. Stretch X by ~1.15 to reach 650px. The ammonite becomes a slightly wide
+   ellipse at 60px on screen; survivable.
+3. Scale to the painted 790px and accept a top at 146 art px — 70% of the
+   character. That is a bar, not a serving counter, and it would occlude the
+   ticket plates. Don't.
 
 ## 3. `dish-return.png`
 
