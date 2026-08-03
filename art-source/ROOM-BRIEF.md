@@ -106,13 +106,14 @@ in `PROMPTS.md` came from.
 | # | prop | reference (A) | model (B) |
 | --- | --- | --- | --- |
 | 1 | `table` | ✅ approved (v2, frieze removed) | ✅ **shipped** — `art-source/room/table.glb`, 28,934 tris, 1.39 MB |
-| 2 | `counter` | ✅ **approved** — `refs/room/counter.png` | ⬜ **next action: run Meshy** |
-| 3 | `dish-return` | ⬜ | ⬜ |
+| 2 | `counter` | ✅ approved — `refs/room/counter.png` | ✅ **shipped** — `art-source/room/counter.glb`, 59,204 tris, 2.31 MB, 5.23:1 |
+| 3 | `dish-return` | ⬜ **next action** | ⬜ |
 | 4 | `pass-sign` | ⬜ | ⬜ |
 | 5–10 | `pillar`, `wall-panel`, `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
 
-**No counter GLB exists.** Nothing has been through Meshy since the table. If a
-session tells you otherwise, it has misread a file — see rule 1.
+Two props through both gates. If a session tells you the counter GLB doesn't
+exist, or that it's table-shaped, it's reading a stale copy of this file or a
+mislabelled upload — see rule 1.
 
 Also open, and bigger than any single prop: **`tools/render_room.mjs` does not
 exist.** It is the scene assembler, and it is the piece that makes this whole
@@ -142,39 +143,37 @@ job worth doing. Runbook §6 specifies it.
 
 ## The next three actions, in order
 
-**1. Counter through Meshy.** The reference is approved and committed at
-`art-source/refs/room/counter.png`.
+**1. Counter — done.** Shipped as `art-source/room/counter.glb`. Checked
+against all four things the checkpoint asks for on a long prop: top edge one
+straight line at 34°, front face reading darker than the top, base as one
+continuous plinth, and it measures 5.23:1 against a character — close to the
+reference's own 5.4:1, so the conversion didn't distort it.
 
-> Image to 3D → **no remesh** → *stop and look at the top edge in Meshy's
-> viewer* → Texture → Export GLB. No Rig, no Animate.
+That fourth check also caught a real bug in this document, worth recording so
+it doesn't come back: an earlier version of this checkpoint asked for "the top
+surface landing near half the character's height," copied from the *table's*
+line in `DINING-ROOM-3D-RUNBOOK.md` §Step 1. That line is table-only —
+`DINING-ROOM-SPEC.md`'s "half his height" sentence names tables specifically
+and says nothing about the counter, and the counter's own prompt in
+`PROMPTS.md` §2 asks for a **low** counter by name ("a long low serving
+counter, about six times wider than it is tall"). The shipped counter measures
+21% of a character's height. That is squat by design, not a defect — it is
+what "low" and "six times wider than tall" both mean. Don't re-flag it.
 
-Skipping the remesh is free and reversible. If the edge comes back wavy, re-run
-*with* Remesh 20k as a repair attempt — retopology is the only lever that might
-straighten it, and doing it first makes a bad edge unattributable.
-
-The viewer check is not optional and is the only place it can be caught. The
-reference's serving edge wanders 1.6px across 1493px of length — 0.1% — so it is
-straight going in. If it comes back wavy or broken, that is Meshy's doing and it
-is a re-roll of the conversion, not of the prompt. Then:
-
-```
-python3 tools/whatis.py <download>          # expect: no geometry match, ~5:1
-python3 tools/shrink_glb.py <download> --inplace
-node tools/preview_prop.mjs art-source/room/counter.glb --textured --with tyrone-t1
-```
-
-What the checkpoint is looking for: the top edge still one straight line at 34°;
-the front face still reading darker than the top; the base still one continuous
-plinth; and the top surface landing near half the character's height.
-
-**Known and already decided:** the reference is about **5.4:1**, not the 6:1 the
-prompt asked for. That is not a defect and not a re-roll. It means the counter
-runs ~560 art px at the correct height instead of the painted board's 790, and
-the answer is to place it at 560–600 and dress the extra wall. The ranked
-options are in `PROMPTS.md` §2.
+**Known and already decided, separately:** the reference is about **5.4:1**,
+not the 6:1 the prompt asked for. Also not a defect. It means the counter runs
+~560 art px at the correct height instead of the painted board's 790, and the
+answer is to place it at 560–600 and dress the extra wall. The ranked options
+are in `PROMPTS.md` §2.
 
 **2. `dish-return` and `pass-sign`.** `PROMPTS.md` §3 and §4, same loop, Remesh
 skipped, one of each — both are mirrored in code for the second copy.
+
+```
+python3 tools/whatis.py <download>          # expect: no geometry match
+python3 tools/shrink_glb.py <download> --inplace
+node tools/preview_prop.mjs art-source/room/<name>.glb --textured --with tyrone-t1
+```
 
 **3. Assemble grey.** Write `tools/render_room.mjs` and render four props at
 their spec positions with no walls, no lamps, no dressing.
