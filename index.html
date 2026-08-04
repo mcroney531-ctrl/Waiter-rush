@@ -778,7 +778,10 @@
   const CAPACITY_NOTICE_MS = 2600;
   // Longer than the capacity banner: this one is a reward rather than an
   // instruction, and the point is to look at the character for a moment.
-  const TIER_NOTICE_MS = 3000;
+  // 3000->4500: once a tier had a full illustrated splash instead of just a
+  // text banner, three seconds was not long enough to actually look at it
+  // while still tracking the floor.
+  const TIER_NOTICE_MS = 4500;
   // Auto-pickup fires every frame you stand on a pad, so a refusal message
   // needs a gate or it repaints itself into a solid block of text.
   const HINT_COOLDOWN_MS = 1600;
@@ -1431,6 +1434,25 @@
   let tierNotice = 0;         // ms left on the "levelled up" flourish
   let tierNoticeName = '';
 
+  // The full illustrated "PROMOTED!" splash, keyed by the tier just reached
+  // (2, 3, 4 — there is no promotion into tier 1). Not every character has
+  // one for every tier yet, so this is loaded the same speculative way as
+  // tierArt and drawMoments falls back to the plain text banner when a slot
+  // never resolves — same convention as the tier-ladder portraits.
+  let promoArt = {};          // {tier: {img}} — img null until loaded or missing
+
+  function loadPromoArt(id){
+    promoArt = {};
+    for (let tier = 2; tier <= 4; tier++){
+      const slot = { img: null };
+      const im = new Image();
+      im.onload  = () => { slot.img = im; };
+      im.onerror = () => { slot.img = null; };
+      im.src = `assets/promotions/${id}-t${tier}.jpg`;
+      promoArt[tier] = slot;
+    }
+  }
+
   let playerSheet = null;
   let playerSheetImg = null;
 
@@ -1456,6 +1478,7 @@
       return slot;
     });
     applyTier(0);
+    loadPromoArt(charId);
   }
 
   // Shows the requested tier, or the best one below it that actually loaded.
@@ -2905,8 +2928,25 @@
                    'BOTH HANDS FREE', 'you can carry two orders now', 300);
     }
     if (tierNotice > 0){
-      momentBanner(slot++, Math.min(1, tierNotice / 500), 'LEVELLED UP',
-                   (tierNoticeName || 'New kit') + ' — tier ' + (tierIndex + 1), 260);
+      const noticeAlpha = Math.min(1, tierNotice / 500);
+      // A full illustrated splash for the tier just reached, if one exists —
+      // falls back to the plain text banner otherwise, same convention as
+      // the tier-ladder portraits. Sized to the art's own aspect and parked
+      // in the counter strip above the floor, the same zone the small text
+      // banner already occupied — bigger, not a new place to look.
+      const promo = promoArt[tierIndex + 1];
+      if (promo && promo.img){
+        const img = promo.img;
+        const dh = 190, dw = dh * (img.naturalWidth / img.naturalHeight);
+        const dx = W/2 - dw/2, dy = FLOOR_TOP - dh + 10;
+        ctx.save();
+        ctx.globalAlpha = noticeAlpha;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.restore();
+      } else {
+        momentBanner(slot++, noticeAlpha, 'LEVELLED UP',
+                     (tierNoticeName || 'New kit') + ' — tier ' + (tierIndex + 1), 260);
+      }
       // The banner says it; this is what makes the player look at the character
       // instead of at the banner. A ring on the floor at their feet, expanding
       // and fading — near the sprite without covering anything that is read.
