@@ -880,10 +880,12 @@
       rushActive = true;
       rushEndsAt = now + rushDurationMs;
       sfxRushLand();
+      startRushMusic();
     }
     if (rushActive && now >= rushEndsAt){
       rushActive = false;
       rushArmedAt = 0;
+      endRushMusic();
     }
   }
 
@@ -1001,6 +1003,7 @@
     rushArmedAt = 0; rushLandAt = 0;
     rushActive = false; rushEndsAt = 0;
     rushDurationMs = 0; rushSpawnMult = 1; rushDrainMult = 1;
+    rushMusicSaved = null;
     updateHUD();
   }
 
@@ -1245,6 +1248,48 @@
     rampMusic(0, MUSIC_FADE_MS, () => {
       music.pause(); music.currentTime = 0;
       if (then) then();
+    });
+  }
+
+  let rushMusicSaved = null;   // {track, time} of whatever was playing before the rush track took over
+
+  // Swaps to shift-3, the "final boss" track, for the duration of a rush --
+  // fading out whatever was playing and fading the rush track in over it.
+  // Guarded on musicSet still being 'shift': a rush only ever arms mid-shift,
+  // but this is cheap insurance against a stray call finding music somewhere
+  // else (muted, not yet initialised).
+  function startRushMusic(){
+    if (!music || musicSet !== 'shift' || muted) return;
+    rushMusicSaved = { track: musicTrack, time: music.currentTime };
+    const rushTrack = MUSIC.shift.tracks[MUSIC.shift.tracks.length - 1];
+    rampMusic(0, MUSIC_FADE_MS, () => {
+      music.pause();
+      musicTrack = MUSIC.shift.tracks.length - 1;
+      music.src = rushTrack;
+      music.currentTime = 0;
+      music.play().then(() => rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS)).catch(() => {});
+    });
+  }
+
+  // Reverses startRushMusic -- fades back to whatever track and position it
+  // interrupted. Guarded on musicSet still being 'shift': if the rush ran out
+  // the clock on the player's last life, endGame() already cut to the menu
+  // track and there is nothing here to resume.
+  function endRushMusic(){
+    if (!music || !rushMusicSaved || musicSet !== 'shift'){ rushMusicSaved = null; return; }
+    const saved = rushMusicSaved;
+    rushMusicSaved = null;
+    rampMusic(0, MUSIC_FADE_MS, () => {
+      music.pause();
+      musicTrack = saved.track;
+      music.src = MUSIC.shift.tracks[musicTrack];
+      // currentTime only sticks reliably once the browser has metadata for
+      // the newly assigned src -- setting it in the same tick as `src` is a
+      // known source of silent no-ops, worse on mobile than desktop.
+      music.addEventListener('loadedmetadata', () => {
+        music.currentTime = saved.time;
+        music.play().then(() => rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS)).catch(() => {});
+      }, { once: true });
     });
   }
 

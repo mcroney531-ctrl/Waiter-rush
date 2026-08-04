@@ -36,6 +36,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
       t.state='waiting'; t.patience=1; t.warned=false; },
     get sheetOn(){return sheetReady();},
     get music(){return music;}, get musicErrorStreak(){return musicErrorStreak;},
+    get musicSet(){return musicSet;}, get musicTrack(){return musicTrack;},
+    get rushMusicSaved(){return rushMusicSaved;}, get muted(){return muted;},
     get rushActive(){return rushActive;}, get rushArmedAt(){return rushArmedAt;},
     get rushLandAt(){return rushLandAt;}, get rushEndsAt(){return rushEndsAt;},
     get rushFastCount(){return rushFastCount;}, set rushFastCount(v){rushFastCount=v;},
@@ -65,7 +67,8 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
-              'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak',
+              'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
+              'rushMusicSaved', 'muted',
               'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
               'rushUsedThisShift', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
     assert field in DBG, field
