@@ -1025,6 +1025,7 @@
   const DISH_CLATTER = 0.10;   // dropping them in the return
   const WARN_LEVEL   = 0.10;   // a table running out of patience
   const TUT_BELL     = 0.13;   // the counter bell on a new tutorial message
+  const PICKER_KNOCK = 0.11;   // stepping left/right through the waiter picker
   // How low patience gets before the table is announced, and the shortest gap
   // between announcements. Eight tables can cross the line together; without
   // the gap that is eight overlapping copies of the same sound.
@@ -1290,6 +1291,29 @@
   function sfxTutorialBell(){
     if (!ac || muted) return;
     ding(ac.currentTime, 1975.5, TUT_BELL, 0.42, 'sine');   // B6
+  }
+
+  // Stepping left/right through the waiter picker: a knock on the wooden
+  // frame rather than a UI blip, matching the carved-plaque look of the
+  // picker itself. A hard bandpass click for the strike, a short low tone
+  // underneath for the hollow resonance of the wood — same two-layer shape
+  // as sfxStep's sole-and-thump, just harder and shorter, since this is a
+  // knock rather than a footfall.
+  function sfxPickerStep(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    const v = 0.92 + Math.random() * 0.16;
+    burst(t, 1400 * v, 3.4, PICKER_KNOCK, 0.03);
+    const o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(300 * v, t);
+    o.frequency.exponentialRampToValueAtTime(190 * v, t + 0.05);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(PICKER_KNOCK * 0.75, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.11);
   }
 
   // Both a button and a key: the button is the only option on a phone, and
@@ -1757,6 +1781,7 @@
     const i = CAST.indexOf(pickedChar);
     pickedChar = CAST[(i + delta + CAST.length) % CAST.length];
     renderPicker(delta > 0 ? 'next' : 'prev');
+    sfxPickerStep();
   }
 
   function randomiseAvatar(){
