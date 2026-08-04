@@ -865,6 +865,7 @@
     rushSpawnMult  = lerp(RUSH_SPAWN_MULT_START, RUSH_SPAWN_MULT_END, p);
     rushDrainMult  = lerp(RUSH_DRAIN_MULT_START, RUSH_DRAIN_MULT_END, p);
     sfxRushIncoming();
+    initRushMusic();   // spend the telegraph window fetching the track it will need
   }
 
   // Only the real shift arms one -- a chaotic spike has no place in the
@@ -1003,7 +1004,7 @@
     rushArmedAt = 0; rushLandAt = 0;
     rushActive = false; rushEndsAt = 0;
     rushDurationMs = 0; rushSpawnMult = 1; rushDrainMult = 1;
-    rushMusicSaved = null;
+    killRushMusic();   // the element is kept and reused; only its playback stops
     updateHUD();
   }
 
@@ -1210,15 +1211,26 @@
     });
   }
 
+  // Generalised so the rush track can fade on its own element without the two
+  // sharing one interval handle and cutting each other's fade short. The fade
+  // id lives on the element itself; rampMusic below stays the wrapper every
+  // existing caller already uses.
+  function rampEl(el, to, ms, done){
+    if (!el) return null;
+    clearInterval(el._fade);
+    const from = el.volume, t0 = performance.now();
+    el._fade = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+      if (k === 1){ clearInterval(el._fade); el._fade = null; if (done) done(); }
+    }, 30);
+    return el._fade;
+  }
+
   function rampMusic(to, ms, done){
     if (!music) return;
     clearInterval(musicFade);
-    const from = music.volume, t0 = performance.now();
-    musicFade = setInterval(() => {
-      const k = Math.min(1, (performance.now() - t0) / ms);
-      music.volume = Math.max(0, Math.min(1, from + (to - from) * k));
-      if (k === 1){ clearInterval(musicFade); musicFade = null; if (done) done(); }
-    }, 30);
+    musicFade = rampEl(music, to, ms, done);
   }
 
   // Autoplay is blocked until the page has had a gesture, so a cold first load
@@ -1227,6 +1239,11 @@
   function playMusic(setName){
     const set = MUSIC[setName];
     if (!set) return;
+    // Any set change ends the rush overlay. endGame() comes straight here
+    // without passing through endRushMusic -- the loop has already stopped by
+    // then, so the rush's own end transition never fires -- and without this
+    // the rush track would keep playing under the menu theme.
+    killRushMusic();
     const already = musicSet === setName && music && !music.paused;
     musicSet = setName;
     if (muted || already) return;
@@ -1244,6 +1261,7 @@
   // `then` runs after that, which is how one set hands over to the next.
   function stopMusic(then){
     musicSet = null;
+    killRushMusic();
     if (!music || music.paused){ if (then) then(); return; }
     rampMusic(0, MUSIC_FADE_MS, () => {
       music.pause(); music.currentTime = 0;
@@ -1251,45 +1269,74 @@
     });
   }
 
-  let rushMusicSaved = null;   // {track, time} of whatever was playing before the rush track took over
+  // The rush track gets its own <audio> element rather than being swapped into
+  // the shared one, which is what the first version of this did and why it
+  // played silence instead of a sting.
+  //
+  // Reassigning .src unloads whatever was buffered: the ~3MB rush file then has
+  // to download before play() can resolve, and a rush only lasts 8-18s, so on
+  // anything but a warm cache the swap finishes after the rush is already over.
+  // Coming back cost a second reload for the same reason, plus a loadedmetadata
+  // round trip to restore the playhead. A second streaming element removes both
+  // reloads outright -- the shift track keeps its buffer AND its position while
+  // paused, so resuming is just play() again, and the rush track is fetched once
+  // and kept.
+  const RUSH_TRACK = 'assets/audio/shift-3.mp3';
+  let rushMusic = null;
+  let rushMusicPlaying = false;
 
-  // Swaps to shift-3, the "final boss" track, for the duration of a rush --
-  // fading out whatever was playing and fading the rush track in over it.
-  // Guarded on musicSet still being 'shift': a rush only ever arms mid-shift,
-  // but this is cheap insurance against a stray call finding music somewhere
-  // else (muted, not yet initialised).
+  // Called when a rush arms, not when it lands: the telegraph window ("RUSH IS
+  // COMING", 5-15s) is exactly the head start the fetch needs, and it costs
+  // nothing on a shift where no rush ever arms.
+  function initRushMusic(){
+    if (rushMusic) return;
+    rushMusic = new Audio();
+    rushMusic.preload = 'auto';
+    rushMusic.loop = true;      // so it cannot run out under a long rush
+    rushMusic.volume = 0;
+    rushMusic.src = RUSH_TRACK;
+  }
+
+  // Ends the overlay outright rather than fading. Any change of music set --
+  // game over, a new shift -- has to come through here, or the rush element
+  // keeps playing underneath the new track.
+  function killRushMusic(){
+    rushMusicPlaying = false;
+    if (!rushMusic) return;
+    clearInterval(rushMusic._fade); rushMusic._fade = null;
+    rushMusic.pause();
+    rushMusic.volume = 0;
+  }
+
+  function resumeShiftMusic(){
+    if (!music || musicSet !== 'shift') return;
+    music.play().then(() => rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS)).catch(() => {});
+  }
+
+  // Guarded on musicSet still being 'shift': a rush only ever lands mid-shift,
+  // but this is cheap insurance against a stray call finding music elsewhere.
   function startRushMusic(){
     if (!music || musicSet !== 'shift' || muted) return;
-    rushMusicSaved = { track: musicTrack, time: music.currentTime };
-    const rushTrack = MUSIC.shift.tracks[MUSIC.shift.tracks.length - 1];
+    initRushMusic();                       // no-op if arming already did it
     rampMusic(0, MUSIC_FADE_MS, () => {
-      music.pause();
-      musicTrack = MUSIC.shift.tracks.length - 1;
-      music.src = rushTrack;
-      music.currentTime = 0;
-      music.play().then(() => rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS)).catch(() => {});
+      music.pause();                       // keeps src and currentTime -- resuming is just play()
+      rushMusic.currentTime = 0;
+      rushMusic.volume = 0;
+      rushMusic.play().then(() => {
+        rushMusicPlaying = true;
+        rampEl(rushMusic, MUSIC.shift.vol, MUSIC_FADE_MS);
+      }).catch(() => resumeShiftMusic());  // rush track unavailable: the sting is lost, the room keeps its music
     });
   }
 
-  // Reverses startRushMusic -- fades back to whatever track and position it
-  // interrupted. Guarded on musicSet still being 'shift': if the rush ran out
-  // the clock on the player's last life, endGame() already cut to the menu
-  // track and there is nothing here to resume.
+  // rushMusicPlaying false means the swap never took and the catch above
+  // already put the shift track back, so there is nothing here to undo.
   function endRushMusic(){
-    if (!music || !rushMusicSaved || musicSet !== 'shift'){ rushMusicSaved = null; return; }
-    const saved = rushMusicSaved;
-    rushMusicSaved = null;
-    rampMusic(0, MUSIC_FADE_MS, () => {
-      music.pause();
-      musicTrack = saved.track;
-      music.src = MUSIC.shift.tracks[musicTrack];
-      // currentTime only sticks reliably once the browser has metadata for
-      // the newly assigned src -- setting it in the same tick as `src` is a
-      // known source of silent no-ops, worse on mobile than desktop.
-      music.addEventListener('loadedmetadata', () => {
-        music.currentTime = saved.time;
-        music.play().then(() => rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS)).catch(() => {});
-      }, { once: true });
+    if (!rushMusic || !rushMusicPlaying){ rushMusicPlaying = false; return; }
+    rushMusicPlaying = false;
+    rampEl(rushMusic, 0, MUSIC_FADE_MS, () => {
+      rushMusic.pause();
+      resumeShiftMusic();
     });
   }
 
@@ -1299,7 +1346,10 @@
     if (master) master.gain.setTargetAtTime(muted ? 0 : SFX_MASTER, ac.currentTime, 0.02);
     // The mute button owns the music too. Unmuting back onto a menu screen
     // should bring the track back, not leave the button lying about what it did.
-    if (muted) { clearInterval(musicFade); musicFade = null; if (music) music.pause(); }
+    // Muting mid-rush drops the overlay rather than pausing it: unmuting goes
+    // back through playMusic, which restarts the shift set from its first
+    // track, and a rush element left parked would then play over the top of it.
+    if (muted) { clearInterval(musicFade); musicFade = null; if (music) music.pause(); killRushMusic(); }
     else if (musicSet) { const s = musicSet; musicSet = null; playMusic(s); }
     const b = document.getElementById('muteBtn');
     if (b){
