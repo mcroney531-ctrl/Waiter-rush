@@ -109,23 +109,28 @@ in `PROMPTS.md` came from.
 | 2 | `counter` | ✅ approved — `refs/room/counter.png` | ✅ **shipped** — `art-source/room/counter.glb`, 59,204 tris, 2.31 MB, 5.23:1 |
 | 3 | `dish-return` | ✅ approved — `refs/room/dish-return.png` | ⬜ **next action: run Meshy** |
 | 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 302,572 tris, 11.97 MB — **exported Y-up already; always render with `--upright none`, see below** |
-| 5–10 | `pillar`, `wall-panel`, `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
+| 5 | `pillar` | ✅ approved — `refs/room/pillar.png` | ✅ **shipped** — `art-source/room/pillar.glb`, 298,326 tris, 11.70 MB — **exported Y-up already; always render with `--upright none`** |
+| 6–10 | `wall-panel`, `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
 
-Three props through gate A, two through both. If a session tells you the
+Four props through gate A, three through both. If a session tells you the
 counter GLB doesn't exist, or that it's table-shaped, it's reading a stale
 copy of this file or a mislabelled upload — see rule 1.
 
-**`pass-sign.glb` needs an upright override.** `preview_prop.mjs`'s
-shortest-axis-is-up guess assumes an object is wider and deeper than it is
-tall — true for a table or counter, false for a flat hanging sign, whose
-shortest axis is its own thickness. Guessing wrong laid it on its side (the
-carved arrow visibly rotated through down/right/up/left across the four
-yaws instead of staying down). `preview_prop.mjs` now takes
-`--upright x|y|z|none` to override the guess; this one wants `none`. Check
-any tall, thin, or otherwise non-table-proportioned prop (`pillar` is next)
-the same way — render once, look at whether a directional feature (an
-arrow, a face, anything asymmetric) stays consistent across yaws, and use
-the override if it doesn't.
+**`pass-sign.glb` and `pillar.glb` both need an upright override.**
+`preview_prop.mjs`'s shortest-axis-is-up guess assumes an object is wider
+and deeper than it is tall — true for a table or counter, false for
+anything whose footprint is smaller than its height. Guessing wrong laid
+the pass-sign on its side (the carved arrow visibly rotated through
+down/right/up/left across the four yaws instead of staying down) and did
+the same to the pillar — bbox `0.685 x 1.9 x 0.685` guessed axis `x`,
+which renders it lying on its side with the capital pointing sideways in
+two of the four yaws. `preview_prop.mjs` takes `--upright x|y|z|none` to
+override the guess; both of these want `none` — Meshy exported them Y-up
+already, the heuristic just doesn't know that a square-section object can
+still be the tall axis. Check any tall, thin, or otherwise
+non-table-proportioned prop the same way — render once, look at whether a
+directional feature (an arrow, a face, a repeated motif) stays consistent
+across yaws, and use the override if it doesn't.
 
 Also open, and bigger than any single prop: **`tools/render_room.mjs` does not
 exist.** It is the scene assembler, and it is the piece that makes this whole
@@ -182,7 +187,16 @@ are in `PROMPTS.md` §2.
 Y-up (unlike the table and counter) — see the upright-override note above
 before re-previewing it.
 
-**3. `dish-return` — next action.** Reference approved at
+**3. `pillar` — done.** Shipped as `art-source/room/pillar.glb`. Same
+upright-override case as the pass-sign: default guess picked axis `x` and
+laid it on its side, `--upright none` confirmed correct (capital, fluted
+shaft and plinth hold steady across all four yaws). Measures 112% of a
+character's height (1.9 vs 1.7) — expected and not a defect, since the
+pillar is a floor-to-ceiling architectural element, not a work surface;
+the table's "half a character's height" rule in `DINING-ROOM-SPEC.md`
+never applied to it. Don't re-flag it.
+
+**4. `dish-return` — next action.** Reference approved at
 `refs/room/dish-return.png`. Same loop as the others, Remesh skipped:
 
 ```
@@ -195,7 +209,7 @@ node tools/preview_prop.mjs art-source/room/dish-return.glb --textured --with ty
 # doesn't hold steady across the four yaws.
 ```
 
-**4. Assemble grey.** Write `tools/render_room.mjs` and render four props at
+**5. Assemble grey.** Write `tools/render_room.mjs` and render four props at
 their spec positions with no walls, no lamps, no dressing.
 
 ```
