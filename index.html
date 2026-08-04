@@ -1085,6 +1085,7 @@
   let music = null, musicFade = null;
   let musicSet = null;      // which set is wanted; null means silence
   let musicTrack = 0;
+  let musicErrorStreak = 0; // consecutive failed advances, since playMusic reset
 
   function initMusic(){
     if (music) return;
@@ -1093,13 +1094,25 @@
     music.volume = 0;
     // A set with several tracks advances instead of looping. Only one src is
     // ever assigned, so track two is not fetched until track one ends.
-    music.addEventListener('ended', () => {
+    const advance = () => {
       if (!musicSet) return;
       const set = MUSIC[musicSet];
       if (set.tracks.length < 2) return;         // single tracks use .loop
       musicTrack = (musicTrack + 1) % set.tracks.length;
       music.src = set.tracks[musicTrack];
       music.play().catch(() => {});
+    };
+    music.addEventListener('ended', () => { musicErrorStreak = 0; advance(); });
+    // A track that stalls or fails to load -- mobile data mid-shift is the
+    // real case -- fires `error`, not `ended`. Without this the playlist just
+    // goes silent for the rest of the shift: `ended` never fires for a track
+    // that never started, so nothing was listening for the failure. Capped at
+    // one pass over the playlist so a genuine outage gives up quietly instead
+    // of hammering play() in a tight loop.
+    music.addEventListener('error', () => {
+      if (!musicSet) return;
+      if (++musicErrorStreak > MUSIC[musicSet].tracks.length) return;
+      advance();
     });
   }
 
@@ -1125,6 +1138,7 @@
     if (muted || already) return;
     initMusic();
     musicTrack = 0;
+    musicErrorStreak = 0;
     music.loop = set.tracks.length === 1;
     music.src = set.tracks[0];
     music.volume = 0;
