@@ -111,17 +111,18 @@ in `PROMPTS.md` came from.
 | 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 302,572 tris, 11.97 MB — **exported Y-up already; always render with `--upright none`, see below** |
 | 5 | `pillar` | ✅ approved — `refs/room/pillar.png` | ✅ **shipped** — `art-source/room/pillar.glb`, 298,326 tris, 11.70 MB — **exported Y-up already; always render with `--upright none`** |
 | 6 | `wall-panel` | ✅ approved — `refs/room/wall-panel.png` | ✅ **shipped** — `art-source/room/wall-panel.glb`, 429,724 tris, 16.53 MB — **exported Y-up already; always render with `--upright none`** |
-| 7–10 | `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
+| 7 | `pendant-lamp` | ✅ approved — `refs/room/pendant-lamp.png` | ✅ **shipped** — `art-source/room/pendant-lamp.glb`, 264,450 tris, 10.55 MB — **exported Y-up already; always render with `--upright none`** |
+| 8–10 | `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
 
-Five props through gate A, four through both. If a session tells you the
+Six props through gate A, five through both. If a session tells you the
 counter GLB doesn't exist, or that it's table-shaped, it's reading a stale
 copy of this file or a mislabelled upload — see rule 1.
 
-**`pass-sign.glb`, `pillar.glb`, and `wall-panel.glb` all need an upright
-override.** `preview_prop.mjs`'s shortest-axis-is-up guess assumes an
-object is wider and deeper than it is tall — true for a table or counter,
-false for anything whose *shortest* dimension isn't its height. Three
-different ways that assumption has broken so far:
+**`pass-sign.glb`, `pillar.glb`, `wall-panel.glb`, and `pendant-lamp.glb`
+all need an upright override.** `preview_prop.mjs`'s shortest-axis-is-up
+guess assumes an object is wider and deeper than it is tall — true for a
+table or counter, false for anything whose *shortest* dimension isn't its
+height. Four different ways that assumption has broken so far:
 
 - **pass-sign** — a flat hanging sign, shortest axis is its own thickness.
   Guessed wrong, laid it on its side (the carved arrow visibly rotated
@@ -134,19 +135,25 @@ different ways that assumption has broken so far:
   plaque — the skull motif showed from a steep raking angle instead of
   face-on, exactly like looking down at a table rather than at a hung
   panel.
+- **pendant-lamp** — square in section like the pillar
+  (`0.765 x 1.898 x 0.766`). Guessed `x`, laid the whole fixture on its
+  side so the chain ran horizontal like a flail instead of hanging down.
 
-All three were already exported Y-up; the heuristic just has no way to
-tell a genuinely short vertical object from a flat one lying with its
-thin axis pointed the wrong way. `preview_prop.mjs` takes
-`--upright x|y|z|none` to override the guess — all three of these want
+All four were already exported Y-up; the heuristic just has no way to
+tell a genuinely short vertical object from a flat or square one lying
+with its thin axis pointed the wrong way. `preview_prop.mjs` takes
+`--upright x|y|z|none` to override the guess — all four of these want
 `none`. Check any tall, thin, flat, or otherwise non-table-proportioned
 prop the same way: render once with no override, look at whether a
-directional feature (an arrow, a face, a repeated motif) stays consistent
-across yaws or reads face-on rather than from above, and use the override
-if it doesn't. At this point assume every remaining prop (`pendant-lamp`,
-`planter`, `floor-inlay`, `shelf-unit`) will need the same check — only
-the table and counter, both genuinely wider/deeper than tall, have
-guessed correctly so far.
+directional feature (an arrow, a face, a repeated motif, a hanging chain)
+stays consistent/vertical across yaws, and use the override if it
+doesn't. At this point assume every remaining prop (`planter`,
+`floor-inlay`, `shelf-unit`) will need the same check — only the table and
+counter, both genuinely wider/deeper than tall, have guessed correctly so
+far. `floor-inlay` is a special case worth pre-empting: it's meant to be
+seen from directly above (flush in the floor), so for that one the
+"guessed wrong" render may actually be the desired orientation — judge it
+against the reference's top-down framing, not against "does it stand up."
 
 Also open, and bigger than any single prop: **`tools/render_room.mjs` does not
 exist.** It is the scene assembler, and it is the piece that makes this whole
@@ -222,7 +229,16 @@ thin panel rather than a slab lying down. Measures 72% of a character's
 height; no spec ratio applies to a wall panel (level-2/3 dressing, not a
 work surface), so this isn't compared against the table's 50% line.
 
-**5. `dish-return` — next action.** Reference approved at
+**5. `pendant-lamp` — done.** Shipped as `art-source/room/pendant-lamp.glb`.
+Same override case as the pillar (square in section, `0.765 x 1.898 x
+0.766`): default guess picked `x` and laid the whole fixture on its side,
+chain running horizontal like a flail. `--upright none` confirmed
+correct — chain hangs straight down from a ceiling plate to the amber
+shade, holds steady across all four yaws. Measures 112% of a character's
+height, which is expected (full ceiling-to-shade chain length, not a
+tabletop object) and not compared against the table's 50% line.
+
+**6. `dish-return` — next action.** Reference approved at
 `refs/room/dish-return.png`. Same loop as the others, Remesh skipped:
 
 ```
@@ -235,7 +251,7 @@ node tools/preview_prop.mjs art-source/room/dish-return.glb --textured --with ty
 # doesn't hold steady across the four yaws.
 ```
 
-**6. Assemble grey.** Write `tools/render_room.mjs` and render four props at
+**7. Assemble grey.** Write `tools/render_room.mjs` and render four props at
 their spec positions with no walls, no lamps, no dressing.
 
 ```
