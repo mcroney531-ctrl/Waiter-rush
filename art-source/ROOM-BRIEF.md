@@ -110,27 +110,43 @@ in `PROMPTS.md` came from.
 | 3 | `dish-return` | ✅ approved — `refs/room/dish-return.png` | ⬜ **next action: run Meshy** |
 | 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 302,572 tris, 11.97 MB — **exported Y-up already; always render with `--upright none`, see below** |
 | 5 | `pillar` | ✅ approved — `refs/room/pillar.png` | ✅ **shipped** — `art-source/room/pillar.glb`, 298,326 tris, 11.70 MB — **exported Y-up already; always render with `--upright none`** |
-| 6–10 | `wall-panel`, `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
+| 6 | `wall-panel` | ✅ approved — `refs/room/wall-panel.png` | ✅ **shipped** — `art-source/room/wall-panel.glb`, 429,724 tris, 16.53 MB — **exported Y-up already; always render with `--upright none`** |
+| 7–10 | `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
 
-Four props through gate A, three through both. If a session tells you the
+Five props through gate A, four through both. If a session tells you the
 counter GLB doesn't exist, or that it's table-shaped, it's reading a stale
 copy of this file or a mislabelled upload — see rule 1.
 
-**`pass-sign.glb` and `pillar.glb` both need an upright override.**
-`preview_prop.mjs`'s shortest-axis-is-up guess assumes an object is wider
-and deeper than it is tall — true for a table or counter, false for
-anything whose footprint is smaller than its height. Guessing wrong laid
-the pass-sign on its side (the carved arrow visibly rotated through
-down/right/up/left across the four yaws instead of staying down) and did
-the same to the pillar — bbox `0.685 x 1.9 x 0.685` guessed axis `x`,
-which renders it lying on its side with the capital pointing sideways in
-two of the four yaws. `preview_prop.mjs` takes `--upright x|y|z|none` to
-override the guess; both of these want `none` — Meshy exported them Y-up
-already, the heuristic just doesn't know that a square-section object can
-still be the tall axis. Check any tall, thin, or otherwise
-non-table-proportioned prop the same way — render once, look at whether a
+**`pass-sign.glb`, `pillar.glb`, and `wall-panel.glb` all need an upright
+override.** `preview_prop.mjs`'s shortest-axis-is-up guess assumes an
+object is wider and deeper than it is tall — true for a table or counter,
+false for anything whose *shortest* dimension isn't its height. Three
+different ways that assumption has broken so far:
+
+- **pass-sign** — a flat hanging sign, shortest axis is its own thickness.
+  Guessed wrong, laid it on its side (the carved arrow visibly rotated
+  through down/right/up/left across the four yaws instead of staying down).
+- **pillar** — square in section (`0.685 x 1.9 x 0.685`), shortest axis
+  is a tie between X and Z, not the actual height. Guessed `x`, laid it on
+  its side with the capital pointing sideways in two of the four yaws.
+- **wall-panel** — a flat plaque (`1.9 x 1.229 x 0.336`), shortest axis is
+  its own thickness again. Guessed `z`, flattened it into a tabletop
+  plaque — the skull motif showed from a steep raking angle instead of
+  face-on, exactly like looking down at a table rather than at a hung
+  panel.
+
+All three were already exported Y-up; the heuristic just has no way to
+tell a genuinely short vertical object from a flat one lying with its
+thin axis pointed the wrong way. `preview_prop.mjs` takes
+`--upright x|y|z|none` to override the guess — all three of these want
+`none`. Check any tall, thin, flat, or otherwise non-table-proportioned
+prop the same way: render once with no override, look at whether a
 directional feature (an arrow, a face, a repeated motif) stays consistent
-across yaws, and use the override if it doesn't.
+across yaws or reads face-on rather than from above, and use the override
+if it doesn't. At this point assume every remaining prop (`pendant-lamp`,
+`planter`, `floor-inlay`, `shelf-unit`) will need the same check — only
+the table and counter, both genuinely wider/deeper than tall, have
+guessed correctly so far.
 
 Also open, and bigger than any single prop: **`tools/render_room.mjs` does not
 exist.** It is the scene assembler, and it is the piece that makes this whole
@@ -196,7 +212,17 @@ pillar is a floor-to-ceiling architectural element, not a work surface;
 the table's "half a character's height" rule in `DINING-ROOM-SPEC.md`
 never applied to it. Don't re-flag it.
 
-**4. `dish-return` — next action.** Reference approved at
+**4. `wall-panel` — done.** Shipped as `art-source/room/wall-panel.glb`.
+Same override case, different failure shape: it's a flat plaque, not a
+tall column, so the default guess (`z`, its own thickness) flattened it
+into a tabletop instead of standing it up. `--upright none` confirmed
+correct — front face shows the skull relief face-on, back is plain flat
+stone (matches the prompt's "flat-backed"), both edge views read as a
+thin panel rather than a slab lying down. Measures 72% of a character's
+height; no spec ratio applies to a wall panel (level-2/3 dressing, not a
+work surface), so this isn't compared against the table's 50% line.
+
+**5. `dish-return` — next action.** Reference approved at
 `refs/room/dish-return.png`. Same loop as the others, Remesh skipped:
 
 ```
@@ -209,7 +235,7 @@ node tools/preview_prop.mjs art-source/room/dish-return.glb --textured --with ty
 # doesn't hold steady across the four yaws.
 ```
 
-**5. Assemble grey.** Write `tools/render_room.mjs` and render four props at
+**6. Assemble grey.** Write `tools/render_room.mjs` and render four props at
 their spec positions with no walls, no lamps, no dressing.
 
 ```
