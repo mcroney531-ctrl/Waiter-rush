@@ -722,14 +722,25 @@
   // length and the peak itself was not sharp enough to bite quickly once
   // reached. PATIENCE_END_S 15->11 tightens the peak itself, since the
   // problem was not that peak arrived too late.
-  const PATIENCE_END_S   = 11;
+  //
+  // 11 still was not enough. A second pair of playthroughs on the same two
+  // platforms after that change: PC held 100% ramp for a full 48 seconds
+  // with zero tables lost; mobile lost its first table 9 seconds after
+  // crossing peak. Same cliff, just moved later -- the climb itself tracks
+  // fine (both runs hit tier 3/4 within a couple seconds of each other) but
+  // the destination still is not hard enough to bite. 11->8.
+  const PATIENCE_END_S   = 8;
   const SPAWN_START_MS  = 7000;    // average gap between orders at open
   // 3400->2800 (17.6->21.4 orders/min at peak). The 2.74s-round-trip floor
   // this used to be pinned against is stale: that was measured before
   // PLAYER_SPEED went to 550px/s, and the real round trip is now ~1.1s, so
   // there is real slack below the old number -- see the same playthrough
   // data noted at PATIENCE_END_S.
-  const SPAWN_FLOOR_MS  = 2800;
+  //
+  // 2800 still left peak survivable indefinitely -- see the second
+  // playthrough pair noted at PATIENCE_END_S. 2800->2300 (21.4->26.1
+  // orders/min at peak), still well above the ~1.1s round-trip floor.
+  const SPAWN_FLOOR_MS  = 2300;
 
   // Real services arrive in surges, not on a slider. The ramp above still sets
   // the baseline; this swings the spawn gap either side of it so a party lands,
@@ -799,7 +810,10 @@
   // END 12000->9500: faster late-shift turnover so bussing pressure stacks
   // on top of delivery pressure at peak instead of arriving on its own
   // schedule -- see the playthrough note at PATIENCE_END_S.
-  const EAT_START_MS = 22000, EAT_END_MS = 9500;
+  //
+  // 9500->7800: same second-pass tightening as PATIENCE_END_S and
+  // SPAWN_FLOOR_MS -- 9500 was not moving the needle on its own.
+  const EAT_START_MS = 22000, EAT_END_MS = 7800;
   const eatMs = () => lerp(EAT_START_MS, EAT_END_MS, rushProgress());
 
   // Money is held in whole cents so a shift's total never drifts the way a
@@ -1051,9 +1065,13 @@
     // Menu is one track on repeat. The shift is a playlist -- track one runs
     // 3:29 and a good shift is around three minutes, so most players never
     // reach track two, and the ones who do have earned eight more minutes.
+    // Track three is the "you were not supposed to still be here" song; once
+    // it ends the playlist wraps back to track one rather than stopping --
+    // the `ended` handler below is already generic over playlist length.
     menu:  { vol: 0.42, tracks: ['assets/audio/menu-theme.mp3'] },
     shift: { vol: 0.32, tracks: ['assets/audio/shift-1.mp3',
-                                 'assets/audio/shift-2.mp3'] },
+                                 'assets/audio/shift-2.mp3',
+                                 'assets/audio/shift-3.mp3'] },
   };
   const MUSIC_FADE_MS = 900;
   // Quieter than the menu on purpose: during a shift the effects carry

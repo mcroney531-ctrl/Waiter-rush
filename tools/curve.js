@@ -47,6 +47,8 @@ const step = async (p, keys, ms) => {
 
   const seen = new Map();
   const curve = [];
+  const losses = [];
+  let lastLives = 3;
   const t0 = Date.now();
   let over = false;
 
@@ -55,7 +57,7 @@ const step = async (p, keys, ms) => {
       const d = window.__dbg;
       return { carried: d.carried.map(x => ({ type: x.type, tableId: x.tableId })),
                tickets: d.tickets.map(t => ({ side: t.side, id: t.tableId })),
-               score: d.score, deliveries: d.deliveries, cleared: d.cleared,
+               score: d.score, deliveries: d.deliveries, cleared: d.cleared, lives: d.lives,
                bus: d.BUS, passes: d.PASSES, px: d.player.x, py: d.player.y,
                tables: d.tables.map(t => ({ id: t.id, padX: t.padX, padY: t.padY, state: t.state })) };
     });
@@ -86,7 +88,8 @@ const step = async (p, keys, ms) => {
 
     const t = Date.now() - t0;
     if (!curve.length || t - curve[curve.length - 1].t >= 5000)
-      curve.push({ t, score: s.score, del: s.deliveries, cl: s.cleared });
+      curve.push({ t, score: s.score, del: s.deliveries, cl: s.cleared, lives: s.lives });
+    if (s.lives < lastLives) { losses.push(t); lastLives = s.lives; }
 
     over = await p.evaluate(() => !document.getElementById('overlay').classList.contains('hidden'));
   }
@@ -103,5 +106,6 @@ const step = async (p, keys, ms) => {
     return `$${m}: ${c ? (c.t/1000).toFixed(0) + 's' : 'never'}`;
   });
   console.log('milestones  ' + hit.join('   '));
+  console.log('table losses  ' + (losses.length ? losses.map(t => (t/1000).toFixed(0) + 's').join('  ') : 'none'));
   await br.close();
 })();
