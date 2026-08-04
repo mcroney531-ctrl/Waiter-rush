@@ -35,7 +35,13 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
                     spawnTime:performance.now()});
       t.state='waiting'; t.patience=1; t.warned=false; },
     get sheetOn(){return sheetReady();},
-    get music(){return music;}, get musicErrorStreak(){return musicErrorStreak;} };}});
+    get music(){return music;}, get musicErrorStreak(){return musicErrorStreak;},
+    get rushActive(){return rushActive;}, get rushArmedAt(){return rushArmedAt;},
+    get rushLandAt(){return rushLandAt;}, get rushEndsAt(){return rushEndsAt;},
+    get rushFastCount(){return rushFastCount;}, set rushFastCount(v){rushFastCount=v;},
+    get rushUsedThisShift(){return rushUsedThisShift;},
+    get rushSpawnMult(){return rushSpawnMult;}, get rushDrainMult(){return rushDrainMult;},
+    get rushDurationMs(){return rushDurationMs;}, forceRush(){armRush();} };}});
 """
 
 WAITS = ("      (window.__waits=window.__waits||[]).push(waited);\n"
@@ -59,6 +65,8 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
-              'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak'):
+              'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak',
+              'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
+              'rushUsedThisShift', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
     assert field in DBG, field
 print('probe.html regenerated with', len(DBG.splitlines()), 'lines of handle')

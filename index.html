@@ -819,6 +819,74 @@
   const EAT_START_MS = 22000, EAT_END_MS = 7800;
   const eatMs = () => lerp(EAT_START_MS, EAT_END_MS, rushProgress());
 
+  // ---------- Rush events ----------
+  // A once-per-shift curveball on top of the steady ramp above: a short,
+  // sharp spike in both order volume and patience drain, telegraphed a few
+  // seconds before it lands. Two ways to arm it, sharing one cap so a shift
+  // gets at most one:
+  //
+  //   - earned: serving and bussing fast enough, often enough, fills a
+  //     counter. A floor running hot on both ends is exactly the one that
+  //     gets slammed next -- a consequence of good service, not bad luck.
+  //   - wildcard: a small, independent random chance each second, so a
+  //     slower or newer player who never fills the counter still
+  //     occasionally gets hit by one -- the tournament bus that happens to
+  //     stop at your diner, nothing to do with how well you're doing.
+  //
+  // First pass at every number below. Real playthroughs tune this the same
+  // way the peak ramp itself was tuned -- see PATIENCE_END_S.
+  const RUSH_SAFE_MS = 20000;            // neither trigger can arm before this -- protects the generous open
+  const RUSH_FAST_PATIENCE_FRAC = 0.85;  // delivered with this much of the table's own patience still left ("first 15%")
+  const RUSH_FAST_BUS_FRAC = 0.20;       // bussed within this fraction of the current eating window -- a little more slack than delivery, since noticing a table went dirty and crossing the floor is its own step
+  const RUSH_FAST_THRESHOLD = 10;        // qualifying fast actions (either kind) needed to arm the earned trigger
+  const RUSH_WILDCARD_CHANCE = 0.0015;   // per second, independent of performance -- roughly a 25-30% chance across a full shift on its own
+  const RUSH_ARM_DELAY_MIN_MS = 5000, RUSH_ARM_DELAY_MAX_MS = 15000; // telegraph -> landing
+  // Both duration and intensity scale with rushProgress at the moment it
+  // arms, locked in for the whole event rather than drifting with the clock
+  // while it plays out -- a tier-1 rush is short and mild, a tier-4 one runs
+  // longer and hits harder.
+  const RUSH_DURATION_START_MS = 8000, RUSH_DURATION_END_MS = 18000;
+  const RUSH_SPAWN_MULT_START = 0.6, RUSH_SPAWN_MULT_END = 0.35;   // multiplies spawnInterval while active -- lower is faster
+  const RUSH_DRAIN_MULT_START = 1.4, RUSH_DRAIN_MULT_END = 2.2;    // multiplies patience drain while active
+  const RUSH_TIP_MULT = 1.5;             // the reward for surviving it -- stacks with flow, same as a good streak landing during a big tip
+
+  let rushFastCount = 0;
+  let rushUsedThisShift = false;
+  let rushArmedAt = 0, rushLandAt = 0;      // 0 means not armed
+  let rushActive = false, rushEndsAt = 0;
+  let rushDurationMs = 0, rushSpawnMult = 1, rushDrainMult = 1;    // locked in at arm time
+
+  function armRush(){
+    rushUsedThisShift = true;               // consumed on arming, not landing, so the other trigger can't sneak in during the telegraph delay
+    rushArmedAt = performance.now();
+    rushLandAt = rushArmedAt + lerp(RUSH_ARM_DELAY_MIN_MS, RUSH_ARM_DELAY_MAX_MS, Math.random());
+    const p = rushProgress();
+    rushDurationMs = lerp(RUSH_DURATION_START_MS, RUSH_DURATION_END_MS, p);
+    rushSpawnMult  = lerp(RUSH_SPAWN_MULT_START, RUSH_SPAWN_MULT_END, p);
+    rushDrainMult  = lerp(RUSH_DRAIN_MULT_START, RUSH_DRAIN_MULT_END, p);
+    sfxRushIncoming();
+  }
+
+  // Only the real shift arms one -- a chaotic spike has no place in the
+  // controlled tutorial floor.
+  function updateRush(dt){
+    if (mode !== 'game') return;
+    const now = performance.now();
+    if (!rushUsedThisShift && elapsed > RUSH_SAFE_MS){
+      if (rushFastCount >= RUSH_FAST_THRESHOLD) armRush();
+      else if (Math.random() < RUSH_WILDCARD_CHANCE * dt / 1000) armRush();
+    }
+    if (rushArmedAt && !rushActive && now >= rushLandAt){
+      rushActive = true;
+      rushEndsAt = now + rushDurationMs;
+      sfxRushLand();
+    }
+    if (rushActive && now >= rushEndsAt){
+      rushActive = false;
+      rushArmedAt = 0;
+    }
+  }
+
   // Money is held in whole cents so a shift's total never drifts the way a
   // running float would. Everything reaching the screen goes through money().
   const DELIVERY_BASE_C = 500;   // $5 — what the table leaves regardless
@@ -895,7 +963,7 @@
       // idle cannot take a new order, so dirty tables shrink the usable floor.
       state: 'idle',
       patience: 1, ticketId: null, happyTimer: 0, eatTimer: 0, wrongCooldown: 0, wrongDwell: 0,
-      warned: false
+      warned: false, dirtySince: 0
     }));
     tickets = [];
     // size stays the collision radius it has always been — the body is drawn
@@ -928,6 +996,11 @@
     spawnInterval = SPAWN_START_MS;
     elapsed = 0;
     ticketIdCounter = 1;
+    rushFastCount = 0;
+    rushUsedThisShift = false;
+    rushArmedAt = 0; rushLandAt = 0;
+    rushActive = false; rushEndsAt = 0;
+    rushDurationMs = 0; rushSpawnMult = 1; rushDrainMult = 1;
     updateHUD();
   }
 
@@ -1046,6 +1119,7 @@
   const WARN_LEVEL   = 0.10;   // a table running out of patience
   const TUT_BELL     = 0.13;   // the counter bell on a new tutorial message
   const PICKER_KNOCK = 0.11;   // stepping left/right through the waiter picker
+  const RUSH_ALARM   = 0.12;   // rush telegraph and landing
   // How low patience gets before the table is announced, and the shortest gap
   // between announcements. Eight tables can cross the line together; without
   // the gap that is eight overlapping copies of the same sound.
@@ -1315,6 +1389,27 @@
     const t = ac.currentTime;
     ding(t,        622.25, WARN_LEVEL, 0.20, 'triangle');   // D#5
     ding(t + 0.13, 466.16, WARN_LEVEL, 0.30, 'triangle');   // A#4
+  }
+
+  // A rush arming: a tritone (the classic alarm interval), sawtooth rather
+  // than the warm sine/triangle language everything celebratory uses, so it
+  // reads as trouble on first note rather than another tip bell.
+  function sfxRushIncoming(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    ding(t,        698.46, RUSH_ALARM, 0.16, 'sawtooth');   // F5
+    ding(t + 0.10, 493.88, RUSH_ALARM, 0.16, 'sawtooth');   // B4 -- a tritone below
+    ding(t + 0.20, 698.46, RUSH_ALARM, 0.20, 'sawtooth');
+  }
+
+  // The rush actually landing: a harder hit than the telegraph -- a noise
+  // burst under a low sawtooth stab, an octave down from the telegraph's
+  // tone, so the moment it lands reads as heavier than the warning was.
+  function sfxRushLand(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    burst(t, 2000, 1.2, RUSH_ALARM * 1.2, 0.09, 'bandpass');
+    ding(t + 0.02, 349.23, RUSH_ALARM * 1.1, 0.3, 'sawtooth');   // F4
   }
 
   // The counter bell -- the "ding" you'd tap to call a waiter over, played on
@@ -2128,6 +2223,9 @@
     for (const t of tables){
       if (t.state === 'dirty' && inDropZone(t)){
         if (handsFull()){ hintFloater(fullHandsHint()); return; }
+        // Same fast-service signal as delivery below, mirrored for bussing —
+        // see RUSH_FAST_BUS_FRAC.
+        if (performance.now() - t.dirtySince <= RUSH_FAST_BUS_FRAC * eatMs()) rushFastCount++;
         t.state = 'clearing';
         carried.push({ type: 'dishes', tableId: t.id, pickedAt: performance.now() });
         sfxDishUp();
@@ -2165,6 +2263,12 @@
       table.state = 'happy';
       table.happyTimer = 1200;
       table.ticketId = null;
+      // Captured before the reset below -- how much of this table's own
+      // patience was still left when it was served. The rush-events fast
+      // counter reads off this rather than tip speed, since it is relative
+      // to the table's actual window instead of a fixed absolute scale --
+      // see RUSH_FAST_PATIENCE_FRAC.
+      if (table.patience >= RUSH_FAST_PATIENCE_FRAC) rushFastCount++;
       table.patience = 1;
       const waited = performance.now() - item.orderedAt;
       const frac = tipFraction(waited);
@@ -2176,7 +2280,7 @@
       } else {
         breakStreak();
       }
-      const tip = Math.round(frac * TIP_MAX_C * (flowLit ? FLOW_MULT : 1));
+      const tip = Math.round(frac * TIP_MAX_C * (flowLit ? FLOW_MULT : 1) * (rushActive ? RUSH_TIP_MULT : 1));
       score += DELIVERY_BASE_C + tip;
       tipFloater(table.x, table.barY - 20, tip, waited, flowLit);
       sfxTip(frac, flowLit);
@@ -2348,7 +2452,9 @@
   // ---------- Update ----------
   function update(dt){
     elapsed += dt;
-    spawnInterval = lerp(SPAWN_START_MS, SPAWN_FLOOR_MS, rushProgress()) * waveFactor();
+    updateRush(dt);
+    spawnInterval = lerp(SPAWN_START_MS, SPAWN_FLOOR_MS, rushProgress()) * waveFactor()
+                  * (rushActive ? rushSpawnMult : 1);
 
     // Tutorial steps stage their own orders; only the real shift and the
     // practice round spawn on the timer.
@@ -2412,7 +2518,7 @@
     const inLesson = mode === 'tutorial' && tut && !tut.practice;
     const patienceS = inLesson ? TUTORIAL_PATIENCE_S
                                : lerp(PATIENCE_START_S, PATIENCE_END_S, rushProgress());
-    drainRate = 1 / (patienceS * 1000);
+    drainRate = 1 / (patienceS * 1000) * (rushActive ? rushDrainMult : 1);
     for (const t of tables){
       if (t.state === 'waiting' && drainEnabled){
         t.patience -= drainRate * dt;
@@ -2453,7 +2559,7 @@
       }
       if (t.state === 'eating'){
         t.eatTimer -= dt;
-        if (t.eatTimer <= 0){ t.eatTimer = 0; t.state = 'dirty'; }
+        if (t.eatTimer <= 0){ t.eatTimer = 0; t.state = 'dirty'; t.dirtySince = performance.now(); }
       }
       if (t.state === 'angry'){
         t.angryTimer -= dt;
@@ -2930,16 +3036,17 @@
   // Everything in here obeys one rule: nothing covers the table numbers. Below
   // FLOOR_TOP is where the plaques hang, and covering a number at the moment
   // the player is trying to hold it in their head is the worst possible time.
-  function momentBanner(slot, alpha, title, sub, w){
+  function momentBanner(slot, alpha, title, sub, w, color){
+    const c = color || COLORS.mustard;
     const y = FLOOR_TOP - 56 - slot * 52;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(28,23,18,0.9)';
     roundRect(ctx, W/2 - w/2, y, w, 44, 10); ctx.fill();
-    ctx.strokeStyle = COLORS.mustard; ctx.lineWidth = 3;
+    ctx.strokeStyle = c; ctx.lineWidth = 3;
     roundRect(ctx, W/2 - w/2, y, w, 44, 10); ctx.stroke();
-    ctx.fillStyle = COLORS.mustard;
+    ctx.fillStyle = c;
     ctx.font = '16px Galindo, sans-serif';
     ctx.fillText(title, W/2, y + 20);
     ctx.font = '700 11px DM Sans, sans-serif';
@@ -2991,6 +3098,15 @@
                   0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    }
+    if (rushArmedAt && !rushActive){
+      // A pulse rather than a flat hold -- the whole point of the telegraph
+      // is that it reads as urgent, not as another calm notice.
+      const pulse = 0.7 + 0.3 * Math.sin((performance.now() - rushArmedAt) / 220);
+      momentBanner(slot++, pulse, 'RUSH IS COMING...', 'brace yourself', 300, COLORS.angry);
+    }
+    if (rushActive){
+      momentBanner(slot++, 1, 'RUSH!', 'tips ×' + RUSH_TIP_MULT + ' while it lasts', 300, COLORS.angry);
     }
     if (flowFlash > 0){
       const top = FLOOR_TOP - 40 - slot * 52;
