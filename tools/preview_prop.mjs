@@ -36,7 +36,7 @@ const args = process.argv.slice(2);
 const glbArg = args.find(a => !a.startsWith('--'));
 if (!glbArg) {
   console.error('usage: node tools/preview_prop.mjs <model.glb> [--with <character>] '
-              + '[--textured] [--elev 34]');
+              + '[--textured] [--elev 34] [--upright x|y|z|none]');
   process.exit(1);
 }
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i === -1 ? d : args[i + 1]; };
@@ -85,6 +85,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CELL = ${CELL}, YAWS = ${JSON.stringify(YAWS)}, WITH = ${WITH ? 'true' : 'false'};
 const TEXTURED = ${TEXTURED};
+const UPRIGHT_OVERRIDE = ${JSON.stringify(opt('upright', null))};
 const sheet = document.createElement('canvas');
 sheet.width = CELL * YAWS.length; sheet.height = CELL;
 const sctx = sheet.getContext('2d');
@@ -129,8 +130,15 @@ root.traverse(o => {
 let box = new THREE.Box3().setFromObject(root);
 let size = box.getSize(new THREE.Vector3());
 out.rawSize = { x: +size.x.toFixed(3), y: +size.y.toFixed(3), z: +size.z.toFixed(3) };
-out.shortestAxis = uprightGuess(size);
-// Stand it up: the shortest axis becomes Y.
+// The shortest-axis-is-up guess assumes the object is wider and deeper than
+// it is tall, which is true for a table or counter and false for anything
+// flat and tall -- a hanging sign's shortest axis is its own thickness, not
+// its height, and guessing there rotates it onto its side. --upright
+// <x|y|z|none> overrides the guess for exactly that case: pass the axis that
+// is genuinely vertical as exported, or "none" if it is already Y-up.
+out.shortestAxis = UPRIGHT_OVERRIDE || uprightGuess(size);
+out.uprightSource = UPRIGHT_OVERRIDE ? 'override' : 'guessed';
+// Stand it up: the chosen axis becomes Y.
 if (out.shortestAxis === 'z') root.rotation.x = -Math.PI / 2;
 else if (out.shortestAxis === 'x') root.rotation.z = Math.PI / 2;
 
@@ -212,8 +220,9 @@ await writeFile(dst, Buffer.from(out.png.split(',')[1], 'base64'));
 await rm(STAGE, { recursive: true, force: true });
 
 console.log(`  raw bbox        ${out.rawSize.x} x ${out.rawSize.y} x ${out.rawSize.z}`);
-console.log(`  shortest axis   ${out.shortestAxis}  ->  ${out.shortestAxis === 'y'
-  ? 'already Y-up' : `exported ${out.shortestAxis.toUpperCase()}-up, stood upright for this preview`}`);
+const uprightNote = (out.shortestAxis === 'y' || out.shortestAxis === 'none')
+  ? 'already Y-up' : `exported ${out.shortestAxis.toUpperCase()}-up, stood upright for this preview`;
+console.log(`  upright axis    ${out.shortestAxis} (${out.uprightSource})  ->  ${uprightNote}`);
 console.log(`  upright         ${out.uprightSize.w} wide x ${out.uprightSize.h} tall x ${out.uprightSize.d} deep`);
 if (out.characterHeight != null) {
   console.log(`  character       ${out.characterHeight} tall`);

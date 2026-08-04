@@ -107,13 +107,25 @@ in `PROMPTS.md` came from.
 | --- | --- | --- | --- |
 | 1 | `table` | ✅ approved (v2, frieze removed) | ✅ **shipped** — `art-source/room/table.glb`, 28,934 tris, 1.39 MB |
 | 2 | `counter` | ✅ approved — `refs/room/counter.png` | ✅ **shipped** — `art-source/room/counter.glb`, 59,204 tris, 2.31 MB, 5.23:1 |
-| 3 | `dish-return` | ⬜ **next action** | ⬜ |
-| 4 | `pass-sign` | ⬜ | ⬜ |
+| 3 | `dish-return` | ✅ approved — `refs/room/dish-return.png` | ⬜ **next action: run Meshy** |
+| 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 302,572 tris, 11.97 MB — **exported Y-up already; always render with `--upright none`, see below** |
 | 5–10 | `pillar`, `wall-panel`, `pendant-lamp`, `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
 
-Two props through both gates. If a session tells you the counter GLB doesn't
-exist, or that it's table-shaped, it's reading a stale copy of this file or a
-mislabelled upload — see rule 1.
+Three props through gate A, two through both. If a session tells you the
+counter GLB doesn't exist, or that it's table-shaped, it's reading a stale
+copy of this file or a mislabelled upload — see rule 1.
+
+**`pass-sign.glb` needs an upright override.** `preview_prop.mjs`'s
+shortest-axis-is-up guess assumes an object is wider and deeper than it is
+tall — true for a table or counter, false for a flat hanging sign, whose
+shortest axis is its own thickness. Guessing wrong laid it on its side (the
+carved arrow visibly rotated through down/right/up/left across the four
+yaws instead of staying down). `preview_prop.mjs` now takes
+`--upright x|y|z|none` to override the guess; this one wants `none`. Check
+any tall, thin, or otherwise non-table-proportioned prop (`pillar` is next)
+the same way — render once, look at whether a directional feature (an
+arrow, a face, anything asymmetric) stays consistent across yaws, and use
+the override if it doesn't.
 
 Also open, and bigger than any single prop: **`tools/render_room.mjs` does not
 exist.** It is the scene assembler, and it is the piece that makes this whole
@@ -141,7 +153,7 @@ job worth doing. Runbook §6 specifies it.
 
 ---
 
-## The next three actions, in order
+## The next actions, in order
 
 **1. Counter — done.** Shipped as `art-source/room/counter.glb`. Checked
 against all four things the checkpoint asks for on a long prop: top edge one
@@ -166,16 +178,24 @@ not the 6:1 the prompt asked for. Also not a defect. It means the counter runs
 answer is to place it at 560–600 and dress the extra wall. The ranked options
 are in `PROMPTS.md` §2.
 
-**2. `dish-return` and `pass-sign`.** `PROMPTS.md` §3 and §4, same loop, Remesh
-skipped, one of each — both are mirrored in code for the second copy.
+**2. `pass-sign` — done.** Shipped as `art-source/room/pass-sign.glb`. Exported
+Y-up (unlike the table and counter) — see the upright-override note above
+before re-previewing it.
+
+**3. `dish-return` — next action.** Reference approved at
+`refs/room/dish-return.png`. Same loop as the others, Remesh skipped:
 
 ```
-python3 tools/whatis.py <download>          # expect: no geometry match
+python3 tools/whatis.py <download>
 python3 tools/shrink_glb.py <download> --inplace
-node tools/preview_prop.mjs art-source/room/<name>.glb --textured --with tyrone-t1
+node tools/preview_prop.mjs art-source/room/dish-return.glb --textured --with tyrone-t1
+# render once first without --upright to see whether the guess got it right --
+# a wash station is squarer than a table or counter, closer to the case that
+# breaks the heuristic. Add --upright none (or x/z) if a directional feature
+# doesn't hold steady across the four yaws.
 ```
 
-**3. Assemble grey.** Write `tools/render_room.mjs` and render four props at
+**4. Assemble grey.** Write `tools/render_room.mjs` and render four props at
 their spec positions with no walls, no lamps, no dressing.
 
 ```
