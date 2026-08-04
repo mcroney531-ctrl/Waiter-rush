@@ -855,7 +855,24 @@
   const TIP_GOOD = 0.5;
 
   const lerp = (a, b, t) => a + (b - a) * t;
-  const rushProgress = () => Math.min(1, elapsed / RUSH_PEAK_MS);
+  // Real playthroughs (two platforms, three rounds of tightening the peak
+  // endpoints) now land genuine losses right around peak -- but Rone's read
+  // on the feel is that the shift plays flat-easy for most of its length and
+  // then several axes crunch down together in the last stretch: a switch,
+  // not a ramp. Measured at the tier-4 point of a real run (176s, 65%
+  // through a linear clock): patience was still 33s and the queue cap only
+  // 3. Nothing there should feel dangerous yet, and it does not.
+  //
+  // RUSH_EASE reshapes the clock instead of moving any endpoint. t^0.72
+  // front-loads how fast progress accrues -- 65% linear progress becomes
+  // 73.5%, 36% becomes 48% -- while t=0 and t=1 are untouched, so the
+  // generous open (patience still ~62s by 40s in) and the validated peak
+  // (still exactly 8s patience at 270s) do not move. Every axis reads off
+  // this same eased clock, same as before -- the whole point of the
+  // original single-clock design was that spawn and patience move together,
+  // and reshaping the clock instead of splitting the axes keeps that intact.
+  const RUSH_EASE = 0.72;
+  const rushProgress = () => Math.min(1, elapsed / RUSH_PEAK_MS) ** RUSH_EASE;
 
   let spawnTimer = 0;
   let spawnInterval = SPAWN_START_MS; // ms, shrinks over time
