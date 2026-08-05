@@ -33,6 +33,33 @@
     font-family: 'DM Sans', 'Segoe UI', sans-serif;
     touch-action: none;
   }
+  /* The letterbox around the board, warmed while a rush runs. It is the one
+     surface in the game that costs nothing to use: outside the canvas, so no
+     amount of it can hurt readability, and peripheral vision is exactly where
+     "the room changed" registers without being looked at.
+
+     Its own fixed layer, and emphatically NOT a filter on <html>. The first
+     attempt did that, and a filter on the root element applies to everything
+     inside it -- the canvas included. It turned Tyrone's red cap pink and his
+     body yellow, which is the precise failure the spec's tiebreaker is about:
+     atmosphere had changed the things the player reads. This sits behind the
+     board instead, so the opaque board hides it everywhere except the gutter.
+
+     Amber rather than red on purpose. COLORS.angry (#B33A3A) means a table is
+     about to walk, and washing the screen in that hue would camouflage the one
+     signal a player cannot afford to miss.
+
+     Long transition both ways: 20-45s of rush wants a room that has changed,
+     not one that is visibly changing. */
+  #gutterGlow {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+                rgba(255,138,43,0) 38%, rgba(255,138,43,0.22) 72%,
+                rgba(255,96,20,0.42) 100%);
+    opacity: 0; transition: opacity 900ms ease;
+  }
+  html.rush #gutterGlow { opacity: 1; }
+  #wrap { z-index: 1; }
   #wrap {
     position: relative;
     width: 100vw;
@@ -439,6 +466,7 @@
 </style>
 </head>
 <body>
+<div id="gutterGlow"></div>
 <div id="wrap">
   <div id="board">
   <canvas id="game" width="960" height="640"></canvas>
@@ -893,6 +921,13 @@
   let rushArmedAt = 0, rushLandAt = 0;      // 0 means not armed
   let rushActive = false, rushEndsAt = 0;
   let rushDurationMs = 0, rushSpawnMult = 1, rushDrainMult = 1;    // locked in at arm time
+  // The exit beat. A rush used to simply stop -- tint off, music back, nothing
+  // said -- and a mode you do not notice ending did not feel like a mode while
+  // it was running. rushOver holds the closing banner, and rushTips is what the
+  // banner is for: the multiplier is the reason to push through a rush rather
+  // than hide from it, and until now nothing ever told you what it paid.
+  const RUSH_OVER_MS = 2600;
+  let rushOver = 0, rushTips = 0, rushOverTips = 0;
 
   const rollRushTarget = () =>
     Math.round(lerp(RUSH_FAST_MIN, RUSH_FAST_MAX, Math.random()));
@@ -934,6 +969,9 @@
       rushActive = false;
       rushArmedAt = 0;
       rushReadyAt = now + RUSH_COOLDOWN_MS;
+      rushOver = RUSH_OVER_MS;
+      rushOverTips = rushTips;
+      rushTips = 0;
       endRushMusic();
       // A promotion earned mid-rush waited for the floor to calm down rather
       // than fighting the rush banner for the same strip of screen.
@@ -1056,6 +1094,7 @@
     promoPending = false;
     rushArmedAt = 0; rushLandAt = 0;
     rushActive = false; rushEndsAt = 0;
+    rushOver = 0; rushTips = 0; rushOverTips = 0;
     rushDurationMs = 0; rushSpawnMult = 1; rushDrainMult = 1;
     killRushMusic();   // the element is kept and reused; only its playback stops
     updateHUD();
@@ -2554,6 +2593,10 @@
       }
       const tip = Math.round(frac * TIP_MAX_C * (flowLit ? FLOW_MULT : 1) * (rushActive ? RUSH_TIP_MULT : 1));
       score += DELIVERY_BASE_C + tip;
+      // Everything the delivery paid, not just the tip's rush share: what the
+      // closing banner is answering is "was pushing through that worth it",
+      // and the base pay was earned in the rush too.
+      if (rushActive) rushTips += DELIVERY_BASE_C + tip;
       tipFloater(table.x, table.barY - 20, tip, waited, flowLit);
       sfxTip(frac, flowLit);
       deliveries++;
@@ -2867,6 +2910,7 @@
       }
     }
 
+    if (rushOver > 0) rushOver -= dt;
     if (capacityNotice > 0 && !promoSplashUp()) capacityNotice -= dt;
     if (tierNotice > 0) tierNotice -= dt;
     if (warnCooldown > 0) warnCooldown -= dt;
@@ -2877,6 +2921,16 @@
   }
 
   function endGame(){
+    // The shift ending ends the rush with it, and this has to happen here
+    // rather than be left to updateRush: that function's end branch never runs,
+    // because the loop stops on this same frame. Without it rushActive stays
+    // true, and the class toggle further down loop() -- which runs after
+    // update() -- puts the gutter straight back on the frame this took it off,
+    // leaving the results screen lit like a rush until the next shift.
+    rushActive = false;
+    rushArmedAt = 0;
+    rushOver = 0;
+    document.documentElement.classList.remove('rush');
     running = false;
     const overlay = document.getElementById('overlay');
     overlay.innerHTML = `
@@ -3431,7 +3485,7 @@
     // when the first rush of a shift arms and within reach of the $75 tier.
     const rushBannerUp =
       (rushArmedAt && !rushActive && rushComingReady && rushComingImg.naturalWidth) ||
-      (rushActive && rushActiveReady && rushActiveImg.naturalWidth);
+      ((rushActive || rushOver > 0) && rushActiveReady && rushActiveImg.naturalWidth);
     // The rush telegraph goes first because, as art, it is a wide panel rather
     // than one of the stackable strips -- it covers the ground the first two
     // momentBanner slots occupy, so it has to claim them before anything else
@@ -3487,6 +3541,47 @@
       // Deliberately no slot reservation: every slot sits inside this art, so
       // there is nothing to reserve. A capacity notice landing mid-rush draws
       // over it and stays readable -- momentBanner paints its own opaque panel.
+    }
+    // The exit beat. Reuses the rush plaque rather than introducing a fourth
+    // banner: the mode closing should look like the same object being put away,
+    // and a shape the player has been staring at for 20-45s reads as "that
+    // thing is over" faster than anything new would.
+    if (rushOver > 0 && rushActiveReady && rushActiveImg.naturalWidth){
+      const k = rushOver / RUSH_OVER_MS;                 // 1 at the whistle, 0 gone
+      const dw = 360, dh = dw * (rushActiveImg.naturalHeight / rushActiveImg.naturalWidth);
+      ctx.save();
+      // Fades and settles rather than popping: it arrived with a bang, so it
+      // should leave by dropping back down, which is the opposite gesture.
+      ctx.globalAlpha = Math.min(1, k * 2.4);
+      ctx.translate(W/2, FLOOR_TOP - dh/2 - 12);
+      ctx.scale(1 - 0.06 * (1 - k), 1 - 0.06 * (1 - k));
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(rushActiveImg, -dw/2, -dh/2, dw, dh);
+      // Cool the lava as it goes. Without this the plaque still shouts RUSH!
+      // in the same heat it arrived in while the line underneath says it is
+      // over, which reads as a contradiction rather than as a closing beat.
+      // The `saturation` blend takes the source's saturation and keeps the
+      // backdrop's hue and lightness, so a flat grey drains the colour without
+      // darkening the art -- clipped to the plaque so nothing else cools with it.
+      ctx.save();
+      ctx.globalCompositeOperation = 'saturation';
+      ctx.globalAlpha = 0.85 * (1 - k);
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(-dw/2, -dh/2, dw, dh);
+      ctx.restore();
+      // What it paid. This is the whole reason for the beat -- the tip
+      // multiplier is the argument for pushing through a rush instead of
+      // hiding from it, and nothing ever told the player what it came to.
+      const line = rushOverTips > 0 ? 'RUSH OVER  ·  ' + money(rushOverTips) + ' earned'
+                                    : 'RUSH OVER';
+      ctx.font = '700 12px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(20,12,8,0.85)';
+      ctx.strokeText(line, 0, dh/2 - 12);
+      ctx.fillStyle = '#FFE9B8';
+      ctx.fillText(line, 0, dh/2 - 12);
+      ctx.restore();
     }
     // Held, not drawn small, while a promotion splash owns the strip -- see
     // promoSplashUp. The countdown is frozen alongside this, so nothing is lost.
@@ -3672,9 +3767,43 @@
     ctx.restore();
   }
 
+  // Warm light over the board and nothing else. Composited here rather than at
+  // the end of render() on purpose: the character, the pads, the tickets, the
+  // floaters and the HUD are all drawn after this and keep their full contrast,
+  // so the room changes colour without a single thing the player reads changing
+  // with it. The spec's tiebreaker is that readability wins over atmosphere;
+  // this is how you get both.
+  //
+  // `overlay` rather than a flat fill: it lifts the lit parts of the board and
+  // leaves the shadows alone, which reads as the lights having come up rather
+  // than as a sheet of orange laid over the room.
+  function drawRushLight(){
+    const k = rushActive ? 1 : rushOver > 0 ? rushOver / RUSH_OVER_MS : 0;
+    if (k <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    // Held steady rather than pulsed. A 20-45s state wants a room that has
+    // changed, not one that keeps asking to be looked at -- the same finding
+    // that made the rush plaque breathe instead of blink.
+    //
+    // 0.22 rather than the 0.34 this started at, settled by measuring rather
+    // than by eye. The tint costs contrast on everything drawn over the board:
+    // at 0.34 the SET DOWN lettering fell from 3.83:1 against the floor to
+    // 3.16:1, and 0.22 gives most of the warmth back for a third of that loss.
+    // The patience bars turned out not to be the thing at risk -- teal and
+    // angry both sit at ~1.4:1 against the floor either way, so they were never
+    // a luminance signal, and both are drawn after this at full saturation, so
+    // the signal that matters (teal against red) does not move at all.
+    ctx.globalAlpha = 0.22 * k;
+    ctx.fillStyle = '#FF8A2B';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
   function render(){
     ctx.clearRect(0,0,W,H);
     drawFloor();
+    drawRushLight();
     drawTipsSign();   // scenery: everything below draws over it, the player included
     drawDropZones();
     drawPickupZone();
@@ -3695,6 +3824,11 @@
     lastTime = t;
     update(dt);
     if (mode === 'tutorial') updateTutorial(dt);
+    // Set from the live flag rather than toggled on the transitions: endGame()
+    // and a reset both leave a rush behind without passing through its own end
+    // branch, and a gutter still glowing on the results screen is worse than
+    // one that lags a frame.
+    document.documentElement.classList.toggle('rush', rushActive);
     render();
     requestAnimationFrame(loop);
   }
