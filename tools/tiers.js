@@ -91,6 +91,46 @@ const check = (name, got, want) => {
         await p.evaluate(() => window.__dbg.capacityNotice > 0
                             && window.__dbg.capacityNotice < 2600), true);
 
+  // ---- a dropped sprite request recovers ----
+  // A player loading the game on a phone the moment after a push saw a headless
+  // placeholder walking the floor for the whole session. 41 requests totalling
+  // 16.6 MB fire before the shift starts against a six-per-host cap, so one
+  // sheet losing that race is ordinary -- and `error` used to be permanent.
+  // Fresh page per case, because the fix is in the load path.
+  const dropCase = async (pattern, budget) => {
+    const pg = await br.newPage({ viewport: { width: 1000, height: 700 } });
+    let aborted = 0;
+    // Regex, not a glob: the retry appends ?retry=N to bust a negative cache,
+    // so a glob ending in .png stops matching after the first attempt and the
+    // test silently passes by never failing anything.
+    await pg.route(new RegExp(pattern), r =>
+      aborted++ < budget ? r.abort('failed') : r.continue());
+    await pg.goto(B + '/probe.html', { waitUntil: 'load' });
+    await pg.click('#landingStart');
+    await pg.waitForSelector('#avatarCard img', { timeout: 30000 });
+    await pg.click('#avatarDone');
+    await pg.waitForTimeout(16000);        // past the whole 400/1200/3500/9000 ladder
+    const out = await pg.evaluate(() => ({ sheetOn: window.__dbg.sheetOn,
+                                           tierArt: window.__dbg.tierArt }));
+    await pg.close();
+    return out;
+  };
+
+  const twice = await dropCase('assets/sprites/.*-t1\\.png', 2);
+  check('a sheet that drops twice is retried', twice.tierArt, [true, true, true, true]);
+  check('and the character is drawn', twice.sheetOn, true);
+
+  // The sharp one: three usable sheets in memory and the game drew a
+  // placeholder anyway, because applyTier only ever searched downward and
+  // there is nothing below tier 1.
+  const gone = await dropCase('assets/sprites/.*-t1\\.png', 99);
+  check('tier 1 unreachable leaves the others loaded', gone.tierArt, [false, true, true, true]);
+  check('and the character is still drawn', gone.sheetOn, true);
+
+  // No sheet at all is the one case that legitimately has nothing to draw.
+  const none = await dropCase('assets/sprites/.*\\.png', 999);
+  check('no sheet at all falls back to the placeholder', none.sheetOn, false);
+
   // ---- reset drops back ----
   await p.evaluate(() => { document.getElementById('startBtn').click(); });
   await p.waitForTimeout(400);

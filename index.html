@@ -1759,10 +1759,7 @@
     promoArt = {};
     for (let tier = 2; tier <= 4; tier++){
       const slot = { img: null };
-      const im = new Image();
-      im.onload  = () => { slot.img = im; };
-      im.onerror = () => { slot.img = null; };
-      im.src = `assets/promotions/${id}-t${tier}.jpg`;
+      loadArt(`assets/promotions/${id}-t${tier}.jpg`, im => { slot.img = im; });
       promoArt[tier] = slot;
     }
   }
@@ -1790,11 +1787,37 @@
 
   function loadHandsFreeArt(id){
     const slot = { img: null };
-    const im = new Image();
-    im.onload  = () => { slot.img = im; };
-    im.onerror = () => { slot.img = null; };
-    im.src = `assets/ui/hands-free-${id}.webp`;
+    loadArt(`assets/ui/hands-free-${id}.webp`, im => { slot.img = im; });
     handsFreeArt = slot;
+  }
+
+  // A dropped image request used to be permanent. The character is the one
+  // asset with no graceful degradation -- a missing banner falls back to text,
+  // a missing sprite sheet leaves a headless placeholder walking the floor --
+  // and 41 requests totalling 16.6 MB fire before the shift starts, against a
+  // browser's six-per-host cap. One of them losing that race is not rare, and
+  // it is likeliest right after a push, when nothing is warm in the CDN yet.
+  //
+  // The retry exists because `error` cannot tell a dropped request from a file
+  // that is genuinely not there, and those want opposite responses. Trying a
+  // few times costs nothing when the file is really missing and fixes the case
+  // where it was only late.
+  const ART_RETRY_MS = [400, 1200, 3500, 9000];   // ~14s of patience, then quiet
+
+  function loadArt(src, done){
+    const attempt = n => {
+      const im = new Image();
+      im.onload  = () => done(im);
+      im.onerror = () => {
+        if (n >= ART_RETRY_MS.length){ done(null); return; }
+        setTimeout(() => attempt(n + 1), ART_RETRY_MS[n]);
+      };
+      // Cache-busted on retry: a browser that has just negatively cached this
+      // URL hands back the same failure without asking the network again,
+      // which would make every retry free and useless.
+      im.src = n ? src + (src.includes('?') ? '&' : '?') + 'retry=' + n : src;
+    };
+    attempt(0);
   }
 
   let playerSheet = null;
@@ -1813,12 +1836,9 @@
     const tiers = (ROSTER[charId] && ROSTER[charId].tiers) || [];
     tierArt = tiers.map(entry => {
       const slot = { cfg: tierConfig(entry), img: null };
-      const im = new Image();
-      // Failure stays silent: a missing sheet leaves this tier unavailable and
-      // the player keeps whatever they already had, rather than vanishing.
-      im.onload  = () => { slot.img = im; applyTier(tierIndex); };
-      im.onerror = () => { slot.img = null; };
-      im.src = entry.src;
+      // Retried rather than given up on -- see loadArt. Giving up silently is
+      // what left a headless placeholder walking the floor for a whole session.
+      loadArt(entry.src, im => { slot.img = im; if (im) applyTier(tierIndex); });
       return slot;
     });
     applyTier(0);
@@ -1830,12 +1850,22 @@
   // Nothing loaded at all leaves playerSheet null and the drawn body runs.
   function applyTier(want){
     tierIndex = Math.max(0, Math.min(want, tierArt.length - 1));
+    const use = i => {
+      playerSheet = tierArt[i].cfg;
+      playerSheetImg = tierArt[i].img;
+    };
     for (let i = tierIndex; i >= 0; i--){
-      if (tierArt[i] && tierArt[i].img){
-        playerSheet = tierArt[i].cfg;
-        playerSheetImg = tierArt[i].img;
-        return;
-      }
+      if (tierArt[i] && tierArt[i].img){ use(i); return; }
+    }
+    // Nothing at or below this tier. Reaching upward shows kit the player has
+    // not earned yet, which is why it is the last thing tried rather than part
+    // of the search above -- but it is only reached when the alternative is no
+    // character at all. A tier-1 sheet that failed while tiers 2-4 loaded used
+    // to leave a headless placeholder walking a floor with three usable sheets
+    // sitting in memory; slightly-wrong kit beats that every time. The player
+    // drops back to the correct sheet at their next promotion.
+    for (let i = tierIndex + 1; i < tierArt.length; i++){
+      if (tierArt[i] && tierArt[i].img){ use(i); return; }
     }
     playerSheet = null;
     playerSheetImg = null;
