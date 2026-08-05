@@ -42,13 +42,26 @@ prompts were not kept, which is the gap this file closes.
   appears **nowhere** in the art. Grey is the worst possible choice here,
   because the corner stones are grey.
 
-Expect to tune `--lo` / `--hi` against the actual output, and expect some
-magenta spill on the anti-aliased edge — check the cut composited over the dark
-floor before accepting it.
+Expect to tune `--lo` / `--hi` against the actual output, and **pass
+`--shadow`**. Both of these frames came back with a drop shadow despite the
+prompt asking for none, and a shadow cast on magenta is dark magenta: fully
+opaque, nowhere near the key colour by distance, so the plain key kept it as a
+solid pink rim tracing every bone. `--shadow` divides brightness out before
+comparing, which puts a shadow of the key back on top of the key. On this art
+the shadow measured 0.07 against the cream bones at 0.86 and the amber gems at
+0.75, so there is a wide gap to sit in.
+
+`cut_plaque.py` also un-multiplies the backdrop out of the anti-aliased edge in
+`flat` mode now. Keying only writes alpha, so a half-covered pixel still held
+half a magenta — which is fine over the background it was cut from and wrong
+over anything else. That matters here specifically, because the floor these sit
+on is about to be rebuilt.
+
+Check the cut composited over the dark floor before accepting it either way.
 
 ---
 
-## 1. `set-down.png`
+## 1. `set-down.png` — **shipped** as `assets/ui/set-down.webp`
 
 > The object: a long shallow rectangular frame lying flat on the ground, made
 > of pale fossilised dinosaur bones laid end to end, with a chunky carved stone
@@ -69,7 +82,12 @@ is what becomes art; the hole stays a hole.
 draws the words, at 12px Galindo, and baked text is text you cannot change or
 translate. It would also be unreadable — see below.
 
-**3.38:1, and it is not negotiable.** The pad is `DROP = A(196) x A(58)`, which
+**3.38:1 in the box, though the art itself need not be.** Both references came
+back short — 2.40:1 against the 3:1 asked for, and 1.98:1 against 2.5:1, the
+same regression toward square that the counter reference showed. Composited at
+the real 122x36 and inspected at 4x, the 1.41x horizontal stretch is invisible:
+at this size a bone segment is 9px and the silhouette is doing all the work.
+Not worth a re-roll. The **box** is fixed, though — The pad is `DROP = A(196) x A(58)`, which
 is **122 x 36 canvas pixels**, and that number is the delivery hit box as well
 as the drawing. The band it sits in is 80 art px tall (700–780 for the back row,
 900–990 for the front) and the spec keeps that corridor clear. Art at any other
@@ -118,7 +136,7 @@ code already does. Correctness is not.
 `CLEAR` over it, because the old pad had `SET DOWN` painted in and the two
 together were unreadable.
 
-## 2. `pick-up.png`
+## 2. `pick-up.png` — **shipped** as `assets/ui/pick-up.webp`
 
 > The same frame, in the same materials and the same style, but shorter — about
 > two and a half times wider than it is tall. Identical bone construction and

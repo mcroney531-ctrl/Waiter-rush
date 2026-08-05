@@ -40,11 +40,32 @@ from PIL import Image, ImageFilter
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def key_flat(a, key, lo, hi):
+def key_flat(a, key, lo, hi, shadow=False):
     """Alpha from colour distance to a flat backdrop, with a soft ramp so the
-    cut edge is anti-aliased rather than a staircase."""
+    cut edge is anti-aliased rather than a staircase.
+
+    `shadow` additionally keys out the backdrop's own shadow. Art generated with
+    a drop shadow -- which happens whether or not the prompt asked for one --
+    casts it onto the backdrop, and a shadow is the backdrop scaled toward
+    black, so it is fully opaque and nowhere near the key colour by distance.
+    On the drop-zone frame that left a solid pink rim tracing every bone.
+
+    Scaling toward black is exactly what dividing out brightness undoes: compare
+    each pixel's colour normalised to its own brightest channel against the key
+    normalised the same way, and a shadow of the key lands on top of the key
+    while genuinely different art stays far away. Measured on this frame: the
+    shadow sits at 0.07, the cream bones at 0.86, the amber gems at 0.75.
+    """
     d = np.abs(a - np.array(key)).sum(2)
-    return np.clip((d - lo) / (hi - lo), 0, 1)
+    alpha = np.clip((d - lo) / (hi - lo), 0, 1)
+    if shadow:
+        k = np.array(key, dtype=np.float64)
+        kn = k / k.max()
+        px = a.astype(np.float64)
+        dn = np.abs(px / np.clip(px.max(2, keepdims=True), 1, None) - kn).sum(2)
+        # Ramped rather than cut, so the shadow's own soft edge stays soft.
+        alpha = np.minimum(alpha, np.clip((dn - 0.10) / 0.12, 0, 1))
+    return alpha
 
 
 def key_vignette(a, step):
@@ -75,6 +96,35 @@ def key_vignette(a, step):
     return np.where(bg, 0.0, 1.0)
 
 
+def unmultiply(rgb, key, alpha):
+    """Take the backdrop back out of the edge pixels.
+
+    Keying only writes alpha. A pixel half-covered by a bone still holds the
+    colour the renderer actually produced -- half bone, half backdrop -- so over
+    a dark floor the leftover backdrop shows as a rim in the backdrop's own
+    colour. On a magenta key that rim is bright pink and it traced every bone in
+    the drop-zone frame.
+
+    Compositing says `seen = fg*alpha + key*(1-alpha)`, so the foreground the
+    artist drew is `(seen - key*(1-alpha)) / alpha`. Solving it back out is what
+    makes a keyed edge sit on any background rather than only on the one it was
+    cut from -- which matters here, because the floor under these is about to be
+    rebuilt in 3D.
+
+    Only for `flat`. It needs one known backdrop colour, and vignette exists
+    precisely because that backdrop is a gradient.
+    """
+    k = np.array(key, dtype=np.float64)
+    # Below this the pixel is nearly all backdrop and the division amplifies
+    # noise into confetti; it is transparent enough that its colour is unseen.
+    solid = alpha > 0.04
+    out = rgb.copy()
+    az = np.where(solid, alpha, 1.0)[..., None]
+    fixed = (rgb - k * (1.0 - az)) / az
+    out[solid] = fixed[solid]
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src')
@@ -83,6 +133,8 @@ def main():
     ap.add_argument('--bg', default='254,254,254', help='flat mode backdrop colour')
     ap.add_argument('--lo', type=int, default=34, help='flat: fully transparent below this distance')
     ap.add_argument('--hi', type=int, default=88, help='flat: fully opaque above this distance')
+    ap.add_argument('--shadow', action='store_true',
+                    help='flat: also key out the backdrop\'s own drop shadow')
     ap.add_argument('--step', type=int, default=22, help='vignette: max per-pixel colour step')
     ap.add_argument('--ground', type=int, default=0, help='fade the last N source rows out')
     ap.add_argument('--width', type=int, default=640)
@@ -93,7 +145,8 @@ def main():
     a = np.asarray(im).astype(np.int16)
 
     if args.mode == 'flat':
-        alpha = key_flat(a, [int(v) for v in args.bg.split(',')], args.lo, args.hi)
+        alpha = key_flat(a, [int(v) for v in args.bg.split(',')], args.lo, args.hi,
+                         args.shadow)
     else:
         alpha = key_vignette(a, args.step)
 
@@ -105,7 +158,11 @@ def main():
         ramp[y1:] = 0
         alpha *= ramp[:, None]
 
-    out = im.convert('RGBA')
+    rgb = a.astype(np.float64)
+    if args.mode == 'flat':
+        rgb = unmultiply(rgb, [int(v) for v in args.bg.split(',')], alpha)
+
+    out = Image.fromarray(rgb.round().clip(0, 255).astype(np.uint8), 'RGB').convert('RGBA')
     am = Image.fromarray((alpha * 255).astype(np.uint8))
     if args.mode == 'vignette':
         am = am.filter(ImageFilter.GaussianBlur(0.8))

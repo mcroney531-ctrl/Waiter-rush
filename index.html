@@ -617,6 +617,13 @@
   let rushComingReady = false;
   rushComingImg.onload = () => { rushComingReady = true; };
   rushComingImg.src = 'assets/ui/rush-coming.webp';
+  // The floor pads. One frame image each, bone border with a transparent
+  // middle -- the middle is a hole on purpose so the floor shows through it,
+  // which is what lets these survive the room being rebuilt in 3D.
+  const padImg = new Image();  padImg.src  = 'assets/ui/set-down.webp';
+  const passImg = new Image(); passImg.src = 'assets/ui/pick-up.webp';
+  const ready = im => im.complete && im.naturalWidth > 0;
+
   const rushActiveImg = new Image();
   let rushActiveReady = false;
   rushActiveImg.onload = () => { rushActiveReady = true; };
@@ -2961,15 +2968,84 @@
     ctx.restore();
   }
 
+  // Every pad state comes off one image rather than one image per state. Four
+  // assets would be three more startup requests, and there are already 41 of
+  // them racing before the shift starts — one losing that race is what left a
+  // headless waiter walking the floor.
+  //
+  // `carrying` deliberately lights **every** pad at once. The mockup captioned
+  // this "signal the best place to set down", and if that ever meant the
+  // *correct* table it would delete the game: the ticket fades on purpose and
+  // remembering the number is the whole mechanic. Proximity is fine, and is all
+  // `active` is. Correctness is not.
+  function drawPadArt(img, w, h, mode, phase){
+    const x = -w / 2, y = -h / 2;
+    ctx.save();
+    if (mode === 'active'){
+      // Glow first and separately: shadowBlur haloes the alpha silhouette, so
+      // the amber gathers around the bones instead of washing over them.
+      ctx.shadowColor = 'rgba(255,193,87,0.85)';
+      ctx.shadowBlur = A(20) * (0.72 + 0.28 * Math.sin(phase / 240));
+      ctx.drawImage(img, x, y, w, h);
+      ctx.shadowBlur = 0;
+      // Additive rather than a tint fill: it brightens the bones without
+      // flattening them to one colour, which a source-atop fill does.
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.26 + 0.10 * Math.sin(phase / 240);
+      ctx.drawImage(img, x, y, w, h);
+    } else if (mode === 'carrying'){
+      ctx.drawImage(img, x, y, w, h);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.16;
+      ctx.drawImage(img, x, y, w, h);
+    } else {
+      ctx.globalAlpha = mode === 'dirty' ? 0.45 : 0.62;
+      ctx.drawImage(img, x, y, w, h);
+    }
+    ctx.restore();
+  }
+
   // The pads themselves are painted into the board. All the code adds is the
   // highlight for the one you are standing on, plus the CLEAR prompt when a
   // table is waiting to be bussed — a dirty table is public knowledge, so that
   // label gives nothing away about the order you are carrying.
   function drawDropZones(){
+    const carrying = carried.length > 0;
+    const phase = performance.now();
     for (const t of tables){
       const standing = inDropZone(t);
+      const dirty = t.state === 'dirty';
       ctx.save();
       ctx.translate(t.padX, t.padY);
+      if (ready(padImg)){
+        drawPadArt(padImg, DROP.w, DROP.h,
+                   dirty ? 'dirty' : standing ? 'active' : carrying ? 'carrying' : 'idle',
+                   phase);
+        if (dirty){
+          // The frame is a border with a hole in it, so CLEAR needs its own
+          // backing or the floor pattern reads straight through the word.
+          ctx.fillStyle = 'rgba(28,23,18,0.88)';
+          roundRect(ctx, -DROP.w/2 + A(18), -DROP.h/2 + A(10),
+                    DROP.w - A(36), DROP.h - A(20), 8);
+          ctx.fill();
+          ctx.fillStyle = COLORS.mustard;
+          ctx.font = '14px Galindo, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('CLEAR', 0, 5);
+        } else {
+          // Brighter while carrying, because that is when it is being read.
+          ctx.globalAlpha = standing ? 0.95 : carrying ? 0.72 : 0.42;
+          ctx.fillStyle = COLORS.mustard;
+          ctx.font = '12px Galindo, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('SET DOWN', 0, 4);
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+        continue;
+      }
+      // Fallback below, used until the art loads and permanently if it never
+      // does — same convention as every other art asset here.
       // The resting pad. It used to be painted into the board art, so the game
       // only drew the active and dirty states over the top — which meant that
       // on a board without painted pads there was nothing to walk to at all.
@@ -3023,14 +3099,25 @@
   // section has an order waiting, teal when you are standing on it.
   function drawPickupZone(){
     const at = passUnderPlayer();
+    const phase = performance.now();
     for (const p of PASSES){
       const standing = at === p;
-      const ready = queueFor(p.side).length > 0;
-      if (!standing && !ready) continue;
+      const waiting = queueFor(p.side).length > 0;
+      if (ready(passImg)){
+        // Unlike a set-down pad this one is drawn even when idle: it is where
+        // the shift starts, and an empty pass is still the place to go back to.
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        drawPadArt(passImg, p.w, p.h,
+                   standing ? 'active' : waiting ? 'carrying' : 'idle', phase);
+        ctx.restore();
+        continue;
+      }
+      if (!standing && !waiting) continue;
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.fillStyle = standing ? 'rgba(47,111,107,0.32)' : 'rgba(224,167,46,0.16)';
-      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
+      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);   // fallback path
       ctx.fill();
       ctx.strokeStyle = standing ? COLORS.counter : COLORS.mustard;
       ctx.lineWidth = 3;
