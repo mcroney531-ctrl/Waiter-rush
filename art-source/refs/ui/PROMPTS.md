@@ -12,7 +12,9 @@ into `board.jpg`. Different pipeline, different constraints, so a separate file:
 
 Save each as `art-source/refs/ui/<name>.png` and push before doing anything
 else with it — a chat upload dies with its session and these are the source for
-every re-roll.
+every re-roll. The exact `cut_plaque.py` line that produced each shipped asset
+is recorded with it below, because the flags are tuned per image and
+reconstructing them from the result is guesswork.
 
 Already shipped this way, before this file existed: `rush-coming.webp`,
 `rush-active.webp`, and the five `hands-free-<character>.webp` banners. Their
@@ -70,6 +72,11 @@ Check the cut composited over the dark floor before accepting it either way.
 > whole middle of the frame is empty flat background — the frame is a border and
 > nothing else. No paw print, no marking, no fill inside it.
 
+```
+python3 tools/cut_plaque.py art-source/refs/ui/set-down.png set-down \
+        --mode flat --bg 188,50,101 --shadow --width 512
+```
+
 ### The three things this has to get right
 
 **The middle must be empty.** The game draws `SET DOWN` into it, and the floor
@@ -87,8 +94,10 @@ back short — 2.40:1 against the 3:1 asked for, and 1.98:1 against 2.5:1, the
 same regression toward square that the counter reference showed. Composited at
 the real 122x36 and inspected at 4x, the 1.41x horizontal stretch is invisible:
 at this size a bone segment is 9px and the silhouette is doing all the work.
-Not worth a re-roll. The **box** is fixed, though — The pad is `DROP = A(196) x A(58)`, which
-is **122 x 36 canvas pixels**, and that number is the delivery hit box as well
+Not worth a re-roll.
+
+The **box** is fixed, though. The pad is `DROP = A(196) x A(58)`, which is
+**122 x 36 canvas pixels**, and that number is the delivery hit box as well
 as the drawing. The band it sits in is 80 art px tall (700–780 for the back row,
 900–990 for the front) and the spec keeps that corridor clear. Art at any other
 aspect gets stretched into this one.
@@ -142,6 +151,11 @@ together were unreadable.
 > two and a half times wider than it is tall. Identical bone construction and
 > identical corner stones, just a narrower rectangle. The middle is empty flat
 > background.
+
+```
+python3 tools/cut_plaque.py art-source/refs/ui/pick-up.png pick-up \
+        --mode flat --bg 183,47,99 --shadow --width 512
+```
 
 A separate generation rather than a rescale: `PASS_W x PASS_H` is
 `A(150) x A(58)`, which is **2.59:1** against the set-down pad's 3.38:1.
