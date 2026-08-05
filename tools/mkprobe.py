@@ -43,12 +43,14 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get rushMusicPlaying(){return rushMusicPlaying;},
     forceTierNotice(age){applyTier(1); tierNoticeName=(ROSTER[charId]&&ROSTER[charId].name)||'';
       tierNotice = TIER_NOTICE_MS - (age||0);},
+    get handsFreeArt(){return !!handsFreeArt.img;},
+    get capacityNotice(){return capacityNotice;}, set capacityNotice(v){capacityNotice=v;},
     get rushActive(){return rushActive;}, get rushArmedAt(){return rushArmedAt;},
     get rushLandAt(){return rushLandAt;}, get rushEndsAt(){return rushEndsAt;},
     get rushFastCount(){return rushFastCount;}, set rushFastCount(v){rushFastCount=v;},
     get rushReadyAt(){return rushReadyAt;}, get rushFastTarget(){return rushFastTarget;},
     get promoPending(){return promoPending;},
-    set capacityNotice(v){capacityNotice=v;},
+    get capacityNotice(){return capacityNotice;}, set capacityNotice(v){capacityNotice=v;},
     get rushSpawnMult(){return rushSpawnMult;}, get rushDrainMult(){return rushDrainMult;},
     get rushDurationMs(){return rushDurationMs;}, forceRush(){armRush();} };}});
 """
@@ -76,7 +78,7 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
               'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
               'muted', 'rushMusic', 'rushMusicPlaying', 'forceTierNotice',
-              'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
+              'handsFreeArt', 'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
               'rushReadyAt', 'rushFastTarget', 'promoPending', 'capacityNotice', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
     assert field in DBG, field
 print('probe.html regenerated with', len(DBG.splitlines()), 'lines of handle')

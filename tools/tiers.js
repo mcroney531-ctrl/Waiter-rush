@@ -66,6 +66,31 @@ const check = (name, got, want) => {
 
   await p.screenshot({ path: '/tmp/tier4.png', clip: { x: 0, y: 0, width: 960, height: 640 } });
 
+  // ---- every character has a hands-free banner, and it holds for a splash ----
+  // One banner per character, loaded by loadCharacter the same way the
+  // promotion splashes are. A missing or misnamed file fails silently at
+  // runtime -- drawMoments just falls back to the text strip -- so nothing
+  // would report it but this.
+  for (const id of await p.evaluate(() => window.__dbg.roster)) {
+    await p.evaluate(c => window.__dbg.setChar(c), id);
+    await p.waitForTimeout(900);
+    check(`${id} has a hands-free banner`,
+          await p.evaluate(() => window.__dbg.handsFreeArt), true);
+  }
+  // The promotion splash covers every momentBanner slot and is drawn after the
+  // capacity notice, so a notice landing under one would be invisible. It waits
+  // instead, with its countdown frozen -- a notice that silently burned its
+  // 2.6s behind a splash is the regression this catches.
+  await p.evaluate(() => { window.__dbg.setTier(1); window.__dbg.forceTierNotice();
+                           window.__dbg.capacityNotice = 2600; });
+  await p.waitForTimeout(900);
+  check('the capacity notice waits out a promotion splash',
+        await p.evaluate(() => window.__dbg.capacityNotice), 2600);
+  await p.waitForTimeout(5200);            // TIER_NOTICE_MS is 4500
+  check('and runs once the splash clears',
+        await p.evaluate(() => window.__dbg.capacityNotice > 0
+                            && window.__dbg.capacityNotice < 2600), true);
+
   // ---- reset drops back ----
   await p.evaluate(() => { document.getElementById('startBtn').click(); });
   await p.waitForTimeout(400);
