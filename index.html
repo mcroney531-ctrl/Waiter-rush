@@ -617,6 +617,10 @@
   let rushComingReady = false;
   rushComingImg.onload = () => { rushComingReady = true; };
   rushComingImg.src = 'assets/ui/rush-coming.webp';
+  const rushActiveImg = new Image();
+  let rushActiveReady = false;
+  rushActiveImg.onload = () => { rushActiveReady = true; };
+  rushActiveImg.src = 'assets/ui/rush-active.webp';
   // Sized so the two queues never meet in the middle — at four a side they
   // would otherwise read as one row of eight and the section split, which is
   // the whole point of two passes, would be invisible.
@@ -3261,6 +3265,44 @@
       ctx.restore();
       slot = 2;
     }
+    // 360 rather than the telegraph's 400: this art is 2.38:1 against that
+    // one's 4:1, so matching widths would stand it 168px tall and crowd the
+    // top of the canvas. 360 lands it inside the counter strip (y 24-176) and
+    // clears both PICK UP signs.
+    if (rushActive && rushActiveReady && rushActiveImg.naturalWidth){
+      const age = performance.now() - rushEndsAt + rushDurationMs;   // ms since it landed
+      const dw = 360, dh = dw * (rushActiveImg.naturalHeight / rushActiveImg.naturalWidth);
+      // Same easeOutBack pop as the promotion splash -- an explosion should
+      // arrive with a bang, not fade up. It runs for 20-45s after that, so
+      // the steady state is a slow breath rather than the telegraph's blink:
+      // this banner states a condition, it is not asking to be noticed again
+      // every second.
+      const k = Math.min(1, age / 320);
+      const c1 = 1.70158, c3 = c1 + 1;
+      const pop = 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+      const scale = (0.6 + 0.4 * pop) * (1 + 0.015 * Math.sin(age / 340));
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, age / 160);
+      ctx.translate(W/2, FLOOR_TOP - dh/2 - 12);
+      ctx.scale(scale, scale);
+      ctx.drawImage(rushActiveImg, -dw/2, -dh/2, dw, dh);
+      // The art says RUSH but not what it pays, and the multiplier is the
+      // reason to push through one rather than hide from it. This art is tall
+      // enough to cover every momentBanner slot, so the line rides along the
+      // banner's own dark lower band instead of stacking beneath it -- drawn
+      // inside the same transform so it scales with the pop.
+      ctx.font = '700 12px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(20,12,8,0.85)';
+      ctx.strokeText('tips ×' + RUSH_TIP_MULT + ' while it lasts', 0, dh/2 - 12);
+      ctx.fillStyle = '#FFE9B8';
+      ctx.fillText('tips ×' + RUSH_TIP_MULT + ' while it lasts', 0, dh/2 - 12);
+      ctx.restore();
+      // Deliberately no slot reservation: every slot sits inside this art, so
+      // there is nothing to reserve. A capacity notice landing mid-rush draws
+      // over it and stays readable -- momentBanner paints its own opaque panel.
+    }
     if (capacityNotice > 0){
       momentBanner(slot++, Math.min(1, capacityNotice / 500),
                    'BOTH HANDS FREE', 'you can carry two orders now', 300);
@@ -3322,7 +3364,10 @@
       const pulse = 0.7 + 0.3 * Math.sin((performance.now() - rushArmedAt) / 220);
       momentBanner(slot++, pulse, 'RUSH IS COMING...', 'brace yourself', 300, COLORS.angry);
     }
-    if (rushActive){
+    // Text fallback, as with the telegraph. The art carries no tip-multiplier
+    // line, so keep saying it here in the small strip beneath -- the reward is
+    // the reason to push through a rush rather than hide from it.
+    if (rushActive && !(rushActiveReady && rushActiveImg.naturalWidth)){
       momentBanner(slot++, 1, 'RUSH!', 'tips ×' + RUSH_TIP_MULT + ' while it lasts', 300, COLORS.angry);
     }
     if (flowFlash > 0){
