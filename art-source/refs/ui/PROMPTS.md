@@ -165,3 +165,36 @@ stones out of square, and the two sit on screen at the same time.
 Generate it in the **same session** as `set-down.png`, immediately after. Two
 frames that are meant to be the same object at two lengths are exactly what
 drifts when a session ends in between.
+
+---
+
+## 3. A dish-return frame — **deliberately not made yet. Do not add one.**
+
+There are three floor markings and only two are bone frames, so the dish
+returns look unfinished next to them and the obvious next move is a third
+generation. It is being held on purpose, and this section exists so a session
+picking this up cold does not helpfully make one.
+
+**It is not the same kind of object.** The set-down and pick-up pads are floor
+markings the game draws where nothing exists. The dish return is a **prop that
+stands on the floor** — already painted into the board, and already approved as
+`refs/room/dish-return.png`, prop 3 of the room kit. It goes through Meshy and
+gets baked into `board.jpg`; it does not live in `assets/ui/` at all.
+
+**Its box is not even pad-shaped.** `BUS_STATIONS` is `A(200) x A(240)`, which
+is **125 x 150 canvas px — portrait, 0.83:1**, against 3.38:1 and 2.59:1 for
+the two pads. That box is the standing prop's whole body, not a footprint on
+the ground. A bone frame at that aspect is a picture frame stood on its end.
+
+**And the question is not what it should look like.** It is whether the station
+needs a floor marking at all. The spec's lighting section says the grounding
+problem is solved by contact shadow, and `render_room.mjs` renders with
+`shadowMap` on for exactly that reason — a rendered dish return with a real
+contact shadow may read as somewhere to walk to without any marking under it,
+in which case a frame is noise on a floor the spec wants quiet.
+
+So the order is: `dish-return` through Meshy → `render_room.mjs` → look at the
+station in the rendered room → *then* decide. If it does turn out to need one,
+the recipe is already here: same style block, `--mode flat --shadow`, sized to
+whatever `BUS` is by then. Nothing about that gets easier by doing it now, and
+the geometry it would be sized against is the thing most likely to move.
