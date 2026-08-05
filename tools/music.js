@@ -126,8 +126,11 @@ async function open(args) {
 }
 
 // ---- the shift playlist wraps ----
-// Track one is 3:29 and track two is eight minutes, so this is driven rather
-// than waited out: fire `ended` and check what the handler does with it.
+// The three tracks run 3:28, 8:00 and 2:17, so this is driven rather than
+// waited out: fire `ended` and check what the handler does with it. Walking the
+// whole list rather than asserting a fixed length -- this test asserted a
+// two-track wrap for a while after shift-3.mp3 was added, and reported the
+// correct behaviour as a failure.
 {
   const { br, p } = await open(ALLOW);
   await p.click('#landingStart');
@@ -137,15 +140,23 @@ async function open(args) {
   let s = await state(p);
   check('playlist starts on track one', /shift-1\.mp3$/.test(s.src), s.src);
 
-  await p.evaluate(() => window.__audio[0].dispatchEvent(new Event('ended')));
-  await p.waitForTimeout(400);
-  s = await state(p);
-  check('and ending track one moves to track two', /shift-2\.mp3$/.test(s.src), s.src);
+  const tracks = await p.evaluate(() => window.__dbg.MUSIC.shift.tracks.map(
+    t => t.split('/').pop()));
+  check('the playlist has more than one track', tracks.length > 1, tracks.join(' '));
 
+  for (let i = 1; i < tracks.length; i++) {
+    await p.evaluate(() => window.__audio[0].dispatchEvent(new Event('ended')));
+    await p.waitForTimeout(400);
+    s = await state(p);
+    check(`ending track ${i} moves to track ${i + 1}`,
+          s.src.endsWith(tracks[i]), s.src);
+  }
+  // And off the end of the list, back to the start rather than to silence.
   await p.evaluate(() => window.__audio[0].dispatchEvent(new Event('ended')));
   await p.waitForTimeout(400);
   s = await state(p);
-  check('and ending track two wraps back to one', /shift-1\.mp3$/.test(s.src), s.src);
+  check(`ending the last track wraps back to ${tracks[0]}`,
+        s.src.endsWith(tracks[0]), s.src);
   await br.close();
 }
 

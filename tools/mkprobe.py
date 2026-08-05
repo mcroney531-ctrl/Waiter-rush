@@ -36,7 +36,7 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
       t.state='waiting'; t.patience=1; t.warned=false; },
     get sheetOn(){return sheetReady();},
     get music(){return music;}, get musicErrorStreak(){return musicErrorStreak;},
-    get musicSet(){return musicSet;}, get musicTrack(){return musicTrack;},
+    get musicSet(){return musicSet;}, get musicTrack(){return musicTrack;}, MUSIC:MUSIC,
     get muted(){return muted;},
     get rushMusic(){return rushMusic ? {src:rushMusic.src, time:rushMusic.currentTime,
       vol:rushMusic.volume, paused:rushMusic.paused, readyState:rushMusic.readyState} : null;},
