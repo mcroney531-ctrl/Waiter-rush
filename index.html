@@ -604,6 +604,14 @@
     im.src = 'assets/food/' + n + '.png';
     foodImg[n] = im;
   }
+  // What a finished meal leaves behind, rendered through the same pipeline as
+  // the food above so it is lit by the same sun. Until it loads -- and
+  // permanently if it never does -- drawDirtyDishes falls back to the vector
+  // stack it replaces, same convention as the board and the sprite sheets.
+  const dirtyImg = new Image();
+  let dirtyReady = false;
+  dirtyImg.onload = () => { dirtyReady = true; };
+  dirtyImg.src = 'assets/food/dirty-plate.png';
   // Sized so the two queues never meet in the middle — at four a side they
   // would otherwise read as one row of eight and the section split, which is
   // the whole point of two passes, would be invisible.
@@ -2965,6 +2973,15 @@
 
   function drawDirtyDishes(cx, cy, s){
     s = s || 1;
+    if (dirtyReady && dirtyImg.naturalWidth){
+      // 32*s keeps roughly the footprint the vector stack occupied (it spanned
+      // about 28*s across two plates and a glass), so nothing else on the table
+      // has to move; the art is one plate rather than a stack, so a touch wider
+      // is what makes it read at this size.
+      const w = 32 * s, h = w * (dirtyImg.naturalHeight / dirtyImg.naturalWidth);
+      ctx.drawImage(dirtyImg, cx - w/2, cy - h/2, w, h);
+      return;
+    }
     drawPlate(cx - 2*s, cy + 3*s, 11*s, false);
     drawPlate(cx + 1*s, cy - 2*s, 10*s, false);
     // a used glass beside the stack
