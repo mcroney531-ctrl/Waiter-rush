@@ -41,6 +41,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get rushMusic(){return rushMusic ? {src:rushMusic.src, time:rushMusic.currentTime,
       vol:rushMusic.volume, paused:rushMusic.paused, readyState:rushMusic.readyState} : null;},
     get rushMusicPlaying(){return rushMusicPlaying;},
+    forceTierNotice(age){applyTier(1); tierNoticeName=(ROSTER[charId]&&ROSTER[charId].name)||'';
+      tierNotice = TIER_NOTICE_MS - (age||0);},
     get rushActive(){return rushActive;}, get rushArmedAt(){return rushArmedAt;},
     get rushLandAt(){return rushLandAt;}, get rushEndsAt(){return rushEndsAt;},
     get rushFastCount(){return rushFastCount;}, set rushFastCount(v){rushFastCount=v;},
@@ -71,7 +73,7 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
               'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
-              'muted', 'rushMusic', 'rushMusicPlaying',
+              'muted', 'rushMusic', 'rushMusicPlaying', 'forceTierNotice',
               'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
               'rushUsedThisShift', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
     assert field in DBG, field
