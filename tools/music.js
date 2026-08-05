@@ -160,6 +160,90 @@ async function open(args) {
   await br.close();
 }
 
+// ---- a stale play() resolve cannot hijack the handover ----
+// The regression this exists for: musicSet stuck at null with the menu theme
+// still playing through a whole shift, and the rush sting silent because
+// startRushMusic gates on musicSet === 'shift'.
+//
+// music.play() resolves asynchronously, and a cold load leaves three overlapping
+// playMusic('menu') calls in flight (page load, the autoplay-retry gesture, the
+// picker). Each .then() ramps the shared element to its own set's volume. Land
+// one inside stopMusic's fade and rampMusic's clearInterval takes out the fade
+// AND the `then` carrying the handover, so playMusic('shift') never runs.
+//
+// Held open deliberately rather than waited for: on a warm localhost the promise
+// resolves too fast to collide, which is exactly why this shipped.
+{
+  const br = await chromium.launch({ executablePath: EXE, args: ALLOW });
+  const p = await br.newPage({ viewport: { width: 1000, height: 760 } });
+  await p.addInitScript(WATCH);
+  await p.addInitScript(hold => {
+    const A = window.Audio;
+    window.Audio = function (...a) {
+      const el = new A(...a);
+      const play = el.play.bind(el);
+      el.play = () => play().then(r => new Promise(res => setTimeout(() => res(r), hold)));
+      return el;
+    };
+  }, 1200);
+  const vols = [];
+  await p.goto(B + '/probe.html', { waitUntil: 'load' });
+  await p.click('#landingStart');
+  await p.waitForSelector('#avatarCard img', { timeout: 30000 });
+  await p.click('#avatarDone');           // beginRun: stopMusic -> playMusic('shift')
+  // Sample across the whole window the stale menu resolves land in.
+  for (let i = 0; i < 60; i++) {
+    await p.waitForTimeout(100);
+    vols.push(await p.evaluate(() => {
+      const a = (window.__audio || [])[0];
+      return a ? [a.src.split('/').pop(), +a.volume.toFixed(2)] : null;
+    }));
+  }
+  const s = await state(p);
+  check('the handover survives a slow play() promise',
+        await p.evaluate(() => window.__dbg.musicSet) === 'shift',
+        JSON.stringify(s));
+  check('and it is the shift track that ends up playing', /shift-1\.mp3$/.test(s.src), s.src);
+  // The visible symptom of a stale resolve landing on the wrong track.
+  const hijack = vols.find(v => v && /shift-/.test(v[0]) && v[1] > 0.32);
+  check('no stale resolve ramps the shift track to menu volume',
+        !hijack, hijack ? `${hijack[0]} reached ${hijack[1]}` : 'stayed <= 0.32');
+  await br.close();
+}
+
+// ---- a rush swaps the music and gives it back ----
+{
+  const { br, p } = await open(ALLOW);
+  await p.click('#landingStart');
+  await p.waitForSelector('#avatarCard img', { timeout: 30000 });
+  await p.click('#avatarDone');
+  const skip = await p.$('#skipBtn');
+  if (skip && await skip.isVisible()) await skip.click();
+  await p.waitForTimeout(2000);
+  const rush = () => p.evaluate(() => ({
+    set: window.__dbg.musicSet, active: window.__dbg.rushActive,
+    playing: window.__dbg.rushMusicPlaying,
+    shiftPaused: window.__dbg.music ? window.__dbg.music.paused : null,
+    rushVol: window.__dbg.rushMusic ? +window.__dbg.rushMusic.vol.toFixed(2) : null,
+  }));
+  check('the shift set is live before the rush', (await rush()).set === 'shift');
+  await p.evaluate(() => window.__dbg.forceRush());
+  let landed = null;
+  for (let i = 0; i < 40; i++) {            // the telegraph runs 5-15s
+    await p.waitForTimeout(500);
+    const r = await rush();
+    if (r.active && r.playing) { landed = r; break; }
+  }
+  check('the rush track takes over when the rush lands', !!landed, JSON.stringify(landed || await rush()));
+  if (landed) {
+    await p.waitForTimeout(1400);
+    const r = await rush();
+    check('and it is audible', r.rushVol > 0.1, `vol ${r.rushVol}`);
+    check('while the shift track is paused, not stopped', r.shiftPaused === true);
+  }
+  await br.close();
+}
+
 // ---- muted ----
 {
   const { br, p } = await open(ALLOW);

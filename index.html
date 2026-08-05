@@ -1226,6 +1226,19 @@
 
   let music = null, musicFade = null;
   let musicSet = null;      // which set is wanted; null means silence
+  // Bumped by every playMusic and stopMusic. `music.play()` returns a promise
+  // that can resolve long after the set that started it stopped being wanted --
+  // a cold fetch, or simply the three overlapping playMusic('menu') calls a cold
+  // load makes (page load, the autoplay-retry gesture, the picker). Its .then()
+  // then ramps the element to ITS set's volume regardless of what the element is
+  // holding by now. Benign on its own -- the shift track briefly gets menu
+  // volume -- but rampMusic clears the running fade first, so a stale resolve
+  // landing inside stopMusic's fade throws away that fade's `then` as well, and
+  // the handover it was carrying never happens: musicSet stays null with the
+  // menu track still playing. Everything downstream that gates on
+  // `musicSet === 'shift'` -- startRushMusic above all -- is then dead for the
+  // rest of the shift. Comparing the stamp is how a resolve knows it is stale.
+  let musicGen = 0;
   let musicTrack = 0;
   let musicErrorStreak = 0; // consecutive failed advances, since playMusic reset
 
@@ -1300,7 +1313,11 @@
     music.loop = set.tracks.length === 1;
     music.src = set.tracks[0];
     music.volume = 0;
-    music.play().then(() => rampMusic(set.vol, MUSIC_FADE_MS)).catch(() => {});
+    const gen = ++musicGen;
+    music.play().then(() => {
+      if (gen !== musicGen) return;      // a newer set took over while this was pending
+      rampMusic(set.vol, MUSIC_FADE_MS);
+    }).catch(() => {});
   }
 
   // Fades rather than stops, and only pauses once it is actually silent --
@@ -1308,6 +1325,7 @@
   // `then` runs after that, which is how one set hands over to the next.
   function stopMusic(then){
     musicSet = null;
+    musicGen++;               // anything still in flight is now stale
     killRushMusic();
     if (!music || music.paused){ if (then) then(); return; }
     rampMusic(0, MUSIC_FADE_MS, () => {
@@ -1357,7 +1375,11 @@
 
   function resumeShiftMusic(){
     if (!music || musicSet !== 'shift') return;
-    music.play().then(() => rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS)).catch(() => {});
+    const gen = musicGen;
+    music.play().then(() => {
+      if (gen !== musicGen) return;      // the shift ended while this was pending
+      rampMusic(MUSIC.shift.vol, MUSIC_FADE_MS);
+    }).catch(() => {});
   }
 
   // Guarded on musicSet still being 'shift': a rush only ever lands mid-shift,
@@ -1365,7 +1387,12 @@
   function startRushMusic(){
     if (!music || musicSet !== 'shift' || muted) return;
     initRushMusic();                       // no-op if arming already did it
+    const gen = musicGen;
     rampMusic(0, MUSIC_FADE_MS, () => {
+      // The shift can end inside this 900ms fade -- last life lost, or a mute.
+      // Without the check the callback pauses whatever the element now holds
+      // (the menu theme) and starts the rush sting over the top of it.
+      if (gen !== musicGen) return;
       music.pause();                       // keeps src and currentTime -- resuming is just play()
       rushMusic.currentTime = 0;
       rushMusic.volume = 0;
