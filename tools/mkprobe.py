@@ -46,7 +46,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get rushActive(){return rushActive;}, get rushArmedAt(){return rushArmedAt;},
     get rushLandAt(){return rushLandAt;}, get rushEndsAt(){return rushEndsAt;},
     get rushFastCount(){return rushFastCount;}, set rushFastCount(v){rushFastCount=v;},
-    get rushUsedThisShift(){return rushUsedThisShift;},
+    get rushReadyAt(){return rushReadyAt;}, get rushFastTarget(){return rushFastTarget;},
+    get promoPending(){return promoPending;},
     get rushSpawnMult(){return rushSpawnMult;}, get rushDrainMult(){return rushDrainMult;},
     get rushDurationMs(){return rushDurationMs;}, forceRush(){armRush();} };}});
 """
@@ -75,6 +76,6 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
               'muted', 'rushMusic', 'rushMusicPlaying', 'forceTierNotice',
               'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
-              'rushUsedThisShift', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
+              'rushReadyAt', 'rushFastTarget', 'promoPending', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
     assert field in DBG, field
 print('probe.html regenerated with', len(DBG.splitlines()), 'lines of handle')

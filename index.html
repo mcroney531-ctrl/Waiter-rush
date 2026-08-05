@@ -847,8 +847,17 @@
   const RUSH_SAFE_MS = 20000;            // neither trigger can arm before this -- protects the generous open
   const RUSH_FAST_PATIENCE_FRAC = 0.85;  // delivered with this much of the table's own patience still left ("first 15%")
   const RUSH_FAST_BUS_FRAC = 0.20;       // bussed within this fraction of the current eating window -- a little more slack than delivery, since noticing a table went dirty and crossing the floor is its own step
-  const RUSH_FAST_THRESHOLD = 10;        // qualifying fast actions (either kind) needed to arm the earned trigger
-  const RUSH_WILDCARD_CHANCE = 0.0015;   // per second, independent of performance -- roughly a 25-30% chance across a full shift on its own
+  // Rolled fresh before every rush rather than being one fixed number, so the
+  // earned trigger cannot be counted off. Averages 9.5 against the flat 10 it
+  // replaces -- marginally easier, and never twice the same.
+  const RUSH_FAST_MIN = 7, RUSH_FAST_MAX = 12;
+  const RUSH_WILDCARD_CHANCE = 0.002;    // per second, independent of performance
+  // Quiet time after one ENDS before anything can arm again. This is what
+  // makes a shift hold 2-3 rushes instead of exactly one: the old code
+  // consumed a single per-shift token on the first arm and never re-armed.
+  // Note the real spacing is longer than this number -- cooldown, then
+  // however long re-earning the counter takes, then the 5-15s telegraph.
+  const RUSH_COOLDOWN_MS = 50000;
   const RUSH_ARM_DELAY_MIN_MS = 5000, RUSH_ARM_DELAY_MAX_MS = 15000; // telegraph -> landing
   // Both duration and intensity scale with rushProgress at the moment it
   // arms, locked in for the whole event rather than drifting with the clock
@@ -863,13 +872,21 @@
   const RUSH_TIP_MULT = 1.5;             // the reward for surviving it -- stacks with flow, same as a good streak landing during a big tip
 
   let rushFastCount = 0;
-  let rushUsedThisShift = false;
+  let rushFastTarget = 0;                   // this rush's rolled threshold
+  let rushReadyAt = 0;                      // nothing can arm before this timestamp
   let rushArmedAt = 0, rushLandAt = 0;      // 0 means not armed
   let rushActive = false, rushEndsAt = 0;
   let rushDurationMs = 0, rushSpawnMult = 1, rushDrainMult = 1;    // locked in at arm time
 
+  const rollRushTarget = () =>
+    Math.round(lerp(RUSH_FAST_MIN, RUSH_FAST_MAX, Math.random()));
+
   function armRush(){
-    rushUsedThisShift = true;               // consumed on arming, not landing, so the other trigger can't sneak in during the telegraph delay
+    // Both the counter and its target reset here, so the next rush has to be
+    // earned again from zero against a freshly rolled number rather than
+    // riding whatever the counter happened to be carrying.
+    rushFastCount = 0;
+    rushFastTarget = rollRushTarget();
     rushArmedAt = performance.now();
     rushLandAt = rushArmedAt + lerp(RUSH_ARM_DELAY_MIN_MS, RUSH_ARM_DELAY_MAX_MS, Math.random());
     const p = rushProgress();
@@ -885,8 +902,10 @@
   function updateRush(dt){
     if (mode !== 'game') return;
     const now = performance.now();
-    if (!rushUsedThisShift && elapsed > RUSH_SAFE_MS){
-      if (rushFastCount >= RUSH_FAST_THRESHOLD) armRush();
+    // Nothing arms while one is already armed or running, nor during the
+    // cooldown after the last one ended.
+    if (!rushArmedAt && !rushActive && elapsed > RUSH_SAFE_MS && now >= rushReadyAt){
+      if (rushFastCount >= rushFastTarget) armRush();
       else if (Math.random() < RUSH_WILDCARD_CHANCE * dt / 1000) armRush();
     }
     if (rushArmedAt && !rushActive && now >= rushLandAt){
@@ -898,7 +917,11 @@
     if (rushActive && now >= rushEndsAt){
       rushActive = false;
       rushArmedAt = 0;
+      rushReadyAt = now + RUSH_COOLDOWN_MS;
       endRushMusic();
+      // A promotion earned mid-rush waited for the floor to calm down rather
+      // than fighting the rush banner for the same strip of screen.
+      if (promoPending){ promoPending = false; showPromotion(); }
     }
   }
 
@@ -1012,7 +1035,9 @@
     elapsed = 0;
     ticketIdCounter = 1;
     rushFastCount = 0;
-    rushUsedThisShift = false;
+    rushFastTarget = rollRushTarget();
+    rushReadyAt = 0;
+    promoPending = false;
     rushArmedAt = 0; rushLandAt = 0;
     rushActive = false; rushEndsAt = 0;
     rushDurationMs = 0; rushSpawnMult = 1; rushDrainMult = 1;
@@ -1685,6 +1710,7 @@
   let tierArt = [];           // one entry per tier: { cfg, img } — img null until loaded
   let tierNotice = 0;         // ms left on the "levelled up" flourish
   let tierNoticeName = '';
+  let promoPending = false;   // promotion earned mid-rush, waiting for it to end
 
   // The full illustrated "PROMOTED!" splash, keyed by the tier just reached
   // (2, 3, 4 — there is no promotion into tier 1). Not every character has
@@ -1760,10 +1786,25 @@
     // Only announce it if the art actually changed. A tier whose sheet failed
     // to load would otherwise pop a banner over an unchanged character.
     if (playerSheetImg !== before){
-      tierNotice = TIER_NOTICE_MS;
-      tierNoticeName = (ROSTER[charId] && ROSTER[charId].name) || '';
-      sfxPromotion();
+      // The splash is a 190px panel in the same strip the rush banners use,
+      // so the two genuinely collide rather than stacking the way the small
+      // momentBanners do. Hold it -- through the telegraph too, since
+      // covering "RUSH IS COMING" with a celebration would bury the one
+      // warning the player needs. The outfit still changes immediately; it
+      // is only the fanfare and the banner that wait.
+      if (rushArmedAt || rushActive) promoPending = true;
+      else showPromotion();
     }
+  }
+
+  // Two promotions inside one rush would collapse into a single splash for
+  // whichever tier the player ended on, which is the right answer anyway --
+  // it reads off tierIndex at the moment it fires, not at the moment it was
+  // earned.
+  function showPromotion(){
+    tierNotice = TIER_NOTICE_MS;
+    tierNoticeName = (ROSTER[charId] && ROSTER[charId].name) || '';
+    sfxPromotion();
   }
 
   const sheetReady = () => !!(playerSheet && playerSheetImg);
