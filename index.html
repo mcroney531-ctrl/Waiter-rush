@@ -612,6 +612,11 @@
   let dirtyReady = false;
   dirtyImg.onload = () => { dirtyReady = true; };
   dirtyImg.src = 'assets/food/dirty-plate.png';
+  // The rush telegraph, as painted art rather than the text strip it replaces.
+  const rushComingImg = new Image();
+  let rushComingReady = false;
+  rushComingImg.onload = () => { rushComingReady = true; };
+  rushComingImg.src = 'assets/ui/rush-coming.webp';
   // Sized so the two queues never meet in the middle — at four a side they
   // would otherwise read as one row of eight and the section split, which is
   // the whole point of two passes, would be invisible.
@@ -3238,6 +3243,24 @@
   // the tier that pays for a big delivery can be the one that lights flow.
   function drawMoments(){
     let slot = 0;
+    // The rush telegraph goes first because, as art, it is a wide panel rather
+    // than one of the stackable strips -- it covers the ground the first two
+    // momentBanner slots occupy, so it has to claim them before anything else
+    // takes one. A capacity notice landing during a telegraph is not
+    // hypothetical: it fires around delivery six, and the first rush of a
+    // shift arms at about the same moment.
+    if (rushArmedAt && !rushActive && rushComingReady && rushComingImg.naturalWidth){
+      const age = performance.now() - rushArmedAt;
+      const dw = 400, dh = dw * (rushComingImg.naturalHeight / rushComingImg.naturalWidth);
+      ctx.save();
+      // Pulsing rather than a flat hold -- this is the one banner whose job is
+      // to feel urgent. Fades in over the first 200ms so it does not just
+      // materialise mid-pulse.
+      ctx.globalAlpha = Math.min(1, age / 200) * (0.72 + 0.28 * Math.sin(age / 220));
+      ctx.drawImage(rushComingImg, W/2 - dw/2, FLOOR_TOP - dh - 12, dw, dh);
+      ctx.restore();
+      slot = 2;
+    }
     if (capacityNotice > 0){
       momentBanner(slot++, Math.min(1, capacityNotice / 500),
                    'BOTH HANDS FREE', 'you can carry two orders now', 300);
@@ -3292,9 +3315,10 @@
       ctx.stroke();
       ctx.restore();
     }
-    if (rushArmedAt && !rushActive){
-      // A pulse rather than a flat hold -- the whole point of the telegraph
-      // is that it reads as urgent, not as another calm notice.
+    // Text fallback for the telegraph, used only until the art loads and
+    // permanently if it never does -- the art path above already drew it
+    // otherwise. Same pulse either way.
+    if (rushArmedAt && !rushActive && !(rushComingReady && rushComingImg.naturalWidth)){
       const pulse = 0.7 + 0.3 * Math.sin((performance.now() - rushArmedAt) / 220);
       momentBanner(slot++, pulse, 'RUSH IS COMING...', 'brace yourself', 300, COLORS.angry);
     }
