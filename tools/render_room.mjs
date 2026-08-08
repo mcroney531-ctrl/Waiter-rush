@@ -1,0 +1,395 @@
+/**
+ * Assemble the dining room from the Meshy prop kit and render the board.
+ *
+ *   node tools/render_room.mjs --calibrate      # prove the art->world mapping
+ *   node tools/render_room.mjs --grid           # spec bands burned in
+ *   node tools/render_room.mjs --out assets/board.jpg
+ *
+ * Replaces a painted `assets/board.jpg` with a rendered one. The point is not
+ * that a render looks better than a painting -- it is that the geometry stops
+ * being something the code has to be *measured against* and becomes something
+ * the code *states*. A table is at art y 620 because LAYOUT puts it there, so
+ * the board cannot drift out of spec the way the painted one did (45-115px on
+ * every band, and a pickup floor that did not exist at all).
+ *
+ * Read DINING-ROOM-SPEC.md for what the room is for and
+ * DINING-ROOM-3D-RUNBOOK.md sections 4-6 for how this fits the rest.
+ *
+ * ---------------------------------------------------------------------------
+ * The art->world mapping, which is the whole trick
+ *
+ * The camera is orthographic at ELEV degrees above the floor, looking at the
+ * origin from +Y +Z. Under that projection two different world displacements
+ * both move things up and down the screen, and they do it by different amounts:
+ *
+ *   - moving `d` along **Z** (further from camera) rises `d * sin(ELEV)` on screen
+ *   - moving `h` along **Y** (upward)             rises `h * cos(ELEV)` on screen
+ *
+ * At 34 degrees that is 0.559 against 0.829, so floor depth is compressed to
+ * about two thirds of object height. Conflating the two is the classic way an
+ * isometric scene ends up with everything standing in the wrong place, so the
+ * two conversions are separate functions below and neither is inlined.
+ *
+ * Horizontal is the easy one: world X maps straight to screen X.
+ *
+ * --calibrate does not trust any of the above. It drops markers at known art
+ * coordinates, renders, finds them in the pixels and reports the error. If the
+ * mapping is wrong the numbers say so immediately, instead of the room looking
+ * subtly off in a way that gets argued about.
+ */
+import { createServer } from 'node:http';
+import { readFile, writeFile, mkdir, cp, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(HERE, '..');
+const args = process.argv.slice(2);
+const opt = (k, d) => { const i = args.indexOf('--' + k); return i === -1 ? d : args[i + 1]; };
+const has = k => args.includes('--' + k);
+
+const ART_W = 1536, ART_H = 1024;          // matches ART_W/ART_H in index.html
+const ELEV = +opt('elev', 34);             // matches render_sprites.mjs --elev
+const OUT = opt('out', 'art-source/shots/room.png');
+const CALIBRATE = has('calibrate');
+const GRID = has('grid');
+// Markers first, always, when anything about the camera changes. It puts a
+// bright sphere on the floor at a set of known art coordinates and the render
+// gets measured; whatever the projection actually does then shows up as a
+// number instead of as a room that looks subtly wrong.
+const MARKERS = has('markers');
+
+// --------------------------------------------------------------------------
+// Scale
+//
+// Set empirically, per the runbook: a character has to measure 208px tall in
+// this 1536x1024 frame (the spec's figure, itself measured off the shipped
+// Tyrone sprite). PPU is pixels per world unit at the floor plane; --calibrate
+// renders a character and reports his measured height so this can be tuned
+// against the render rather than derived on paper.
+const PPU = +opt('ppu', 470);
+
+// Where world (0,0,0) lands in art space. X is the room's centre line. Y is
+// chosen so the floor fills the bands the spec assigns to it: the counter's
+// front face meets the floor at art y 430 and the front drop pads sit at 945,
+// so the origin sits between them and the room extends both ways from it.
+const ORIGIN_ART_X = ART_W / 2;
+const ORIGIN_ART_Y = +opt('originY', 700);
+
+const RAD = ELEV * Math.PI / 180;
+const SIN_E = Math.sin(RAD), COS_E = Math.cos(RAD);
+
+/** Art x -> world x. The one conversion with no projection in it. */
+const artXToWorld = ax => (ax - ORIGIN_ART_X) / PPU;
+/** Art y on the FLOOR -> world z. Divided by sin, because depth is compressed. */
+const artYToWorldZ = ay => (ay - ORIGIN_ART_Y) / (SIN_E * PPU);
+/** A HEIGHT in art px -> world units. Divided by cos, not sin. Not the same call. */
+const artHeightToWorld = h => h / (COS_E * PPU);
+
+// --------------------------------------------------------------------------
+// The layout, in art space, straight out of the spec's band table.
+//
+// The columns are the x positions index.html already uses. The runbook is
+// explicit that the two rows differing in width is the painting's perspective
+// and that unifying them is a game-feel change rather than a cosmetic one --
+// it moves where the player has to stand. So this moves the rows vertically
+// onto the spec's bands and leaves x alone, which is the smaller change and
+// the one that fixes the actual defect.
+const ROW_BACK = 620, ROW_FRONT = 840;
+const COLS_BACK  = [406, 652, 902.5, 1154];
+const COLS_FRONT = [374, 638, 906.5, 1173.5];
+
+const LAYOUT = [
+  // The counter's front face meets the floor at 430 -- "the number everything
+  // else depends on". Anchored by that face rather than by its centre, so the
+  // band holds however deep the model turns out to be.
+  { prop: 'counter', x: ART_W / 2, y: 430, anchor: 'front', upright: 'none', width: 760 },
+
+  ...COLS_BACK.map(x  => ({ prop: 'table', x, y: ROW_BACK,  upright: 'none' })),
+  ...COLS_FRONT.map(x => ({ prop: 'table', x, y: ROW_FRONT, upright: 'none' })),
+
+  // Against each side wall, clear of the walkable lanes.
+  { prop: 'dish-return', x: 115,  y: 760, upright: 'none' },
+  { prop: 'dish-return', x: 1425, y: 760, upright: 'none', mirror: true },
+
+  // Hung above the counter at each end, over the two pickup positions.
+  { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },
+  { prop: 'pass-sign', x: 1180, y: 300, upright: 'none', hang: 300 },
+];
+
+// Every prop's size in art px. **Width, not height**, and that took a wrong
+// render to work out.
+//
+// Scaling by height is the obvious reading of the spec -- "a table surface
+// should sit at roughly half his height", so 104px on a 208px character. But
+// the table model is 2.5:1 (1.899 wide against 0.760 tall), so 104px tall makes
+// it 313px wide, and the columns are 246-268px apart. The first render came out
+// as two long benches with the four tables of each row fused into one.
+//
+// Width is the constraint that actually binds, and it has a measured value:
+// PROMPTS.md recorded that a table draws 144px on the 960px canvas, which is
+// 230 art px. At 2.5:1 that puts the surface at 92px, or 44% of the character
+// -- close enough to the spec's "roughly half" that the two readings agree once
+// the model's own proportions are taken into account, and it leaves ~20px of
+// floor between neighbouring tables exactly as the painted board does.
+const PROP_ART_WIDTH = {
+  table: 230,
+  counter: 790,        // matches the painted counter, wall to wall between the pillars
+  'dish-return': 200,  // BUS_STATIONS is A(200) wide in index.html
+  'pass-sign': 170,
+};
+
+// Meshy normalises every export so its longest axis is 1.9, and on all ten
+// props that axis is Y. The shortest-axis-is-up guess in preview_prop.mjs is
+// therefore wrong far more often than right, so orientation is stated per prop
+// here rather than inferred. See ROOM-BRIEF.md for the four ways it broke.
+const PROPS = ['table', 'counter', 'dish-return', 'pass-sign'];
+
+// --------------------------------------------------------------------------
+const three = resolve(ROOT, 'node_modules/three');
+if (!existsSync(three)) { console.error('run: npm install three playwright'); process.exit(1); }
+
+const STAGE = resolve(ROOT, '.room-stage');
+await rm(STAGE, { recursive: true, force: true });
+await mkdir(join(STAGE, 'models'), { recursive: true });
+await cp(join(three, 'build/three.module.min.js'), join(STAGE, 'three.module.min.js'));
+await cp(join(three, 'build/three.core.min.js'),   join(STAGE, 'three.core.min.js'));
+await cp(join(three, 'examples/jsm'), join(STAGE, 'jsm'), { recursive: true });
+for (const p of PROPS) {
+  const src = resolve(ROOT, 'art-source/room', p + '.glb');
+  if (!existsSync(src)) { console.error(`missing prop: ${src}`); process.exit(1); }
+  await cp(src, join(STAGE, 'models', p + '.glb'));
+}
+if (CALIBRATE) {
+  const c = resolve(ROOT, 'art-source/tyrone-t1.glb');
+  if (!existsSync(c)) { console.error('no tyrone-t1.glb to calibrate against'); process.exit(1); }
+  await cp(c, join(STAGE, 'models/character.glb'));
+}
+
+const PAGE = `<canvas id="c" width="${ART_W}" height="${ART_H}"></canvas>
+<script>
+  addEventListener('error', e => { window.__err = String(e.message || e); document.title = 'failed'; });
+  addEventListener('unhandledrejection', e => { window.__err = String(e.reason); document.title = 'failed'; });
+</script>
+<script type="importmap">
+{"imports":{"three":"./three.module.min.js","three/addons/":"./jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const ART_W = ${ART_W}, ART_H = ${ART_H}, PPU = ${PPU};
+const ORIGIN_ART_X = ${ORIGIN_ART_X}, ORIGIN_ART_Y = ${ORIGIN_ART_Y};
+const SIN_E = ${SIN_E}, COS_E = ${COS_E}, ELEV = ${ELEV};
+const PPU_ = ${PPU};
+const LAYOUT = ${JSON.stringify(LAYOUT)};
+const PROP_ART_WIDTH = ${JSON.stringify(PROP_ART_WIDTH)};
+const CALIBRATE = ${CALIBRATE};
+const MARKERS = ${MARKERS};
+const MARKER_PTS = ${JSON.stringify([[256,300],[768,300],[1280,300],
+                                     [256,512],[768,512],[1280,512],
+                                     [256,700],[768,700],[1280,700],
+                                     [256,900],[768,900],[1280,900]])};
+
+const artXToWorld = ax => (ax - ORIGIN_ART_X) / PPU;
+const artYToWorldZ = ay => (ay - ORIGIN_ART_Y) / (SIN_E * PPU);
+const artHeightToWorld = h => h / (COS_E * PPU);
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+// Non-optional, and the reason is in the spec: the grounding problem is not the
+// character's own shadow, it is that nothing else in the room casts one, so the
+// floor reads as flat paint. In 3D that is free.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+// Copied verbatim from render_sprites.mjs. A room lit from a different sun than
+// the cast will always look wrong, so this must change in both or neither.
+scene.add(new THREE.AmbientLight(0xffffff, 2.1));
+const key  = new THREE.DirectionalLight(0xfff2dd, 2.4); key.position.set(-4, 7, 6);
+const fill = new THREE.DirectionalLight(0xbcd4ff, 0.7); fill.position.set(5, 3, -4);
+scene.add(key); scene.add(fill);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+// The shadow camera has to cover the whole floor or props at the edges drop
+// their shadows off the end of the map and float.
+const sc = key.shadow.camera;
+sc.left = -3; sc.right = 3; sc.top = 3; sc.bottom = -3; sc.near = 0.1; sc.far = 30;
+sc.updateProjectionMatrix();
+
+// The floor. A plane rather than nothing, because a shadow needs something to
+// land on -- without it every contact shadow renders into empty space.
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 40),
+  new THREE.MeshStandardMaterial({ color: 0x6b5540, roughness: 0.95, metalness: 0 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Orthographic, and not a stylistic choice: the spec asks for near-orthographic
+// so the back row is not tiny, and a sprite rendered orthographically composited
+// into a perspective room is wrong at every position except the one it was
+// tuned at. The frustum is sized straight from PPU so one world unit is exactly
+// PPU pixels, which is what makes the mapping above true rather than approximate.
+const halfW = ART_W / (2 * PPU), halfH = ART_H / (2 * PPU);
+const cam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 100);
+const el = ELEV * Math.PI / 180;
+cam.position.set(0, Math.sin(el) * 30, Math.cos(el) * 30);
+cam.up.set(0, 1, 0);
+cam.lookAt(0, 0, 0);
+// The frame is centred on the world origin, but the origin has to land at art y
+// ORIGIN_ART_Y rather than at the middle of the canvas, so the view window
+// shifts to put it there.
+//
+// The sign is the opposite of the intuitive one and it is worth stating why:
+// setViewOffset's y moves the *window* down the full frame, so the content
+// inside it appears to move *up*. Wanting the origin lower on screen therefore
+// means a negative offset. Getting this backwards put the whole room 377px too
+// high -- exactly twice the shift, which is the signature of a flipped sign
+// rather than a wrong magnitude, and is how it was diagnosed.
+const shiftPx = ORIGIN_ART_Y - ART_H / 2;
+cam.setViewOffset(ART_W, ART_H, 0, -shiftPx, ART_W, ART_H);
+
+function load(url){
+  return new Promise((res, rej) => new GLTFLoader().load(url, res, undefined, e => rej(String(e))));
+}
+const clone = o => o.clone(true);
+
+function upright(root, mode){
+  if (mode === 'none' || !mode) return;              // already Y-up
+  if (mode === 'z') root.rotation.x = -Math.PI / 2;
+  else if (mode === 'x') root.rotation.z = Math.PI / 2;
+}
+
+const out = { placed: [] };
+const cache = {};
+for (const name of ${JSON.stringify(PROPS)}) cache[name] = (await load('models/' + name + '.glb')).scene;
+
+for (const item of (MARKERS ? [] : LAYOUT)) {
+  const root = clone(cache[item.prop]);
+  root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  upright(root, item.upright);
+
+  const holder = new THREE.Group();
+  holder.add(root);
+  scene.add(holder);
+
+  // Scale by the prop's intended WIDTH. Width is the only one of the three axes
+  // that maps to screen with no projection factor at all, so it is both the
+  // constraint that binds and the one with no trigonometry to get wrong.
+  let box = new THREE.Box3().setFromObject(holder);
+  let size = box.getSize(new THREE.Vector3());
+  const s = (PROP_ART_WIDTH[item.prop] / PPU) / size.x;
+  root.scale.setScalar(s);
+  if (item.mirror) root.scale.x *= -1;
+
+  box = new THREE.Box3().setFromObject(holder);
+  size = box.getSize(new THREE.Vector3());
+  const centre = box.getCenter(new THREE.Vector3());
+
+  // Sit it on the floor, centred on its own footprint, then move it to place.
+  holder.position.x += artXToWorld(item.x) - centre.x;
+  holder.position.y += (item.hang ? artHeightToWorld(item.hang) - size.y : 0) - box.min.y;
+  const zRef = item.anchor === 'front' ? artYToWorldZ(item.y) - size.z / 2 : artYToWorldZ(item.y);
+  holder.position.z += zRef - centre.z;
+
+  out.placed.push({ prop: item.prop, artX: item.x, artY: item.y,
+                    artW: +(size.x * PPU).toFixed(0),
+                    artH: +(size.y * COS_E * PPU).toFixed(0) });
+}
+
+if (MARKERS) {
+  // Flat discs lying on the floor, not spheres: a sphere's centre is above the
+  // floor, so what gets measured is the projection of its middle rather than of
+  // the point it is marking, and the two differ by exactly the cos/sin mix-up
+  // this is meant to detect.
+  // One colour per row, so a marker found in the render can be matched back to
+  // the art y it was asked for without assuming anything about the order they
+  // come out of a blob finder. The first attempt at this zipped a sorted list
+  // against a sorted list and paired the wrong points together, which produced
+  // a confident and completely wrong slope.
+  const ROW_COLOURS = [0xff0000, 0x00ff00, 0x0000ff, 0xff00ff];
+  MARKER_PTS.forEach(([ax, ay], i) => {
+    const d = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24),
+      new THREE.MeshBasicMaterial({ color: ROW_COLOURS[Math.floor(i / 3) % 4] }));
+    d.rotation.x = -Math.PI / 2;
+    d.position.set(artXToWorld(ax), 0.002, artYToWorldZ(ay));
+    scene.add(d);
+  });
+  out.markers = MARKER_PTS;
+}
+
+if (CALIBRATE) {
+  const c = (await load('models/character.glb')).scene;
+  const cb = new THREE.Box3().setFromObject(c);
+  const cs = cb.getSize(new THREE.Vector3());
+  // 208px as the game draws him, which is not the same as 208px of bounding box.
+  // Scaling his bbox height to project to 208 rendered him at 248: a character
+  // has a belly and a tail, and at 34 degrees that depth adds projected extent
+  // on top of his height. render_sprites.mjs sizes him off measured pixels for
+  // the same reason, so the ruler has to agree with it or every prop is judged
+  // against a character 19% taller than the one on the board.
+  const SILHOUETTE = 208 / 248;
+  c.scale.setScalar(artHeightToWorld(208) * SILHOUETTE / cs.y);
+  const cb2 = new THREE.Box3().setFromObject(c);
+  c.position.y -= cb2.min.y;
+  c.position.x = artXToWorld(ART_W / 2);
+  c.position.z = artYToWorldZ(945);
+  c.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  scene.add(c);
+  out.calibration = { charWorldHeight: +(artHeightToWorld(208)).toFixed(4),
+                      atArtY: 945, atArtX: ART_W / 2 };
+}
+
+renderer.render(scene, cam);
+out.png = canvas.toDataURL('image/png');
+window.__out = out;
+document.title = 'ready';
+</script>`;
+await writeFile(join(STAGE, 'index.html'), PAGE);
+
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.glb': 'model/gltf-binary' };
+const server = createServer(async (req, res) => {
+  try {
+    const p = join(STAGE, req.url === '/' ? 'index.html' : decodeURIComponent(req.url.slice(1)));
+    const body = await readFile(p);
+    res.writeHead(200, { 'Content-Type': TYPES[extname(p)] || 'application/octet-stream' });
+    res.end(body);
+  } catch { res.writeHead(404); res.end(); }
+}).listen(0);
+const port = server.address().port;
+
+const EXE = ['/opt/pw-browsers/chromium/chrome-linux/chrome',
+             '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find(existsSync);
+const br = await chromium.launch({ executablePath: EXE,
+                                   args: ['--no-sandbox', '--use-gl=swiftshader'] });
+const page = await br.newPage();
+page.on('pageerror', e => console.error('page error:', String(e).slice(0, 300)));
+await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
+await page.waitForFunction(() => ['ready', 'failed'].includes(document.title), null, { timeout: 300000 });
+const err = await page.evaluate(() => window.__err);
+if (err) { console.error('render failed:', err); await br.close(); server.close(); process.exit(1); }
+const out = await page.evaluate(() => window.__out);
+await br.close(); server.close();
+
+const dst = resolve(ROOT, OUT);
+await mkdir(dirname(dst), { recursive: true });
+await writeFile(dst, Buffer.from(out.png.split(',')[1], 'base64'));
+await rm(STAGE, { recursive: true, force: true });
+
+console.log(`  ${out.placed.length} props placed at PPU ${PPU}, origin art y ${ORIGIN_ART_Y}, elev ${ELEV}`);
+for (const p of out.placed) {
+  console.log(`    ${p.prop.padEnd(12)} at art (${String(p.artX).padStart(6)}, ${String(p.artY).padStart(4)})`
+            + `   draws ${String(p.artW).padStart(4)} x ${String(p.artH).padStart(3)} art px`
+            + `   (${(p.artH / 208 * 100).toFixed(0)}% of a character tall)`);
+}
+if (out.calibration) {
+  console.log(`\n  calibration: a 208px character is ${out.calibration.charWorldHeight} world units`);
+  console.log(`  measure him in the render -- if he is not 208px tall, PPU is wrong`);
+}
+console.log(`\n  wrote ${OUT}`);
