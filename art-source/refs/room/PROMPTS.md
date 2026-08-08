@@ -280,7 +280,17 @@ play size. The floor inlay stopped at 91,900 rather than 60,000 because
 meshoptimizer's error bound bit before the ratio did — its fossil relief *is*
 the object — and that is the algorithm protecting the silhouette, not a failure.
 
-Four props still carry their original counts because they shipped before this
-was understood: `pass-sign` 302,572, `pillar` 298,326, `wall-panel` 429,724 and
-`pendant-lamp` 264,450. They work, but running them through the same two
-commands would take the kit from 1.67M triangles to roughly 600k.
+The four that shipped before this was understood have since been run through
+the same two commands — `pass-sign` 302,572 → 60,000, `pillar` 298,326 →
+60,000, `wall-panel` 429,724 → 60,000, `pendant-lamp` 264,450 → 60,000. All
+four hit the budget exactly, which the four newest did not, because their
+originals were an order of magnitude lighter to begin with.
+
+The one worth having checked was the pendant lamp: thin linked geometry is
+where decimation bites hardest, and its chain is individual links. At 23% of
+the original triangles every link is still distinct. The pass sign's carved
+arrow, the pillar's ammonite capital and the wall panel's skull relief all
+came through the same way.
+
+**The kit is now 614,880 triangles and 28.4 MB across ten props — 817,418 in a
+scene with the table instanced eight times**, down from 1,872,490.

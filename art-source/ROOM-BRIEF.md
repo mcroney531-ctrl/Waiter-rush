@@ -109,16 +109,16 @@ in `PROMPTS.md` came from.
 | 1 | `table` | ✅ approved (v2, frieze removed) | ✅ **shipped** — `art-source/room/table.glb`, 28,934 tris, 1.39 MB |
 | 2 | `counter` | ✅ approved — `refs/room/counter.png` | ✅ **shipped** — `art-source/room/counter.glb`, 59,204 tris, 2.31 MB, 5.23:1 |
 | 3 | `dish-return` | ✅ approved — `refs/room/dish-return.png` | ✅ **shipped** — 60,000 tris, 2.87 MB — **`--upright none`** |
-| 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 302,572 tris, 11.97 MB — **exported Y-up already; always render with `--upright none`, see below** |
-| 5 | `pillar` | ✅ approved — `refs/room/pillar.png` | ✅ **shipped** — `art-source/room/pillar.glb`, 298,326 tris, 11.70 MB — **exported Y-up already; always render with `--upright none`** |
-| 6 | `wall-panel` | ✅ approved — `refs/room/wall-panel.png` | ✅ **shipped** — `art-source/room/wall-panel.glb`, 429,724 tris, 16.53 MB — **exported Y-up already; always render with `--upright none`** |
-| 7 | `pendant-lamp` | ✅ approved — `refs/room/pendant-lamp.png` | ✅ **shipped** — `art-source/room/pendant-lamp.glb`, 264,450 tris, 10.55 MB — **exported Y-up already; always render with `--upright none`** |
+| 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 60,000 tris, 2.78 MB — **exported Y-up already; always render with `--upright none`, see below** |
+| 5 | `pillar` | ✅ approved — `refs/room/pillar.png` | ✅ **shipped** — `art-source/room/pillar.glb`, 60,000 tris, 2.69 MB — **exported Y-up already; always render with `--upright none`** |
+| 6 | `wall-panel` | ✅ approved — `refs/room/wall-panel.png` | ✅ **shipped** — `art-source/room/wall-panel.glb`, 60,000 tris, 2.73 MB — **exported Y-up already; always render with `--upright none`** |
+| 7 | `pendant-lamp` | ✅ approved — `refs/room/pendant-lamp.png` | ✅ **shipped** — `art-source/room/pendant-lamp.glb`, 60,000 tris, 2.78 MB — **exported Y-up already; always render with `--upright none`** |
 | 8 | `planter` | ✅ approved | ✅ **shipped** — 74,844 tris, 3.61 MB — **`--upright none`** |
 | 9 | `floor-inlay` | ✅ approved | ✅ **shipped** — 91,900 tris, 4.42 MB — **no override; the default guess is right, see below** |
 | 10 | `shelf-unit` | ✅ approved | ✅ **shipped** — 59,998 tris, 2.85 MB — **`--upright none`** |
 
-**All ten props are through both gates.** The kit is 1,669,952 triangles and
-68.2 MB; the scene with the table instanced eight times is 1,872,490. If a
+**All ten props are through both gates.** The kit is 614,880 triangles and
+28.4 MB; the scene with the table instanced eight times is 817,418. If a
 session tells you the counter GLB doesn't exist, or that it's table-shaped,
 it's reading a stale copy of this file or a mislabelled upload — see rule 1.
 
