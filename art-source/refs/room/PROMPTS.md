@@ -101,7 +101,7 @@ matters most, ask for a light edge or trim along the join.
 
 ---
 
-## 2. `counter.png` — **reference approved**, saved beside this file
+## 2. `counter.png` — **done**, shipped as `art-source/room/counter.glb`
 
 > The object: a long low serving counter, about six times wider than it is tall.
 > One single unbroken horizontal top surface running the full width, in pale
@@ -115,13 +115,17 @@ sacred". If it comes back wavy or broken, re-roll rather than continuing.
 
 This is the prop the near-edge finding matters most for. The whole pickup
 interaction reads off where the counter meets the floor and where its serving
-edge is, and it is a 6:1 object, which is where Meshy is weakest. It is also the
-only prop a remesh was ever specified for — and that instruction has since been
-withdrawn. See the runbook's step 2: 20k was written when the plan was to remesh
-everything at 15k, so it meant "more than the others"; against the 28,934
-triangles Image to 3D actually produces it is a 30% decimation, on the one object
-whose defining feature is a long straight edge. **No remesh.** Everything in the
-kit now goes through at whatever generate produces.
+edge is, and it is a 6:1 object, which is where Meshy is weakest.
+
+It was also the only prop a Meshy remesh was ever specified for, and that
+instruction went through two reversals before settling. "Remesh 20k" was
+written when the plan was to remesh everything at 15k, so it read as *more* —
+but Image to 3D handed this one back at 59,204 triangles, which makes 20k a
+decimation, aimed at the object whose defining feature is a long straight edge.
+Withdrawing it was right. Concluding from that that *nothing* needs decimating
+was not: see the note at the foot of this file. Every prop is now decimated
+here rather than at Meshy, and the counter is one of only three that arrived
+light enough to need none.
 
 ### What the reference measured
 
@@ -192,7 +196,7 @@ painted board's counter runs 790. Options, best first:
    character. That is a bar, not a serving counter, and it would occlude the
    ticket plates. Don't.
 
-## 3. `dish-return.png`
+## 3. `dish-return.png` — **done**, shipped as `art-source/room/dish-return.glb`
 
 > The object: a stone wash station with a deep square basin set into the top,
 > chunky prehistoric plumbing and a carved stone body. About waist height.
@@ -223,7 +227,7 @@ anything under about 40px in the final render is texture rather than a motif.
 > The object: a hanging pendant lamp with a polished amber shade shaped like a
 > smooth egg, dark metal fittings and a short chain.
 
-## 8. `planter.png`
+## 8. `planter.png` — **done**, shipped as `art-source/room/planter.glb`
 
 > The object: a round carved stone planter holding broad prehistoric ferns.
 > Foliage contained within the pot's width, not spilling sideways.
@@ -231,7 +235,7 @@ anything under about 40px in the final render is texture rather than a motif.
 Contained on purpose — this goes against a wall, and a wide sprawl reaches into
 the walkable floor, which the spec keeps clear.
 
-## 9. `floor-inlay.png`
+## 9. `floor-inlay.png` — **done**, shipped as `art-source/room/floor-inlay.glb`
 
 > The object: a circular fossil medallion inlaid flush into a stone floor, seen
 > from directly above. Flat, no height, no raised edge.
@@ -240,9 +244,43 @@ The only top-down one in the kit. It sits flush in the far left and right floor
 margins — never between the table rows, where it would compete with the SET DOWN
 pads the game draws every frame.
 
-## 10. `shelf-unit.png`
+## 10. `shelf-unit.png` — **done**, shipped as `art-source/room/shelf-unit.glb`
 
 > The object: an open shelving unit in dark metal and stone, holding stacked
 > plates and pots, about the height of a doorway.
 
 Back wall dressing behind the counter.
+
+---
+
+## What the whole kit taught us about triangle counts
+
+Meshy's Image to 3D does not ask what the model is for, and across ten props it
+handed back anything from **28,934** triangles for the table to **1,637,074**
+for the planter. Those two render at about the same size on a 1536x1024
+backdrop. The spread is not information, it is noise from the reconstruction.
+
+The three that arrived light — table, counter, dish return — are the ones that
+happened to land under budget. Nothing about the prompts caused it.
+
+`shrink_glb.py` cannot fix this, and it is worth being precise about why: on the
+four heaviest props the split was **29-61 MB of geometry against ~9 MB of
+textures**. Shrinking images is the wrong lever when the mesh is 80% of the file.
+
+So every prop now goes through both, in this order:
+
+```
+node tools/simplify_glb.mjs art-source/room/<prop>.glb --target 60000
+python3 tools/shrink_glb.py art-source/room/<prop>.glb --inplace
+```
+
+On the four newest that was 4,299,368 triangles and 197 MB down to 286,742 and
+13.8 MB, bounding boxes unchanged to three decimals and nothing visibly lost at
+play size. The floor inlay stopped at 91,900 rather than 60,000 because
+meshoptimizer's error bound bit before the ratio did — its fossil relief *is*
+the object — and that is the algorithm protecting the silhouette, not a failure.
+
+Four props still carry their original counts because they shipped before this
+was understood: `pass-sign` 302,572, `pillar` 298,326, `wall-panel` 429,724 and
+`pendant-lamp` 264,450. They work, but running them through the same two
+commands would take the kit from 1.67M triangles to roughly 600k.

@@ -77,7 +77,8 @@ python3 tools/whatis.py <file.glb>                     # what is this
 node tools/preview_prop.mjs <file.glb> --with tyrone-t1 # is it upright, is it the right size
 node tools/preview_prop.mjs <file.glb> --textured       # what actually ships
 python3 tools/board_audit.py                            # do the bands and the code agree
-python3 tools/shrink_glb.py <file.glb> --inplace         # before committing, always
+node tools/simplify_glb.mjs <file.glb> --target 60000     # before committing, always
+python3 tools/shrink_glb.py <file.glb> --inplace         # and this too, in that order
 ```
 
 ### 5. What the sessions cannot do
@@ -107,19 +108,30 @@ in `PROMPTS.md` came from.
 | --- | --- | --- | --- |
 | 1 | `table` | ✅ approved (v2, frieze removed) | ✅ **shipped** — `art-source/room/table.glb`, 28,934 tris, 1.39 MB |
 | 2 | `counter` | ✅ approved — `refs/room/counter.png` | ✅ **shipped** — `art-source/room/counter.glb`, 59,204 tris, 2.31 MB, 5.23:1 |
-| 3 | `dish-return` | ✅ approved — `refs/room/dish-return.png` | ⬜ **next action: run Meshy** |
+| 3 | `dish-return` | ✅ approved — `refs/room/dish-return.png` | ✅ **shipped** — 60,000 tris, 2.87 MB — **`--upright none`** |
 | 4 | `pass-sign` | ✅ approved — `refs/room/pass-sign.png` | ✅ **shipped** — `art-source/room/pass-sign.glb`, 302,572 tris, 11.97 MB — **exported Y-up already; always render with `--upright none`, see below** |
 | 5 | `pillar` | ✅ approved — `refs/room/pillar.png` | ✅ **shipped** — `art-source/room/pillar.glb`, 298,326 tris, 11.70 MB — **exported Y-up already; always render with `--upright none`** |
 | 6 | `wall-panel` | ✅ approved — `refs/room/wall-panel.png` | ✅ **shipped** — `art-source/room/wall-panel.glb`, 429,724 tris, 16.53 MB — **exported Y-up already; always render with `--upright none`** |
 | 7 | `pendant-lamp` | ✅ approved — `refs/room/pendant-lamp.png` | ✅ **shipped** — `art-source/room/pendant-lamp.glb`, 264,450 tris, 10.55 MB — **exported Y-up already; always render with `--upright none`** |
-| 8–10 | `planter`, `floor-inlay`, `shelf-unit` | ⬜ | ⬜ |
+| 8 | `planter` | ✅ approved | ✅ **shipped** — 74,844 tris, 3.61 MB — **`--upright none`** |
+| 9 | `floor-inlay` | ✅ approved | ✅ **shipped** — 91,900 tris, 4.42 MB — **no override; the default guess is right, see below** |
+| 10 | `shelf-unit` | ✅ approved | ✅ **shipped** — 59,998 tris, 2.85 MB — **`--upright none`** |
 
-Six props through gate A, five through both. If a session tells you the
-counter GLB doesn't exist, or that it's table-shaped, it's reading a stale
-copy of this file or a mislabelled upload — see rule 1.
+**All ten props are through both gates.** The kit is 1,669,952 triangles and
+68.2 MB; the scene with the table instanced eight times is 1,872,490. If a
+session tells you the counter GLB doesn't exist, or that it's table-shaped,
+it's reading a stale copy of this file or a mislabelled upload — see rule 1.
 
-**`pass-sign.glb`, `pillar.glb`, `wall-panel.glb`, and `pendant-lamp.glb`
-all need an upright override.** `preview_prop.mjs`'s shortest-axis-is-up
+The last four arrived named after Meshy's own inventions and were matched to
+props by rendering them, not by reading the names: `Emberstone_Basin` →
+`dish-return` (basin in the top, prehistoric plumbing, ammonite relief),
+`Emberstone_Pantry` → `shelf-unit`, `Lush_Kale_in_a_Jewele` → `planter`, and
+`Jurassic_Crest` → `floor-inlay`, which was the only ambiguous one: stood up
+it reads as a second wall panel, and only laid flat does it resolve as a floor
+medallion.
+
+**Seven of the ten need an upright override — `pass-sign`, `pillar`,
+`wall-panel`, `pendant-lamp`, `dish-return`, `planter` and `shelf-unit`.** `preview_prop.mjs`'s shortest-axis-is-up
 guess assumes an object is wider and deeper than it is tall — true for a
 table or counter, false for anything whose *shortest* dimension isn't its
 height. Four different ways that assumption has broken so far:
@@ -138,6 +150,20 @@ height. Four different ways that assumption has broken so far:
 - **pendant-lamp** — square in section like the pillar
   (`0.765 x 1.898 x 0.766`). Guessed `x`, laid the whole fixture on its
   side so the chain ran horizontal like a flail instead of hanging down.
+- **dish-return** (`1.888 x 1.595 x 1.336`), **planter**
+  (`1.615 x 1.900 x 1.598`) and **shelf-unit** (`1.586 x 1.899 x 0.607`) —
+  all three are Y-up and all three have a shortest axis that is not their
+  height. Meshy normalises every export so its longest axis is 1.9, and in
+  practice that axis has been Y on all ten props, which is why `none` is the
+  right answer far more often than the guess is.
+
+**`floor-inlay` is the exception, and it was predicted.** Its bbox is
+`1.899 x 1.899 x 0.938`, so the guess picks `z` and stands it up — where it
+reads as a second wall panel. Laid flat, which is what the guess produces if
+you *don't* override it, it resolves into what it is: a stone tile with a
+fossil skeleton in a recessed oval, seen from above. This is the one prop
+where the "wrong" orientation is the wanted one, so it takes no override at
+all.
 
 All four were already exported Y-up; the heuristic just has no way to
 tell a genuinely short vertical object from a flat or square one lying
@@ -172,12 +198,24 @@ job worth doing. Runbook §6 specifies it.
 - **The counter is one long object**, not a tiled segment with caps. The seam
   would land on the silhouette the spec calls sacred, and the usual fix — a
   pillar over the join — is the one thing forbidden on that edge.
-- **No rig, no animation on props, and therefore no remesh on anything.** The
-  table came out of Image-to-3D at 28,934 triangles, which is already fine. The
-  counter's old "Remesh 20k" instruction has been withdrawn — 20k was written
-  when the plan was to remesh everything at 15k, so it read as *more*; against
-  what generate actually produces it is a 30% decimation, and the object whose
-  defining feature is a long straight edge is the last one to decimate.
+- **No Meshy remesh — decimate here instead, to a 60k budget.** This has been
+  wrong twice and the current answer is measured. Meshy's own Remesh stays out:
+  it means generating again and pulling another 40-70 MB through the transfer
+  path, and it is not reproducible from the repo. But "so leave the triangles
+  alone" was a conclusion drawn from a sample of one, the table's 28,934, and
+  the rest of the kit destroyed it — Image-to-3D handed back 791k for the dish
+  return and **1,637,074 for the planter**, a 56x spread between props that
+  render at about the same size. `shrink_glb.py` cannot help, because the bulk
+  is mesh: 29-61 MB of geometry against ~9 MB of textures per file.
+
+  ```
+  node tools/simplify_glb.mjs art-source/room/<prop>.glb --target 60000
+  python3 tools/shrink_glb.py art-source/room/<prop>.glb --inplace
+  ```
+
+  Both, in that order, on every prop. It took the four newest from 4,299,368
+  triangles and 197 MB to 286,742 and 13.8 MB, with the bounding boxes intact
+  to three decimal places and no visible loss at play size.
 
 ---
 

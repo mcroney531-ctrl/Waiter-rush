@@ -127,7 +127,16 @@ Two Meshy specifics carried over from the food work:
 - Everything comes out of Meshy at an arbitrary scale and orientation. Normalise
   on import; do not eyeball it in the scene.
 
-Then shrink the textures, exactly as for food and characters:
+Then decimate and shrink. Both, in that order, on every prop -- see the foot of
+`refs/room/PROMPTS.md` for the measurements behind the budget:
+
+```
+node tools/simplify_glb.mjs art-source/room/<prop>.glb --target 60000
+```
+
+Meshy hands back anything from 29k to 1.6M triangles for props that render at
+the same size, and `shrink_glb.py` cannot touch it because the bulk is mesh
+rather than image. Then shrink the textures, exactly as for food and characters:
 
 ```
 python3 tools/shrink_glb.py art-source/room/table.glb --inplace
