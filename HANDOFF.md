@@ -51,18 +51,22 @@ This has already come up once and will come up again, because the obvious polish
 
 Do not re-derive these. They come from instrumented runs in headless Chromium, re-measured after the difficulty was slowed down.
 
-**The ramp lives in one place.** `RUSH_PEAK_MS` (600000, ten minutes) drives both curves, and the four numbers that shape the shift are named constants right above it: `PATIENCE_START_S` (120), `PATIENCE_END_S` (18), `SPAWN_START_MS` (7000), `SPAWN_FLOOR_MS` (3400). Patience is expressed in **seconds a fresh table gives you** and `drainRate` is derived from it, rather than the reverse — the seconds are the number on screen and the number worth arguing about.
+**The ramp lives in one place.** `RUSH_PEAK_MS` (270000, 4:30) drives every curve, and the numbers that shape the shift are named constants around it: `PATIENCE_START_S` (80), `PATIENCE_END_S` (8), `SPAWN_START_MS` (7000), `SPAWN_FLOOR_MS` (2300), `EAT_START_MS` (22000), `EAT_END_MS` (7800). Patience is expressed in **seconds a fresh table gives you** and `drainRate` is derived from it, rather than the reverse — the seconds are the number on screen and the number worth arguing about.
+
+**The clock is eased, not linear.** `rushProgress()` is `(elapsed / RUSH_PEAK_MS) ** RUSH_EASE` with `RUSH_EASE` **0.72**, so every row below is interpolated through that curve and the table cannot be re-read linearly. The ease exists because four rounds of real playthroughs kept producing a cliff rather than a ramp — the shift stayed flat-easy and then several axes crunched together at the end. Front-loading progress (65% linear becomes 73.5%) moves the pressure earlier without touching either endpoint.
 
 | elapsed | patience window | spawn gap | orders/min | max deliverable/min |
 | ------: | --------------: | --------: | ---------: | ------------------: |
-|      0s |          2:00   |     7.00s |        8.6 |                  54 |
-|     60s |          1:50   |     6.64s |        9.0 |                  54 |
-|    120s |          1:40   |     6.28s |        9.6 |                  54 |
-|    240s |          1:19   |     5.56s |       10.8 |                  54 |
-|    420s |            49s  |     4.48s |       13.4 |                  54 |
-|    600s |            18s  |     3.40s |       17.6 |                  54 |
+|      0s |          1:20   |     7.00s |        8.6 |                  54 |
+|     60s |            56s  |     5.41s |       11.1 |                  54 |
+|    120s |            40s  |     4.38s |       13.7 |                  54 |
+|    180s |            26s  |     3.49s |       17.2 |                  54 |
+|    240s |            14s  |     2.68s |       22.4 |                  54 |
+|   270s+ |             8s  |     2.30s |       26.1 |                  54 |
 
-Verified live rather than derived: at shift open a fresh table reads 119.7s and the spawn gap is 6.99s; with the clock pushed to 600000 they read 18.0s and 3.40s. The on-screen countdown is true elapsed time.
+The spawn column is the **baseline before `waveFactor()`**, which swings it either side of that figure by `WAVE_DEPTH_START` 0.18 → `WAVE_DEPTH_END` 0.65. An instantaneous reading mid-shift will not match the table and is not meant to.
+
+Verified live rather than derived, by pushing the clock and reading `drainRate` and `eatMs()` off the running game: at shift open a fresh table reads **79.7s** with a 21.9s meal; at 270000 and beyond it reads **8.0s** with a 7.8s meal. Everything past `RUSH_PEAK_MS` is flat — the 330s reading is identical to the 270s one. The on-screen countdown is true elapsed time.
 
 **Movement.** `PLAYER_SPEED` is **550 px/s** (it was 220 — Rone asked for 2-3x and this is 2.5x). One-way counter-to-table is now roughly **0.55s**, round trip **1.10s**, down from 1.37s and 2.74s.
 
@@ -149,7 +153,16 @@ Two rendering notes. Plates are **drawn as vectors, not emoji** — the food ico
 
 Carried dishes never fade. The fade exists to force you to remember a table number; the dish return is a fixed destination, so hiding them would be noise rather than difficulty. The `CLEAR` pad label is likewise safe — a dirty table is public knowledge, so relabelling it gives nothing away about the order you are carrying.
 
-`EAT_MS` (22000) is the lever that decides whether the floor breathes or clogs. Measured with a bot playing 100 seconds of the real shift: the floor settles at **3–4 tables in service with 3–4 eating and about 1 waiting to be cleared**, 14 delivered and 10 cleared, no lives lost. So roughly half the floor is tied up mid-meal at steady state, which is the intended squeeze. Note the consequence at full rush: eight tables with 22-second meals cannot absorb 17.6 orders/min, so `spawnTicket` simply finds no idle table and skips. The game self-throttles rather than punishing — nothing is lost, there are just fewer orders. Turn `EAT_MS` down if the floor feels too tied up.
+**Eating time** is the lever that decides whether the floor breathes or clogs. It is no longer one constant: it ramps from `EAT_START_MS` (22000) to `EAT_END_MS` (7800) through the same eased clock as everything else. The measurement below was taken when it was a flat 22000, so it describes the **opening** of a shift rather than all of it: a bot playing 100 seconds settled at **3–4 tables in service with 3–4 eating and about 1 waiting to be cleared**, 14 delivered and 10 cleared, no lives lost. Roughly half the floor tied up mid-meal is the intended squeeze at open.
+
+**The self-throttle argument that used to live here has inverted, and the sentence was quietly wrong until this was re-derived.** It read: eight tables with 22-second meals cannot absorb 17.6 orders/min, so `spawnTicket` finds no idle table and skips. Both numbers moved, and not in the same direction. A table is unavailable for at least `happyTimer` (1.2s) plus its meal, so the floor's absorb ceiling is `8 / (1.2 + eat)`:
+
+| | meal at peak | absorb ceiling | spawned at peak | headroom |
+| --- | ---: | ---: | ---: | ---: |
+| then | 22.0s | 20.7/min | 17.6/min | 17% |
+| now | 7.8s | 53.3/min | 26.1/min | 104% |
+
+So meals shortening (22s → 7.8s) raised the ceiling far faster than the spawn floor raised demand. **Meal length no longer throttles anything at peak.** The mechanism is still in the code — `spawnTicket` does return early when no table is idle — but what makes it bite now is the player's own round trips and bussing lag, not the meal, which is the same conclusion the `PLAYER_SPEED` note above reaches from the other direction. Turn `EAT_END_MS` up if the late shift feels too loose.
 
 The tutorial gained a **Clear the table** lesson (step 5 of 6). Early steps set `bussingEnabled = false` so they keep the old straight-back-to-idle path and can re-stage an order at the table their text names; the bussing lesson turns it on, serves a table immediately and shortens that one meal to 3.2s, because the lesson is about the clearing rather than the waiting. The practice round runs with bussing on, so it rehearses the real loop.
 
@@ -177,7 +190,7 @@ Two-tops, four-tops and six-tops: bigger parties tip more, eat longer, leave mor
 
 ### 3. Rush waves — built
 
-`waveFactor()` modulates the spawn gap on a `WAVE_PERIOD_MS` (42s) sine. Depth ramps with the shift, `WAVE_DEPTH_START` 0.18 → `WAVE_DEPTH_END` 0.55, so early service breathes gently and late service arrives in slams with real troughs between. Peaks and troughs read as drama where a linear slider reads as a slider.
+`waveFactor()` modulates the spawn gap on a `WAVE_PERIOD_MS` (42s) sine. Depth ramps with the shift, `WAVE_DEPTH_START` 0.18 → `WAVE_DEPTH_END` 0.65, so early service breathes gently and late service arrives in slams with real troughs between. Peaks and troughs read as drama where a linear slider reads as a slider.
 
 ### 4. Endless shift, richer ramp — built
 
@@ -185,9 +198,9 @@ No win state; the run ends when you lose three tables. Rone's reasoning, which o
 
 Four things now ramp instead of two:
 
-- **Patience** — `PATIENCE_START_S` 120 → `PATIENCE_END_S` 18
-- **Spawn gap** — `SPAWN_START_MS` 7000 → `SPAWN_FLOOR_MS` 3400, then modulated by `waveFactor()`
-- **Eat time** — `EAT_START_MS` 22000 → `EAT_END_MS` 12000. Faster turnover, more churn, more bussing pressure.
+- **Patience** — `PATIENCE_START_S` 80 → `PATIENCE_END_S` 8
+- **Spawn gap** — `SPAWN_START_MS` 7000 → `SPAWN_FLOOR_MS` 2300, then modulated by `waveFactor()`
+- **Eat time** — `EAT_START_MS` 22000 → `EAT_END_MS` 7800. Faster turnover, more churn, more bussing pressure.
 - **Counter queue depth** — `QUEUE_CAP_START` 2 → `QUEUE_CAP_END` 4 per side. This is what Rone meant by "higher capacity": *"capacity = counter queue"*, i.e. the harder reading. The player's carry capacity is a one-time progression unlock, not a difficulty axis.
 
 ### 5. Wrong deliveries cost something — built, and the fix matters
@@ -267,7 +280,7 @@ Object.defineProperty(window, '__dbg', { get(){ return {
   PASSES: PASSES, BUS: BUS_STATIONS, set elapsed(v){elapsed = v;} };}});
 ```
 
-Getters, not a snapshot object — `carried` and `tables` are reassigned, so a plain object captures stale references. `set elapsed` is what lets a run be dropped straight into peak rush without waiting ten minutes for the ramp.
+Getters, not a snapshot object — `carried` and `tables` are reassigned, so a plain object captures stale references. `set elapsed` is what lets a run be dropped straight into peak rush without waiting out the 4:30 ramp.
 
 Then drive real keyboard events and read actual state. **Delete `probe.html` before committing** — it is not in `.gitignore`.
 

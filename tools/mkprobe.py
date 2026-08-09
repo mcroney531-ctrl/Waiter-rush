@@ -35,6 +35,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
                     spawnTime:performance.now()});
       t.state='waiting'; t.patience=1; t.warned=false; },
     get sheetOn(){return sheetReady();},
+    get drainRate(){return drainRate;}, get spawnInterval(){return spawnInterval;},
+    get eatMs(){return eatMs();}, get queueCap(){return queueCapPerSide();},
     get music(){return music;}, get musicErrorStreak(){return musicErrorStreak;},
     get musicSet(){return musicSet;}, get musicTrack(){return musicTrack;}, MUSIC:MUSIC,
     get muted(){return muted;},
@@ -79,7 +81,7 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
-              'SIGN', 'moneyMetrics', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
+              'SIGN', 'moneyMetrics', 'drainRate', 'spawnInterval', 'eatMs', 'queueCap', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
               'muted', 'rushMusic', 'rushMusicPlaying', 'forceTierNotice',
               'handsFreeArt', 'rushOver', 'rushOverTips', 'rushTips', 'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
               'rushReadyAt', 'rushFastTarget', 'promoPending', 'capacityNotice', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
