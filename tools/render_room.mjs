@@ -112,7 +112,7 @@ const artHeightToWorld = h => h / (COS_E * PPU);
 // anticipates this -- "proportions matter, exact pixels do not, the game's
 // geometry is remapped to whatever gets built" -- so the bands are honoured in
 // order and proportion while the numbers come from the model.
-const ROW_BACK = 632, ROW_FRONT = 870;
+const ROW_BACK = 631, ROW_FRONT = 850;
 const COLS_BACK  = [406, 652, 902.5, 1154];
 const COLS_FRONT = [374, 638, 906.5, 1173.5];
 
@@ -180,8 +180,12 @@ const LAYOUT = [
   { prop: 'planter', x: 1466, y: 520, upright: 'none' },
   // No override: floor-inlay is the one prop whose default shortest-axis guess
   // lays it flat, which is exactly what a floor medallion wants.
-  { prop: 'floor-inlay', x: 70,   y: 900, upright: 'z+', flush: true },
-  { prop: 'floor-inlay', x: 1466, y: 900, upright: 'z+', flush: true },
+  // yaw 180 because laying a standing prop down turns its own "up" toward the
+  // camera, so the fossil read upside down from the player's side of the room.
+  // A floor decal wants its top pointing away from the viewer, the way you read
+  // an inscription set into a floor.
+  { prop: 'floor-inlay', x: 70,   y: 900, upright: 'z+', yaw: 180, flush: true },
+  { prop: 'floor-inlay', x: 1466, y: 900, upright: 'z+', yaw: 180, flush: true },
 ];
 
 // Every prop's size in art px. **Width, not height**, and that took a wrong
@@ -200,7 +204,12 @@ const LAYOUT = [
 // the model's own proportions are taken into account, and it leaves ~20px of
 // floor between neighbouring tables exactly as the painted board does.
 const PROP_ART_WIDTH = {
-  table: 230,
+  // 190, down from 230. At 230 the tables left 16px of floor between them on
+  // the back row -- the columns are 246px apart there -- which read as a bench
+  // rather than four tables. 190 opens that to 56px back and 74px front, and
+  // takes 29px off each row's screen extent as well, which the vertical layout
+  // below spends on the pickup floor and the pad gaps.
+  table: 190,
   counter: 790,        // matches the painted counter, wall to wall between the pillars
   'dish-return': 200,  // BUS_STATIONS is A(200) wide in index.html
   'pass-sign': 170,
@@ -424,6 +433,10 @@ function load(url){
 }
 const clone = o => o.clone(true);
 
+function spin(root, deg){
+  if (deg) root.rotation.y += deg * Math.PI / 180;
+}
+
 function upright(root, mode){
   if (mode === 'none' || !mode) return;              // already Y-up
   // Sign matters for anything with a front. -PI/2 maps the model's +Z face to
@@ -453,6 +466,7 @@ for (const item of (MARKERS ? [] : LAYOUT)) {
     }
   });
   upright(root, item.upright);
+  spin(root, item.yaw);
 
   const holder = new THREE.Group();
   holder.add(root);
