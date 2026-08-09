@@ -20,11 +20,13 @@ next person who remembers to update both places.
 """
 import os
 import re
+import sys
 
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOARD = os.path.join(ROOT, 'assets', 'board.jpg')
+BOARD_3D = os.path.join(ROOT, 'assets', 'board-3d.jpg')
 SRC = os.path.join(ROOT, 'index.html')
 OUT = os.path.join(ROOT, 'art-source', 'shots', 'board-audit.png')
 
@@ -48,71 +50,70 @@ def die(what):
     )
 
 
-def read_anchors(src):
-    """Pull the live Layout constants out of index.html, in art pixels."""
+def read_anchors(src, board):
+    """Pull the live Layout constants out of index.html, in art pixels.
 
-    def one(pattern, name):
-        m = re.search(pattern, src)
-        if not m:
-            die(name)
-        return float(m.group(1))
+    index.html now carries two geometries behind a `?board=3d` flag -- the
+    painted board's, measured off the painting, and the rendered room's, built
+    from the spec. They live in one GEO ternary, so this picks the branch rather
+    than the old single set of constants. `board` is 'painted' or '3d'.
+    """
+    m = re.search(r'const GEO = USE_3D(.*?);\n', src, re.S)
+    if not m:
+        die('the GEO block')
+    body = re.sub(r'//[^\n]*', '', m.group(1))
+    # Match the two object literals rather than splitting on the ternary's
+    # punctuation. Splitting on the last ':' finds the one inside `padAtX:
+    # false`, and splitting on the first '}' finds the one closing `r1: {...}`
+    # -- both give a branch that parses and is wrong. padAtX is the branch's own
+    # label for itself, so it is what selects.
+    blocks = re.findall(r'\{\s*floorTop:.*?padAtX:\s*(?:true|false)\s*\}', body, re.S)
+    if len(blocks) != 2:
+        die(f'the two GEO branches (found {len(blocks)})')
+    want = 'padAtX: true' if board == '3d' else 'padAtX: false'
+    branch = next((b for b in blocks if want in b), None)
+    if branch is None:
+        die(f'the {board} GEO branch')
 
-    def block(pattern, name):
-        m = re.search(pattern, src, re.S)
-        if not m:
-            die(name)
-        return m.group(1)
+    def num(key, where=branch):
+        mm = re.search(rf'{key}:\s*([\d.]+)', where)
+        if not mm:
+            die(f'GEO.{key} for the {board} board')
+        return float(mm.group(1))
 
-    floor_top = one(r'const FLOOR_TOP\s*=\s*A\(([\d.]+)\)', 'FLOOR_TOP')
+    def row(name):
+        mm = re.search(rf'{name}:\s*\{{([^}}]*)\}}', branch)
+        if not mm:
+            die(f'GEO.{name} for the {board} board')
+        return {k: num(k, mm.group(1)) for k in ('y', 'padY', 'barY')}
 
-    r1_src = block(r'const R1\s*=\s*\{(.*?)\};', 'R1')
-    r2_src = block(r'const R2\s*=\s*\{(.*?)\};', 'R2')
-
-    def row(row_src, row_name):
-        out = {}
-        for k in ('y', 'padY', 'barY'):
-            m = re.search(rf'{k}:\s*A\(([\d.]+)\)', row_src)
-            if not m:
-                die(f'{row_name}.{k}')
-            out[k] = float(m.group(1))
-        return out
-
-    r1 = row(r1_src, 'R1')
-    r2 = row(r2_src, 'R2')
-
-    tables_src = block(r'const tableDefs\s*=\s*\[(.*?)\];', 'tableDefs')
-    entries = re.findall(r'\{x:\s*A\(([\d.]+)\)[^{}]*\.\.\.(R1|R2)\}', tables_src)
+    tables_src = re.search(r'const tableDefs\s*=\s*\[(.*?)\];', src, re.S)
+    if not tables_src:
+        die('tableDefs')
+    entries = re.findall(r'T\(([\d.]+),\s*([\d.]+)\)[^{}]*\.\.\.(R1|R2)', tables_src.group(1))
     if len(entries) != 8:
-        die(f'tableDefs (found {len(entries)} table entries, expected 8)')
-    row1_x = [float(x) for x, row in entries if row == 'R1']
-    row2_x = [float(x) for x, row in entries if row == 'R2']
+        die(f'tableDefs (found {len(entries)} entries, expected 8)')
+    pad_at_x = 'padAtX: true' in branch
+    row1_x = [float(x) if pad_at_x else float(px) for x, px, r in entries if r == 'R1']
+    row2_x = [float(x) if pad_at_x else float(px) for x, px, r in entries if r == 'R2']
 
-    passes_src = block(r'const PASSES\s*=\s*\[(.*?)\];', 'PASSES')
-    pass_x = [float(x) for x in re.findall(r'x:\s*A\(([\d.]+)\)', passes_src)]
-    pass_ys = set(float(y) for y in re.findall(r'y:\s*A\(([\d.]+)\)', passes_src))
-    if len(pass_x) != 2:
-        die(f'PASSES (found {len(pass_x)} entries, expected 2)')
-    if len(pass_ys) != 1:
-        die(f'PASSES.y (the two pads disagree: {sorted(pass_ys)} -- this script assumes '
-            f'one shared y)')
-    pass_y = pass_ys.pop()
+    pass_x = [float(x) for x in
+              re.findall(r'x:\s*A\(([\d.]+)\)',
+                         re.search(r'const PASSES\s*=\s*\[(.*?)\];', src, re.S).group(1))]
+    bus_x = [float(x) for x in
+             re.findall(r'x:\s*A\(([\d.]+)\)',
+                        re.search(r'const BUS_STATIONS\s*=\s*\[(.*?)\];', src, re.S).group(1))]
 
-    bus_src = block(r'const BUS_STATIONS\s*=\s*\[(.*?)\];', 'BUS_STATIONS')
-    bus_x = [float(x) for x in re.findall(r'x:\s*A\(([\d.]+)\)', bus_src)]
-    bus_ys = set(float(y) for y in re.findall(r'y:\s*A\(([\d.]+)\)', bus_src))
-    if len(bus_x) != 2:
-        die(f'BUS_STATIONS (found {len(bus_x)} entries, expected 2)')
-    if len(bus_ys) != 1:
-        die(f'BUS_STATIONS.y (the two stations disagree: {sorted(bus_ys)} -- this script '
-            f'assumes one shared y)')
-    bus_y = bus_ys.pop()
-
-    return dict(floor_top=floor_top, r1=r1, r2=r2, row1_x=row1_x, row2_x=row2_x,
-                pass_x=pass_x, pass_y=pass_y, bus_x=bus_x, bus_y=bus_y)
+    return dict(floor_top=num('floorTop'), r1=row('r1'), r2=row('r2'),
+                row1_x=row1_x, row2_x=row2_x,
+                pass_x=pass_x, pass_y=num('passY'),
+                bus_x=bus_x, bus_y=num('busY'))
 
 
 def main():
-    anchors = read_anchors(open(SRC).read())
+    board = '3d' if '--3d' in sys.argv else 'painted'
+    anchors = read_anchors(open(SRC).read(), board)
+    print(f'auditing the {board} board\n')
     r1, r2 = anchors['r1'], anchors['r2']
 
     ANCHORS = [
@@ -128,7 +129,7 @@ def main():
         ('front drop pads', 900, 990, r2['padY']),
     ]
 
-    im = Image.open(BOARD).convert('RGB')
+    im = Image.open(BOARD_3D if board == '3d' else BOARD).convert('RGB')
     W, H = im.size
     if (W, H) != (1536, 1024):
         print(f'note: board is {W}x{H}, spec bands assume 1536x1024')
@@ -160,13 +161,20 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     im.save(OUT)
 
-    print(f'{"band":18} {"spec":11} {"painted":<9} out by')
+    # Inside or outside the band, not distance from its top edge. The old metric
+    # reported the 3D board's back row as "52px low" when 632 sits squarely
+    # inside 580-700 -- it was measuring against `lo` and calling every value
+    # that was not flush with the band's start an error.
+    print(f'{"band":18} {"spec":11} {"actual":<9} verdict')
     worst = 0
-    for label, lo, hi, painted in COMPARE:
-        off = lo - painted
-        worst = max(worst, abs(off))
-        where = 'high' if off > 0 else ('low' if off < 0 else '')
-        print(f'{label:18} {f"{lo}-{hi}":11} {painted:<9g} {abs(off):g}px {where}'.rstrip())
+    for label, lo, hi, actual in COMPARE:
+        if lo <= actual <= hi:
+            verdict = f'inside ({actual - lo:.0f}px in)'
+        else:
+            off = lo - actual if actual < lo else actual - hi
+            worst = max(worst, off)
+            verdict = f'OUTSIDE by {off:.0f}px {"high" if actual < lo else "low"}'
+        print(f'{label:18} {f"{lo}-{hi}":11} {actual:<9g} {verdict}')
 
     # The one that is not a matter of degree: is the pickup floor clear?
     p0, p1 = next((a, b) for a, b, n in SPEC if n.startswith('PICKUP'))
@@ -182,7 +190,8 @@ def main():
         print('standing at the counter follows from it being occupied.')
     else:
         print(f'pickup floor ({p0}-{p1}) is clear')
-    print(f'\nworst band offset: {worst:g}px\nwrote {os.path.relpath(OUT, ROOT)}')
+    print(f'\n{"every row is inside its band" if worst == 0 else f"worst band miss: {worst:g}px"}')
+    print(f'wrote {os.path.relpath(OUT, ROOT)}')
 
 
 if __name__ == '__main__':

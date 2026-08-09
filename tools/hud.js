@@ -13,6 +13,11 @@ import { existsSync, mkdirSync } from 'node:fs';
 const EXE = ['/opt/pw-browsers/chromium/chrome-linux/chrome',
              '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find(existsSync);
 const B = process.env.BASE || 'http://127.0.0.1:8222';
+// BOARD=3d runs these against the rendered room and its geometry instead
+// of the painted board and its. Both have to pass before the swap: the
+// pads, the passes and the dish returns all move, and this is the check
+// that they still line up with the furniture after they do.
+const Q = process.env.BOARD === '3d' ? '?board=3d' : '';
 
 // Measured off assets/money-sign.png with a gridline overlay: the bare plank
 // runs 0.38-0.85 of the image height and 0.13-0.87 of its width. Anything the
@@ -30,7 +35,7 @@ const p = await br.newPage({ viewport: { width: 1000, height: 760 } });
 const errs = [];
 p.on('pageerror', e => errs.push(String(e).slice(0, 160)));
 
-await p.goto(B + '/probe.html', { waitUntil: 'load' });
+await p.goto(B + '/probe.html' + Q, { waitUntil: 'load' });
 await p.click('#landingStart');
 await p.waitForSelector('#avatarCard img', { timeout: 30000 });
 await p.click('#avatarDone'); await p.waitForTimeout(300);

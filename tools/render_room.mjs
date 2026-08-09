@@ -104,7 +104,15 @@ const artHeightToWorld = h => h / (COS_E * PPU);
 // it moves where the player has to stand. So this moves the rows vertically
 // onto the spec's bands and leaves x alone, which is the smaller change and
 // the one that fixes the actual defect.
-const ROW_BACK = 620, ROW_FRONT = 840;
+// Derived from the tables' measured screen extent, not from the spec's band
+// table directly. A table placed at row y draws from y-122 to y+46: 76px of
+// height plus 92px of projected depth at 34 degrees. That is 168px against the
+// 120px the spec allocates a row, so laying the rows out on the literal bands
+// put the back row's SET DOWN pads on top of the front row's tables. The spec
+// anticipates this -- "proportions matter, exact pixels do not, the game's
+// geometry is remapped to whatever gets built" -- so the bands are honoured in
+// order and proportion while the numbers come from the model.
+const ROW_BACK = 632, ROW_FRONT = 870;
 const COLS_BACK  = [406, 652, 902.5, 1154];
 const COLS_FRONT = [374, 638, 906.5, 1173.5];
 
@@ -112,7 +120,13 @@ const LAYOUT = [
   // The counter's front face meets the floor at 430 -- "the number everything
   // else depends on". Anchored by that face rather than by its centre, so the
   // band holds however deep the model turns out to be.
-  { prop: 'counter', x: ART_W / 2, y: 430, anchor: 'front', upright: 'none', width: 760 },
+  // Tinted down because it was the lightest thing in the frame by a distance and
+  // pulled the eye straight to it. The spec's hierarchy puts the counter at
+  // level 2 -- it frames the gameplay and must not compete with it -- and the
+  // side effect is welcome: darkening the whole prop widens the value gap
+  // between its lit timber top and its stone front, which is the near-edge
+  // reading the counter exists to give.
+  { prop: 'counter', x: ART_W / 2, y: 430, anchor: 'front', upright: 'none', tint: 0.84 },
 
   ...COLS_BACK.map(x  => ({ prop: 'table', x, y: ROW_BACK,  upright: 'none' })),
   ...COLS_FRONT.map(x => ({ prop: 'table', x, y: ROW_FRONT, upright: 'none' })),
@@ -150,8 +164,14 @@ const LAYOUT = [
   // front of the counter's timber top and read as sitting on it; the band at
   // 430-580 is empty floor by decree, so the air above it is the one place in
   // the room a hanging lamp has nothing to collide with visually.
+  //
+  // Two, not three, and the middle one is the one that went. Moving them off
+  // the counter entirely turns out not to be available: the counter occupies
+  // art y 170-430 on screen and the tables start at 490, so there is no height
+  // a hanging lamp can occupy that crosses neither. What the third lamp cost
+  // was the counter's cleanest span -- the timber above the fossil relief, dead
+  // centre, which is the part of the silhouette the eye actually reads.
   { prop: 'pendant-lamp', x: 470,  y: 505, upright: 'none', hang: 335 },
-  { prop: 'pendant-lamp', x: 768,  y: 505, upright: 'none', hang: 335 },
   { prop: 'pendant-lamp', x: 1066, y: 505, upright: 'none', hang: 335 },
 
   // The far margins, which is the one place the spec calls safe for floor
@@ -422,7 +442,16 @@ for (const name of ${JSON.stringify(PROPS)}) cache[name] = (await load('models/'
 
 for (const item of (MARKERS ? [] : LAYOUT)) {
   const root = clone(cache[item.prop]);
-  root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true;
+    // Materials are shared across clones, so a tint has to clone the material
+    // first or every table darkens when the counter does.
+    if (item.tint) {
+      o.material = o.material.clone();
+      o.material.color.multiplyScalar(item.tint);
+    }
+  });
   upright(root, item.upright);
 
   const holder = new THREE.Group();
@@ -565,6 +594,19 @@ tableTops.forEach((v, i) => {
   g.fillStyle = '#d9cdb4';
   g.fillText(n, px, py + yAdj);
 });
+
+// The top strip is flat wall with nothing on it, and flat dead value reads as
+// unfinished. The spec asks for warm ambient fill with nothing in true black,
+// so this is a gentle darkening rather than a black vignette -- it lets the
+// wall recede instead of filling it with ornament nobody would look at, and it
+// happens to sit under the HUD band (art y 0-100), which the spec already
+// reserves for score and lives.
+const vig = g.createLinearGradient(0, 0, 0, 320);
+vig.addColorStop(0,    'rgba(22,16,11,0.55)');
+vig.addColorStop(0.55, 'rgba(22,16,11,0.22)');
+vig.addColorStop(1,    'rgba(22,16,11,0)');
+g.fillStyle = vig;
+g.fillRect(0, 0, ART_W, 320);
 
 out.png = flat.toDataURL('image/png');
 window.__out = out;

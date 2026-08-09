@@ -596,12 +596,43 @@
 
   // The counter is painted across the top; the floor the player can walk on
   // starts below it.
+  // ---- the two boards, during the changeover ----------------------------
+  // ?board=3d loads the rendered room and the spec's geometry; anything else
+  // keeps the painted board and the geometry measured off it. Both have to
+  // switch together and that is the whole reason this exists as one flag: the
+  // painted board's back row sits at art y 465 and the rendered one's at 620,
+  // so a rendered board with painted constants puts every SET DOWN pad 155px
+  // off its table and makes the room look broken for reasons that have nothing
+  // to do with the room.
+  //
+  // Temporary. When the rendered board is accepted this collapses to the 3D
+  // branch and the flag goes.
+  const USE_3D = new URLSearchParams(location.search).get('board') === '3d';
+  const BOARD_SRC = USE_3D ? 'assets/board-3d.jpg' : 'assets/board.jpg';
+  const GEO = USE_3D
+    // Derived from the rendered tables' measured extent rather than read off
+    // the spec's band table. A table draws 168px tall on screen -- 76 of height
+    // plus 92 of projected depth -- against the 120px a band allows, so the
+    // literal bands put the back row's pads on the front row's tables. Order
+    // and proportion are the spec's; the numbers are the model's, which is what
+    // "the game's geometry is remapped to whatever gets built" licenses.
+    // barY sits just above each row's top edge; padX drops to the table's own x
+    // because the renderer places tables exactly there, where the painting did not.
+    ? { floorTop: 430, r1: { y: 632, padY: 713, barY: 502 },
+                       r2: { y: 870, padY: 951, barY: 740 },
+        passY: 470, busY: 760, padAtX: true }
+    // Measured off the painting, and out of spec on every band by 45-115px --
+    // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
+    : { floorTop: 300, r1: { y: 465, padY: 590, barY: 398 },
+                       r2: { y: 700, padY: 855, barY: 612 },
+        passY: 357, busY: 760, padAtX: false };
+
   const counterRect = { x: 0, y: 0, w: W, h: A(430) };
   // The player stands in front of the counter, overlapping its lower face, so
   // the walkable area starts at the counter's base rather than below it. Any
   // lower and the pass pads get pushed down level with the table number plates
   // instead of hugging the counter.
-  const FLOOR_TOP = A(300);
+  const FLOOR_TOP = A(GEO.floorTop);
 
   // Table anchors are the painted number plates. Note the two rows are not
   // evenly spaced and the front row is wider than the back — that is the
@@ -612,13 +643,17 @@
   // padX/padY are measured from the painted SET DOWN pads, which sit slightly
   // wider apart than the number plates above them — the art's perspective, not
   // an error. barY is just above the plate, where a meter clears the number.
-  const R1 = { y: A(465), padY: A(590), barY: A(398) };
-  const R2 = { y: A(700), padY: A(855), barY: A(612) };
+  const R1 = { y: A(GEO.r1.y), padY: A(GEO.r1.padY), barY: A(GEO.r1.barY) };
+  const R2 = { y: A(GEO.r2.y), padY: A(GEO.r2.padY), barY: A(GEO.r2.barY) };
+  // padX differs from x on the painted board because those pads were measured
+  // off where the painting put them, which is not quite under the table. The
+  // renderer places both from the same number, so the 3D branch collapses them.
+  const T = (x, painted) => ({ x: A(x), padX: A(GEO.padAtX ? x : painted) });
   const tableDefs = [
-    {x: A(406),    padX: A(395),    ...R1}, {x: A(652),    padX: A(652),    ...R1},
-    {x: A(902.5),  padX: A(902.5),  ...R1}, {x: A(1154),   padX: A(1167.5), ...R1},
-    {x: A(374),    padX: A(379.5),  ...R2}, {x: A(638),    padX: A(635.5),  ...R2},
-    {x: A(906.5),  padX: A(909.5),  ...R2}, {x: A(1173.5), padX: A(1182.5), ...R2},
+    {...T(406, 395),    ...R1}, {...T(652, 652),    ...R1},
+    {...T(902.5, 902.5), ...R1}, {...T(1154, 1167.5), ...R1},
+    {...T(374, 379.5),  ...R2}, {...T(638, 635.5),  ...R2},
+    {...T(906.5, 909.5), ...R2}, {...T(1173.5, 1182.5), ...R2},
   ];
 
   // Plated dishes, drawn as art rather than emoji. Each is a speech-bubble
@@ -700,8 +735,8 @@
   // They cannot sit on the counter itself — that is furniture the player walks
   // in front of, not on — so they occupy the strip of floor at its base.
   const PASSES = [
-    { side: 'left',  x: A(370),  y: A(357), w: PASS_W, h: PASS_H },
-    { side: 'right', x: A(1180), y: A(357), w: PASS_W, h: PASS_H }
+    { side: 'left',  x: A(370),  y: A(GEO.passY), w: PASS_W, h: PASS_H },
+    { side: 'right', x: A(1180), y: A(GEO.passY), w: PASS_W, h: PASS_H }
   ];
   // The counter queue deepens as the shift wears on — one of the difficulty
   // axes Rone named. Four a side is the natural ceiling anyway, since each
@@ -716,8 +751,8 @@
   // Both painted dish returns are live, one per section, so clearing a table
   // is a trip to your own end of the room rather than across the whole floor.
   const BUS_STATIONS = [
-    { side: 'left',  x: A(115),  y: A(760), w: A(200), h: A(240) },
-    { side: 'right', x: A(1425), y: A(760), w: A(200), h: A(240) }
+    { side: 'left',  x: A(115),  y: A(GEO.busY), w: A(200), h: A(240) },
+    { side: 'right', x: A(1425), y: A(GEO.busY), w: A(200), h: A(240) }
   ];
 
   let tables = [];
@@ -2953,7 +2988,7 @@
   const boardImg = new Image();
   let boardReady = false;
   boardImg.onload = () => { boardReady = true; };
-  boardImg.src = 'assets/board.jpg';
+  boardImg.src = BOARD_SRC;
 
   function drawFloor(){
     if (boardReady){
@@ -3164,6 +3199,19 @@
         ctx.translate(p.x, p.y);
         drawPadArt(passImg, p.w, p.h,
                    standing ? 'active' : waiting ? 'carrying' : 'idle', phase);
+        // The painted board has PICK UP lettered onto the wall signs. The 3D
+        // pass-sign prop deliberately has none -- PROMPTS.md 4, "the game draws
+        // PICK UP itself, and baked text in a 3D model is text you cannot
+        // change or translate" -- so on that board the game has to keep its
+        // half of the bargain, or the two pads are unlabelled.
+        if (USE_3D) {
+          ctx.globalAlpha = standing ? 0.95 : waiting ? 0.8 : 0.5;
+          ctx.fillStyle = COLORS.mustard;
+          ctx.font = '12px Galindo, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('PICK UP', 0, 4);
+          ctx.globalAlpha = 1;
+        }
         ctx.restore();
         continue;
       }
@@ -3189,6 +3237,24 @@
   function drawBusStation(){
     const at = busUnderPlayer();
     const holding = !!carryingDishes();
+    // Same bargain as the pass pads: DISH RETURN is painted onto the old board
+    // and carved into neither of the 3D props, so it is drawn here. Always, not
+    // only when you are holding dishes -- an unlabelled stone basin against the
+    // wall is not self-explanatory, and the old board never made you guess.
+    if (USE_3D) {
+      for (const b of BUS_STATIONS) {
+        ctx.save();
+        ctx.globalAlpha = at === b ? 0.95 : holding ? 0.8 : 0.45;
+        ctx.fillStyle = COLORS.mustard;
+        ctx.font = '11px Galindo, sans-serif';
+        ctx.textAlign = 'center';
+        // Above the basin, where the painted board's sign was. Below it the
+        // two lines landed on the floor inlays in the margins.
+        ctx.fillText('DISH', b.x, b.y - A(112));
+        ctx.fillText('RETURN', b.x, b.y - A(90));
+        ctx.restore();
+      }
+    }
     for (const b of BUS_STATIONS){
       const standing = at === b;
       if (!standing && !holding) continue;

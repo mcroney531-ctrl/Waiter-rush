@@ -23,6 +23,11 @@ import { existsSync } from 'node:fs';
 const EXE = ['/opt/pw-browsers/chromium/chrome-linux/chrome',
              '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].find(existsSync);
 const B = process.env.BASE || 'http://127.0.0.1:8222';
+// BOARD=3d runs these against the rendered room and its geometry instead
+// of the painted board and its. Both have to pass before the swap: the
+// pads, the passes and the dish returns all move, and this is the check
+// that they still line up with the furniture after they do.
+const Q = process.env.BOARD === '3d' ? '?board=3d' : '';
 
 // WCAG AA. 24px+ (or 19px+ bold) counts as large text and drops to 3:1.
 const AA_NORMAL = 4.5, AA_LARGE = 3.0;
@@ -152,7 +157,7 @@ async function audit(name, screen) {
 for (const [tag, vp] of [['desk', { width: 1280, height: 860 }],
                          ['phone', { width: 430, height: 844 }]]) {
   await p.setViewportSize(vp);
-  await p.goto(B + '/probe.html', { waitUntil: 'load' });
+  await p.goto(B + '/probe.html' + Q, { waitUntil: 'load' });
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: 'load' });
   await p.waitForTimeout(500);
