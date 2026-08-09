@@ -208,6 +208,7 @@ await mkdir(join(STAGE, 'models'), { recursive: true });
 await cp(join(three, 'build/three.module.min.js'), join(STAGE, 'three.module.min.js'));
 await cp(join(three, 'build/three.core.min.js'),   join(STAGE, 'three.core.min.js'));
 await cp(join(three, 'examples/jsm'), join(STAGE, 'jsm'), { recursive: true });
+await cp(resolve(ROOT, 'assets/fonts/galindo.woff2'), join(STAGE, 'galindo.woff2'));
 for (const p of PROPS) {
   const src = resolve(ROOT, 'art-source/room', p + '.glb');
   if (!existsSync(src)) { console.error(`missing prop: ${src}`); process.exit(1); }
@@ -220,6 +221,7 @@ if (CALIBRATE) {
 }
 
 const PAGE = `<canvas id="c" width="${ART_W}" height="${ART_H}"></canvas>
+<style>@font-face{font-family:'Galindo';src:url('galindo.woff2') format('woff2');}</style>
 <script>
   addEventListener('error', e => { window.__err = String(e.message || e); document.title = 'failed'; });
   addEventListener('unhandledrejection', e => { window.__err = String(e.reason); document.title = 'failed'; });
@@ -414,6 +416,7 @@ function upright(root, mode){
 }
 
 const out = { placed: [] };
+const tableTops = [];
 const cache = {};
 for (const name of ${JSON.stringify(PROPS)}) cache[name] = (await load('models/' + name + '.glb')).scene;
 
@@ -456,6 +459,18 @@ for (const item of (MARKERS ? [] : LAYOUT)) {
     : (item.hang ? artHeightToWorld(item.hang) - size.y : 0) - box.min.y;
   const zRef = item.anchor === 'front' ? artYToWorldZ(item.y) - size.z / 2 : artYToWorldZ(item.y);
   holder.position.z += zRef - centre.z;
+
+  // The plaque sits in the middle of the tabletop, so its centre is the box's
+  // centre in x and z at the height of the top surface. Kept in world space and
+  // projected through the camera afterwards rather than derived with the same
+  // trigonometry twice -- three.js already knows where its own camera is
+  // looking, including the view offset, and re-deriving it is how the two
+  // disagree by a few pixels that nobody can explain later.
+  if (item.prop === 'table') {
+    const b2 = new THREE.Box3().setFromObject(holder);
+    tableTops.push(new THREE.Vector3((b2.min.x + b2.max.x) / 2, b2.max.y,
+                                     (b2.min.z + b2.max.z) / 2));
+  }
 
   out.placed.push({ prop: item.prop, artX: item.x, artY: item.y,
                     artW: +(size.x * PPU).toFixed(0),
@@ -506,7 +521,52 @@ if (CALIBRATE) {
 }
 
 renderer.render(scene, cam);
-out.png = canvas.toDataURL('image/png');
+
+// --------------------------------------------------------------------------
+// The table numbers, stamped rather than modelled.
+//
+// One table is generated and placed eight times with a blank plaque, and the
+// digit goes on here. Eight separately generated tables would differ in
+// proportion, wood and plaque as well as in number, which is a worse problem
+// than the one it solves -- and stamping keeps the numbers editable, so a
+// change to the floor plan is a re-stamp rather than eight more Meshy runs.
+//
+// index.html's drawTableNumber was deleted for this: leave it in and every
+// table carries two numbers.
+const flat = document.createElement('canvas');
+flat.width = ART_W; flat.height = ART_H;
+const g = flat.getContext('2d');
+g.drawImage(canvas, 0, 0);
+
+await document.fonts.load("64px Galindo");
+
+g.textAlign = 'center';
+// 'alphabetic' plus a measured offset, not 'middle'. Canvas's middle baseline
+// centres the em box, and Galindo's digits sit high in theirs, so the numbers
+// came out about 11px above the middle of their plaques. actualBoundingBox
+// gives the ink, which is what wants centring.
+g.textBaseline = 'alphabetic';
+out.plaques = [];
+tableTops.forEach((v, i) => {
+  const p = v.clone().project(cam);
+  const px = (p.x * 0.5 + 0.5) * ART_W;
+  const py = (-p.y * 0.5 + 0.5) * ART_H;
+  out.plaques.push({ table: i + 1, x: +px.toFixed(1), y: +py.toFixed(1) });
+
+  const n = String(i + 1);
+  g.font = '600 52px Galindo, sans-serif';
+  const m = g.measureText(n);
+  const yAdj = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+  // Carved rather than printed: a dark copy offset down and right reads as the
+  // shadow inside an engraving, and the pale face sits proud of it. The plaque
+  // is dark slate, so the face is the light half of the pair.
+  g.fillStyle = 'rgba(18,16,14,0.75)';
+  g.fillText(n, px + 2, py + yAdj + 3);
+  g.fillStyle = '#d9cdb4';
+  g.fillText(n, px, py + yAdj);
+});
+
+out.png = flat.toDataURL('image/png');
 window.__out = out;
 document.title = 'ready';
 </script>`;
@@ -546,6 +606,10 @@ for (const p of out.placed) {
   console.log(`    ${p.prop.padEnd(12)} at art (${String(p.artX).padStart(6)}, ${String(p.artY).padStart(4)})`
             + `   draws ${String(p.artW).padStart(4)} x ${String(p.artH).padStart(3)} art px`
             + `   (${(p.artH / 208 * 100).toFixed(0)}% of a character tall)`);
+}
+if (out.plaques) {
+  console.log('\n  table numbers stamped at the projected plaque centres:');
+  for (const q of out.plaques) console.log(`    ${q.table}  art (${q.x}, ${q.y})`);
 }
 if (out.calibration) {
   console.log(`\n  calibration: a 208px character is ${out.calibration.charWorldHeight} world units`);
