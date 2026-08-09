@@ -1,4 +1,11 @@
-# Room build — start here
+# Room build — the prop pipeline
+
+> **This phase is complete.** All ten props are through both gates and in
+> `art-source/room/`. For work on the renderer, the `?board=3d` flag or the
+> swap, go to **`ROOM-RENDER.md`** — this file is history now, useful for why
+> a prop is the way it is rather than for what to do next.
+
+
 
 **Paste this at the top of any session that is going to work on the 3D dining
 room, and read the whole file before touching anything.**
