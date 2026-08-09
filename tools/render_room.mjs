@@ -81,6 +81,13 @@ const ORIGIN_ART_Y = +opt('originY', 700);
 const RAD = ELEV * Math.PI / 180;
 const SIN_E = Math.sin(RAD), COS_E = Math.cos(RAD);
 
+// The back wall sits behind the counter. Derived rather than dialled in: the
+// counter's front face is pinned to art y 430 by the spec, its depth follows
+// from its own model once scaled to 790 art px wide, and the wall clears that
+// by a hand's width. Change the counter's width and the wall follows.
+const COUNTER_FRONT_Z = (430 - +opt('originY', 700)) / (Math.sin(RAD) * +opt('ppu', 470));
+const BACK_Z = +(COUNTER_FRONT_Z - 0.72).toFixed(3);
+
 /** Art x -> world x. The one conversion with no projection in it. */
 const artXToWorld = ax => (ax - ORIGIN_ART_X) / PPU;
 /** Art y on the FLOOR -> world z. Divided by sin, because depth is compressed. */
@@ -181,9 +188,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const ART_W = ${ART_W}, ART_H = ${ART_H}, PPU = ${PPU};
+const BACK_Z = ${BACK_Z};
 const ORIGIN_ART_X = ${ORIGIN_ART_X}, ORIGIN_ART_Y = ${ORIGIN_ART_Y};
 const SIN_E = ${SIN_E}, COS_E = ${COS_E}, ELEV = ${ELEV};
-const PPU_ = ${PPU};
 const LAYOUT = ${JSON.stringify(LAYOUT)};
 const PROP_ART_WIDTH = ${JSON.stringify(PROP_ART_WIDTH)};
 const CALIBRATE = ${CALIBRATE};
@@ -222,14 +229,105 @@ const sc = key.shadow.camera;
 sc.left = -3; sc.right = 3; sc.top = 3; sc.bottom = -3; sc.near = 0.1; sc.far = 30;
 sc.updateProjectionMatrix();
 
-// The floor. A plane rather than nothing, because a shadow needs something to
-// land on -- without it every contact shadow renders into empty space.
+// --------------------------------------------------------------------------
+// The shell: floor and three walls.
+//
+// Procedural rather than modelled. Meshy is for objects with silhouettes worth
+// generating; a floor and three flat walls are a canvas texture and six lines
+// of geometry, and going through the pipeline for them would cost two more
+// transfers and give nothing the spec asks for.
+
+/** A canvas texture, tiled. The draw callback gets a 2D context, SIDE x SIDE. */
+function paint(side, repeatX, repeatY, draw){
+  const c = document.createElement('canvas');
+  c.width = c.height = side;
+  draw(c.getContext('2d'), side);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeatX, repeatY);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+// "Floorboards running away from the camera, which gives depth and scale free"
+// -- the spec's words, and the reason the seams run along Z rather than across
+// it. On screen that puts them near-vertical, which is what reads as recession;
+// boards running left to right would read as a striped floor instead.
+// 52 repeats over a 40-unit plane puts six boards per tile at about 60 art px
+// each -- the width a floorboard reads as. The first pass used 12 and produced
+// 261px bands, which read as a striped floor rather than as boards.
+const floorTex = paint(512, 52, 52, (g, S) => {
+  g.fillStyle = '#6a5138'; g.fillRect(0, 0, S, S);
+  const BOARDS = 6, w = S / BOARDS;
+  for (let i = 0; i < BOARDS; i++) {
+    // Each board a slightly different value, so the floor has grain at a glance
+    // without any single plank drawing attention.
+    const v = 0.86 + 0.28 * ((i * 0.37) % 1);
+    g.fillStyle = 'rgb(' + Math.round(106*v) + ',' + Math.round(81*v) + ',' + Math.round(56*v) + ')';
+    g.fillRect(i * w, 0, w - 1, S);
+    g.strokeStyle = 'rgba(30,20,12,0.55)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(i * w, 0); g.lineTo(i * w, S); g.stroke();
+    for (let k = 0; k < 26; k++) {          // grain
+      g.strokeStyle = 'rgba(40,26,16,' + (0.05 + Math.random()*0.07).toFixed(3) + ')';
+      g.lineWidth = 1;
+      const x = i * w + Math.random() * w;
+      g.beginPath(); g.moveTo(x, Math.random() * S); g.lineTo(x, Math.random() * S); g.stroke();
+    }
+  }
+});
+
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
-  new THREE.MeshStandardMaterial({ color: 0x6b5540, roughness: 0.95, metalness: 0 }));
+  new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, metalness: 0 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+
+// Carved basalt, per the house style: dark, coarse, and deliberately quieter in
+// value than the floor so the props read against it rather than into it.
+const wallTex = paint(512, 6, 3, (g, S) => {
+  g.fillStyle = '#3b3229'; g.fillRect(0, 0, S, S);
+  const ROWS = 8, h = S / ROWS;
+  for (let r = 0; r < ROWS; r++) {
+    const off = (r % 2) * (S / 12);
+    for (let c = -1; c < 7; c++) {
+      const x = off + c * (S / 6), v = 0.85 + 0.3 * Math.random();
+      g.fillStyle = 'rgb(' + Math.round(64*v) + ',' + Math.round(54*v) + ',' + Math.round(44*v) + ')';
+      g.fillRect(x + 2, r * h + 2, S / 6 - 4, h - 4);
+    }
+  }
+});
+const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 1, metalness: 0 });
+
+// The shell is sized from the frame, not guessed: the walls sit just outside
+// what the camera can see sideways, and the back wall just behind the counter,
+// so nothing is visible past the edge of the room and nothing intrudes on it.
+const HALF_W = ART_W / (2 * PPU);
+const WALL_H = 1.35;
+
+const back = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2.4, WALL_H), wallMat);
+back.position.set(0, WALL_H / 2, BACK_Z);
+back.receiveShadow = true;
+scene.add(back);
+
+// Just inside the frame rather than just outside it. At HALF_W * 1.02 the side
+// walls fell off the edge of the camera entirely and the floor ran to the
+// margin, which reads as a floor rather than as a room. 0.92 leaves about 60
+// art px of wall showing on each side -- enough to close the room, and still
+// clear of the dish returns at art x 115 and 1425.
+// No side walls, and this is geometry rather than taste. A vertical plane at a
+// fixed x runs parallel to the view direction, and an orthographic camera with
+// no yaw projects it to a line -- it is invisible however it is positioned,
+// which is what two passes at moving them in and out demonstrated. Angling them
+// toward the camera does make them visible, but a 4.2-long wall turned 20
+// degrees swings its near end 0.72 world units inward, which eats most of the
+// margin the dish returns stand in.
+//
+// So the sides get closed the way the spec already asks for: it puts the
+// walkable floor's "genuinely safe area for floor decoration" in the far left
+// and right margins, and sends the planters and the floor inlay there. That is
+// step 5 dressing, not shell geometry.
 
 // Orthographic, and not a stylistic choice: the spec asks for near-orthographic
 // so the back row is not tiny, and a sprite rendered orthographically composited
