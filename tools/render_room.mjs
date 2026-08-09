@@ -124,6 +124,44 @@ const LAYOUT = [
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },
   { prop: 'pass-sign', x: 1180, y: 300, upright: 'none', hang: 300 },
+
+  // ---- level 2 and 3 dressing -------------------------------------------
+  // Everything below is on the back wall or in the side margins, and nothing
+  // is on the walkable floor. The spec is blunt about why: there is no
+  // collision with scenery, so anything painted on the walkable floor gets
+  // walked straight through, and the game draws its own SET DOWN and PICK UP
+  // markings there which floor ornament competes with directly.
+
+  // Standing against the back wall, flanking the counter in the width it does
+  // not use. The counter runs art x 373-1163, so these two live in the gaps.
+  { prop: 'shelf-unit', x: 105,  y: 252, upright: 'none' },
+  { prop: 'shelf-unit', x: 1431, y: 252, upright: 'none', mirror: true },
+
+  // Hung on the wall itself, inboard of the shelves. The first pass put these
+  // at x 320 with the shelves at 150 and the shelves stood in front of them --
+  // both are against the same wall, so anything sharing x is simply hidden.
+  { prop: 'wall-panel', x: 310,  y: 244, upright: 'none', hang: 182 },
+  { prop: 'wall-panel', x: 1226, y: 244, upright: 'none', hang: 182 },
+
+  // Over the pickup floor. The spec is explicit that these are atmosphere and
+  // NOT the shading direction -- overhead light casts no directional shadow to
+  // match, so the room's shading stays front-left however many lamps hang here.
+  // Over the pickup floor rather than over the counter. At y 400 they hung in
+  // front of the counter's timber top and read as sitting on it; the band at
+  // 430-580 is empty floor by decree, so the air above it is the one place in
+  // the room a hanging lamp has nothing to collide with visually.
+  { prop: 'pendant-lamp', x: 470,  y: 505, upright: 'none', hang: 335 },
+  { prop: 'pendant-lamp', x: 768,  y: 505, upright: 'none', hang: 335 },
+  { prop: 'pendant-lamp', x: 1066, y: 505, upright: 'none', hang: 335 },
+
+  // The far margins, which is the one place the spec calls safe for floor
+  // decoration -- outside the lanes, and nowhere near the pads.
+  { prop: 'planter', x: 70,   y: 520, upright: 'none' },
+  { prop: 'planter', x: 1466, y: 520, upright: 'none' },
+  // No override: floor-inlay is the one prop whose default shortest-axis guess
+  // lays it flat, which is exactly what a floor medallion wants.
+  { prop: 'floor-inlay', x: 70,   y: 900, upright: 'z+', flush: true },
+  { prop: 'floor-inlay', x: 1466, y: 900, upright: 'z+', flush: true },
 ];
 
 // Every prop's size in art px. **Width, not height**, and that took a wrong
@@ -146,13 +184,19 @@ const PROP_ART_WIDTH = {
   counter: 790,        // matches the painted counter, wall to wall between the pillars
   'dish-return': 200,  // BUS_STATIONS is A(200) wide in index.html
   'pass-sign': 170,
+  'shelf-unit': 180,
+  'wall-panel': 210,
+  'pendant-lamp': 80,
+  planter: 130,
+  'floor-inlay': 150,
 };
 
 // Meshy normalises every export so its longest axis is 1.9, and on all ten
 // props that axis is Y. The shortest-axis-is-up guess in preview_prop.mjs is
 // therefore wrong far more often than right, so orientation is stated per prop
 // here rather than inferred. See ROOM-BRIEF.md for the four ways it broke.
-const PROPS = ['table', 'counter', 'dish-return', 'pass-sign'];
+const PROPS = ['table', 'counter', 'dish-return', 'pass-sign',
+               'shelf-unit', 'wall-panel', 'pendant-lamp', 'planter', 'floor-inlay'];
 
 // --------------------------------------------------------------------------
 const three = resolve(ROOT, 'node_modules/three');
@@ -360,8 +404,13 @@ const clone = o => o.clone(true);
 
 function upright(root, mode){
   if (mode === 'none' || !mode) return;              // already Y-up
-  if (mode === 'z') root.rotation.x = -Math.PI / 2;
-  else if (mode === 'x') root.rotation.z = Math.PI / 2;
+  // Sign matters for anything with a front. -PI/2 maps the model's +Z face to
+  // -Y, i.e. face down -- which buried the floor inlay's fossil and left its
+  // blank back showing through the floor. 'z+' is the same lay-down with the
+  // decorated face turned up.
+  if (mode === 'z')       root.rotation.x = -Math.PI / 2;
+  else if (mode === 'z+') root.rotation.x =  Math.PI / 2;
+  else if (mode === 'x')  root.rotation.z =  Math.PI / 2;
 }
 
 const out = { placed: [] };
@@ -392,7 +441,19 @@ for (const item of (MARKERS ? [] : LAYOUT)) {
 
   // Sit it on the floor, centred on its own footprint, then move it to place.
   holder.position.x += artXToWorld(item.x) - centre.x;
-  holder.position.y += (item.hang ? artHeightToWorld(item.hang) - size.y : 0) - box.min.y;
+  // flush buries all but the top of a prop. Meshy cannot make a zero-thickness
+  // object -- the floor inlay came back 0.938 deep -- so left standing on the
+  // floor it reads as a plinth rather than as something inlaid.
+  //
+  // The top lands 0.05 above the floor rather than level with it, and that is
+  // not a fudge. The medallion is *recessed* into its tile, so setting the
+  // tile's top face to y=0 puts the fossil itself below the floor plane and the
+  // floor renders over it -- which came out as a mottled ghost of a skeleton
+  // fighting the floorboards. 0.05 clears the recess and still only stands
+  // about 19 art px proud, which reads as a slab set into the floor.
+  holder.position.y += item.flush
+    ? -box.max.y + 0.05
+    : (item.hang ? artHeightToWorld(item.hang) - size.y : 0) - box.min.y;
   const zRef = item.anchor === 'front' ? artYToWorldZ(item.y) - size.z / 2 : artYToWorldZ(item.y);
   holder.position.z += zRef - centre.z;
 
