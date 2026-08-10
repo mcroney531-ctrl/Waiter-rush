@@ -67,7 +67,14 @@ def read_anchors(src, board):
     # false`, and splitting on the first '}' finds the one closing `r1: {...}`
     # -- both give a branch that parses and is wrong. padAtX is the branch's own
     # label for itself, so it is what selects.
-    blocks = re.findall(r'\{\s*floorTop:.*?padAtX:\s*(?:true|false)\s*\}', body, re.S)
+    #
+    # `[^{}]*` after it, not `\s*`, because padAtX is not necessarily the last
+    # key. It was when this was written; adding ticketBase after it broke this
+    # parser, which is the third time the GEO literal has grown a key and the
+    # second time it took a tool with it. Anything that is not a nested object
+    # may now follow, and the run still dies loudly if the shape changes in a
+    # way this cannot read.
+    blocks = re.findall(r'\{\s*floorTop:.*?padAtX:\s*(?:true|false)[^{}]*\}', body, re.S)
     if len(blocks) != 2:
         die(f'the two GEO branches (found {len(blocks)})')
     want = 'padAtX: true' if board == '3d' else 'padAtX: false'
