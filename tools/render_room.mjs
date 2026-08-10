@@ -181,8 +181,23 @@ const LAYOUT = [
   // a hanging lamp can occupy that crosses neither. What the third lamp cost
   // was the counter's cleanest span -- the timber above the fossil relief, dead
   // centre, which is the part of the silhouette the eye actually reads.
-  { prop: 'pendant-lamp', x: 470,  y: 505, upright: 'none', hang: 335 },
-  { prop: 'pendant-lamp', x: 1066, y: 505, upright: 'none', hang: 335 },
+  // One lamp now, not two, and hung higher. The plated food moved onto the
+  // counter top (index.html's TICKET.base), which is the surface these two
+  // were hanging in front of: at hang 335 a lamp occupies art y 170-298 and a
+  // plate occupies 216-315, so the board's lamps would have been drawn behind
+  // the game's plates at the second slot of each side.
+  //
+  // Raising them clears that, but at the height they end up (art 55-183) the
+  // back wall is already full: shelf 15-195, pass-sign 285-455, panels 515-725
+  // and 811-1021, pass-sign 1095-1265, shelf 1341-1521. The only gap that
+  // takes an 80px lamp is 725-811, dead centre. The outer gaps look free and
+  // are not -- the tips sign is drawn over art x 32-288 and the lives row over
+  // 1350-1500, both of which would simply cover a lamp placed there.
+  //
+  // So the count went 3 -> 2 -> 1 for three different reasons, and this one is
+  // the only one that was forced. Dead centre above the pass, over the food,
+  // is also where a pass lamp belongs.
+  { prop: 'pendant-lamp', x: 768, y: 505, upright: 'none', hang: 450 },
 
   // The far margins, which is the one place the spec calls safe for floor
   // decoration -- outside the lanes, and nowhere near the pads.

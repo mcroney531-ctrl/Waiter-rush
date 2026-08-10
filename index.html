@@ -620,12 +620,12 @@
     // because the renderer places tables exactly there, where the painting did not.
     ? { floorTop: 430, r1: { y: 631, padY: 709, barY: 522 },
                        r2: { y: 850, padY: 927, barY: 741 },
-        passY: 480, busY: 760, padAtX: true }
+        passY: 480, busY: 760, padAtX: true, ticketBase: 315 }
     // Measured off the painting, and out of spec on every band by 45-115px --
     // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
     : { floorTop: 300, r1: { y: 465, padY: 590, barY: 398 },
                        r2: { y: 700, padY: 855, barY: 612 },
-        passY: 357, busY: 760, padAtX: false };
+        passY: 357, busY: 760, padAtX: false, ticketBase: 404 };
 
   const counterRect = { x: 0, y: 0, w: W, h: A(430) };
   // The player stands in front of the counter, overlapping its lower face, so
@@ -694,7 +694,24 @@
   // Sized so the two queues never meet in the middle — at four a side they
   // would otherwise read as one row of eight and the section split, which is
   // the whole point of two passes, would be invisible.
-  const TICKET = { slot: 68, maxH: 62, base: A(404), pitch: 70 };
+  // `base` is where a plate's BOTTOM edge sits, and it is the one number in
+  // here that had to follow GEO. On the painted board art 404 is the strip of
+  // floor at the counter's base; on the rendered board floorTop is 430, so the
+  // same 404 lands 26px ABOVE the floor line -- on the counter's carved stone
+  // plinth rather than in front of it. It went unnoticed because the plates
+  // stayed readable there: light plates on flat dark stone is good contrast,
+  // better than the painted board's, so nothing looked broken.
+  //
+  // 315 puts them on the timber counter top instead, which is where plated
+  // food waits at a real pass and what Rone asked for. The slab runs art
+  // 165-315, so bottom-aligning at 315 sets the plates on its front edge with
+  // the NEXT UP label at 190-206 still on timber. The comment this replaces
+  // said plates "cannot sit on the counter itself -- that is furniture the
+  // player walks in front of, not on"; that was true of the painted bench,
+  // which has no usable top surface at this scale. It is not true of a
+  // modelled counter with a 150px-deep slab, and the player still stands on
+  // the floor pad below to collect, so nothing about the reach changes.
+  const TICKET = { slot: 68, maxH: 62, base: A(GEO.ticketBase), pitch: 70 };
 
   // Fits a plate inside its slot without distorting it, bottom-aligned.
   function foodBox(name){
