@@ -3467,9 +3467,55 @@
       ctx.fill();
       ctx.restore();
     }
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    // The contact shadow, and it is the only thing standing the character on
+    // the floor rather than in front of it.
+    //
+    // It used to be one flat ellipse at rgba(0,0,0,0.18), 26x9px under a
+    // ~100px character. That was tuned against the painted board, whose floor
+    // measures luminance 50 right under the soles -- at that value an 18%
+    // black is very nearly invisible, and what actually read as grounding was
+    // the dark floor itself. The rendered board's floor is 95, near enough
+    // twice as bright, and the same shadow is both plainly visible and plainly
+    // too small and too weak to hold him down. It has been that way since the
+    // first committed board-3d.jpg, so this is not a regression -- it is a
+    // shadow that only ever worked against one of the two floors.
+    //
+    // Two stacked passes, because a single flat ellipse is exactly what reads
+    // as a sticker: a wide soft pool for the ambient occlusion, and a tight
+    // dark core where the soles actually meet the boards. A radial gradient
+    // rather than a solid, so the edge falls off instead of ending.
+    // Sat on BODY.ground, which is where drawSheetBody puts the sheet's
+    // anchorY point -- but the anchor overshoots the art. Measured on
+    // tyrone-t1 against the board: the lowest solid pixel of the shoe is 5px
+    // ABOVE that line, so the darkest part of the shadow was landing in a
+    // sliver of bare floor under the soles, which is precisely what reads as
+    // floating. Only the shadow moves; the character, the hitbox and every
+    // pad distance stay exactly where they were.
+    //
+    // Sprite path only. The drawn fallback body really does have its soles on
+    // BODY.ground, so it wants no correction, and nudging it would introduce
+    // the same gap the other way round.
+    //
+    // 4 rather than a per-sheet number because the anchors are measured, not
+    // chosen, and carry the same measurement noise ROOM-RENDER.md flags on the
+    // calibration character (192-210px against a 208 target). A soft pool that
+    // is roughly right on every sheet beats an exact number on one of twenty.
+    const soleY = sheetReady() ? BODY.ground - 4 : BODY.ground;
+    const shr = player.size * 0.62;
+    const pool = ctx.createRadialGradient(0, soleY, 0, 0, soleY, shr);
+    pool.addColorStop(0,    'rgba(0,0,0,0.34)');
+    pool.addColorStop(0.55, 'rgba(0,0,0,0.20)');
+    pool.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.save();
+    ctx.scale(1, 0.30);                       // squashed to the floor plane
+    ctx.fillStyle = pool;
     ctx.beginPath();
-    ctx.ellipse(0, BODY.ground, player.size*0.5, player.size*0.17, 0, 0, Math.PI*2);
+    ctx.arc(0, soleY / 0.30, shr, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,0.26)';
+    ctx.beginPath();
+    ctx.ellipse(0, soleY, player.size*0.42, player.size*0.13, 0, 0, Math.PI*2);
     ctx.fill();
 
     drawBody();
