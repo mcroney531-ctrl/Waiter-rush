@@ -151,11 +151,21 @@ const LAYOUT = [
   { prop: 'shelf-unit', x: 105,  y: 252, upright: 'none' },
   { prop: 'shelf-unit', x: 1431, y: 252, upright: 'none', mirror: true },
 
-  // Hung on the wall itself, inboard of the shelves. The first pass put these
-  // at x 320 with the shelves at 150 and the shelves stood in front of them --
-  // both are against the same wall, so anything sharing x is simply hidden.
-  { prop: 'wall-panel', x: 310,  y: 244, upright: 'none', hang: 182 },
-  { prop: 'wall-panel', x: 1226, y: 244, upright: 'none', hang: 182 },
+  // Hung on the wall itself. These were at x 310 and 1226, inboard of the
+  // shelves, and that put them straight under the pass-signs: a panel is 210
+  // wide so 310 spans 205-415, against the sign's 285-455 at x 370 -- 130px of
+  // overlap, with the arrow shield drawn across the skull relief on both
+  // sides. The signs cannot move, they mark where the player collects; the
+  // panels are dressing, so the panels moved.
+  //
+  // They moved to the middle, which also answers the "the room is emptier in
+  // the middle" note: the back wall above the counter ran empty from x 460 to
+  // 1075, the single largest dead area in the room, while the only two pieces
+  // of wall art were stacked underneath the signage at the ends.
+  // Mirrored as a pair, the way the shelf units already are -- both skulls
+  // facing the same way read as one prop duplicated, which is what they are.
+  { prop: 'wall-panel', x: 620,  y: 244, upright: 'none', hang: 182 },
+  { prop: 'wall-panel', x: 916,  y: 244, upright: 'none', hang: 182, mirror: true },
 
   // Over the pickup floor. The spec is explicit that these are atmosphere and
   // NOT the shading direction -- overhead light casts no directional shadow to
