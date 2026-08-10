@@ -190,12 +190,17 @@ const LAYOUT = [
   { prop: 'planter', x: 1466, y: 520, upright: 'none' },
   // No override: floor-inlay is the one prop whose default shortest-axis guess
   // lays it flat, which is exactly what a floor medallion wants.
-  // yaw 180 because laying a standing prop down turns its own "up" toward the
-  // camera, so the fossil read upside down from the player's side of the room.
-  // A floor decal wants its top pointing away from the viewer, the way you read
-  // an inscription set into a floor.
-  { prop: 'floor-inlay', x: 70,   y: 900, upright: 'z+', yaw: 180, flush: true },
-  { prop: 'floor-inlay', x: 1466, y: 900, upright: 'z+', yaw: 180, flush: true },
+  // No yaw. There was a yaw: 180 here on the reasoning that laying a standing
+  // prop down turns its own "up" toward the camera -- but 'z+' is already the
+  // face-up flip (that is what distinguishes it from 'z', which lays the same
+  // prop face-down), so the extra half turn re-introduced exactly the flip it
+  // was added to cancel. Rone reported it still reading upside down, and the
+  // four-yaw comparison settles it: 90 and 270 show the medallion edge-on with
+  // no fossil visible at all, and against yaw 180 the yaw 0 render is the one
+  // where the gold corner accents catch the key light -- the same motif the
+  // pillar, wall-panel and pendant-lamp all carry.
+  { prop: 'floor-inlay', x: 70,   y: 900, upright: 'z+', flush: true },
+  { prop: 'floor-inlay', x: 1466, y: 900, upright: 'z+', flush: true },
 ];
 
 // Every prop's size in art px. **Width, not height**, and that took a wrong
