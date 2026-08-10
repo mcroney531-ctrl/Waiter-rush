@@ -165,9 +165,15 @@ its longest axis is 1.9, and on all ten props that axis is Y — so
 - **`'none'`** — nine of ten props. Already Y-up.
 - **`'z+'`** — `floor-inlay` only. Lays it down face-**up**. Note `'z'` (−π/2)
   lays it face-**down**; that buried the fossil and left the blank back showing.
-- **`yaw: 180`** — also `floor-inlay`. Laying a standing prop flat turns its own
-  "up" toward the camera, so the fossil read upside-down. Any future flat prop
-  will need the same.
+- **`yaw: 180` — withdrawn, and it was wrong.** `floor-inlay` carried one on the
+  reasoning that laying a standing prop flat turns its own "up" toward the
+  camera. But `'z+'` *is* the face-up flip — that is the entire distinction
+  between it and `'z'` above — so the extra half turn cancelled the flip that
+  was working and restored the one it was meant to fix. It shipped upside-down
+  for four commits before Rone caught it. **A flat prop needs `'z+'` and
+  nothing else.** Settled by rendering all four yaws: 90 and 270 show the
+  medallion edge-on with no fossil at all, and of 0 and 180 only 0 catches the
+  key light on the gold corner accents.
 - **`flush: true`** — sinks a prop until its top is **0.05 above** the floor, not
   level with it. The medallion is *recessed* into its tile, so a top face at y=0
   puts the carving below the floor plane and it renders as a mottled ghost
@@ -340,3 +346,11 @@ character, suspect this before suspecting the layout.
   command, so a cleanup step after a failed conversion runs anyway.
 - **`.git` is 877 MB**, mostly raw Meshy uploads that are in history forever.
   Do not push a prop twice.
+- **The renderer is not byte-reproducible.** Two runs of the *identical* config
+  differ by up to 14 per channel across ~500k pixels (mean 0.7) — swiftshader
+  sampling noise, invisible to the eye. So a pixel diff cannot tell you whether
+  a layout change took effect: the noise floor is larger than many real edits.
+  Measured after a commit message claimed a render was "pixel-identical" to a
+  test render, was contradicted by `np.array_equal`, and turned out to be
+  identical in geometry all along. Compare crops by eye, or diff the layout,
+  not the pixels.
