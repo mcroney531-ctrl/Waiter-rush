@@ -3538,11 +3538,23 @@
     // meet the feet (0.75x -> 1.05x) since a narrow solid disc surrounded by
     // a wide soft one still reads as a spotlight on the arch with the heels
     // and toes past its edge, not a shadow under the whole stance.
+    //
+    // tyrone's own idle-down frame stands with its feet planted asymmetrically
+    // around player.x (one foot's flat sole reads ~24px out, the other's
+    // narrow ball-of-foot point ~13px out), and pixel-sampling the rendered
+    // canvas found the wide pool -- a RADIAL gradient centred on player.x --
+    // was giving the closer foot noticeably more of its own strength than the
+    // farther one purely because it sits nearer the centre, nothing to do
+    // with which foot needs it. 0.85/0.32 instead of 0.7/0.30 flattens that
+    // radial falloff further out, so coverage stops depending so much on
+    // distance from the character's centreline and starts depending on
+    // distance from the shr edge instead, which is closer to what a footprint
+    // actually wants.
     const shr = player.size * 1.4;
     const pool = ctx.createRadialGradient(0, soleY, 0, 0, soleY, shr);
-    pool.addColorStop(0,   'rgba(0,0,0,0.34)');
-    pool.addColorStop(0.7, 'rgba(0,0,0,0.30)');
-    pool.addColorStop(1,   'rgba(0,0,0,0)');
+    pool.addColorStop(0,    'rgba(0,0,0,0.34)');
+    pool.addColorStop(0.85, 'rgba(0,0,0,0.32)');
+    pool.addColorStop(1,    'rgba(0,0,0,0)');
     ctx.save();
     ctx.scale(1, 0.30);                       // squashed to the floor plane
     ctx.fillStyle = pool;
