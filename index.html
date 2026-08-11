@@ -713,6 +713,22 @@
   // the floor pad below to collect, so nothing about the reach changes.
   const TICKET = { slot: 68, maxH: 62, base: A(GEO.ticketBase), pitch: 70 };
 
+  // The rush telegraph and the rush plaque both bottom-anchor at FLOOR_TOP-12
+  // -- fine on the painted board, where a fresh table's tickets sit well below
+  // that line. On the rendered board the tickets moved onto the counter top
+  // (see TICKET.base above) and now sit ABOVE FLOOR_TOP, so the same anchor
+  // draws the banners straight over the plate row: RUSH! hid four of eight
+  // plates outright, the telegraph covered six of the eight T-numbers, and
+  // reading those before you move is the entire memory mechanic.
+  //
+  // TICKET.base - TICKET.maxH - 18 is the ticket row's own top edge (62 for
+  // the tallest plate, 6 for the NEXT UP label the ticket-draw code itself
+  // reserves above it, 12 more as a clean margin). Whichever anchor is
+  // LOWER wins, so this only moves anything on the board where the tickets
+  // actually reach above the old line -- on the painted board it shifts by
+  // 3px and nothing visible changes.
+  const BANNER_BOTTOM = Math.min(FLOOR_TOP - 12, TICKET.base - TICKET.maxH - 18);
+
   // Fits a plate inside its slot without distorting it, bottom-aligned.
   function foodBox(name){
     const im = foodImg[name];
@@ -3616,11 +3632,16 @@
       (rushArmedAt && !rushActive && rushComingReady && rushComingImg.naturalWidth) ||
       ((rushActive || rushOver > 0) && rushActiveReady && rushActiveImg.naturalWidth);
     // The rush telegraph goes first because, as art, it is a wide panel rather
-    // than one of the stackable strips -- it covers the ground the first two
-    // momentBanner slots occupy, so it has to claim them before anything else
-    // takes one. A capacity notice landing during a telegraph is not
-    // hypothetical: it fires around delivery six, and the first rush of a
-    // shift arms at about the same moment.
+    // than one of the stackable strips -- on the painted board it still covers
+    // the first two momentBanner slots (BANNER_BOTTOM barely moves there), so
+    // it has to claim them before anything else takes one. On the rendered
+    // board BANNER_BOTTOM sits above all three slots instead, so slot = 2
+    // below is now stricter than it needs to be on that board specifically --
+    // harmless, since it only pushes a co-occurring small banner to the
+    // topmost slot rather than actually overlapping anything. A capacity
+    // notice landing during a telegraph is not hypothetical: it fires around
+    // delivery six, and the first rush of a shift arms at about the same
+    // moment.
     if (rushArmedAt && !rushActive && rushComingReady && rushComingImg.naturalWidth){
       const age = performance.now() - rushArmedAt;
       const dw = 400, dh = dw * (rushComingImg.naturalHeight / rushComingImg.naturalWidth);
@@ -3629,17 +3650,24 @@
       // to feel urgent. Fades in over the first 200ms so it does not just
       // materialise mid-pulse.
       ctx.globalAlpha = Math.min(1, age / 200) * (0.72 + 0.28 * Math.sin(age / 220));
-      ctx.drawImage(rushComingImg, W/2 - dw/2, FLOOR_TOP - dh - 12, dw, dh);
+      ctx.drawImage(rushComingImg, W/2 - dw/2, BANNER_BOTTOM - dh, dw, dh);
       ctx.restore();
       slot = 2;
     }
-    // 360 rather than the telegraph's 400: this art is 2.38:1 against that
-    // one's 4:1, so matching widths would stand it 168px tall and crowd the
-    // top of the canvas. 360 lands it inside the counter strip (y 24-176) and
-    // clears both PICK UP signs.
+    // Was 360 (2.38:1 against the telegraph's 4:1, so 360 stood it 168px tall
+    // and it lived at FLOOR_TOP - dh/2 - 12, same as the telegraph). That
+    // anchor covers the ticket row on the rendered board -- see BANNER_BOTTOM
+    // -- and a plaque this tall no longer fits the same way it did at the old
+    // FLOOR_TOP-anchored spot: bottom-anchored at BANNER_BOTTOM (116.875 on
+    // the rendered board) a 168px-tall plaque would clip 35px off the top of
+    // the canvas outright, before the pop entrance even overshoots further.
+    // 245 is the widest that clears BANNER_BOTTOM with margin left for that
+    // overshoot (peak scale measured at 1.056x, not the 1.03x a glance at the
+    // formula suggests -- the entrance pop and the idle breathing wobble both
+    // land near their own peaks around the same k).
     if (rushActive && rushActiveReady && rushActiveImg.naturalWidth){
       const age = performance.now() - rushEndsAt + rushDurationMs;   // ms since it landed
-      const dw = 360, dh = dw * (rushActiveImg.naturalHeight / rushActiveImg.naturalWidth);
+      const dw = 245, dh = dw * (rushActiveImg.naturalHeight / rushActiveImg.naturalWidth);
       // Same easeOutBack pop as the promotion splash -- an explosion should
       // arrive with a bang, not fade up. It runs for 20-45s after that, so
       // the steady state is a slow breath rather than the telegraph's blink:
@@ -3651,7 +3679,7 @@
       const scale = (0.6 + 0.4 * pop) * (1 + 0.015 * Math.sin(age / 340));
       ctx.save();
       ctx.globalAlpha = Math.min(1, age / 160);
-      ctx.translate(W/2, FLOOR_TOP - dh/2 - 12);
+      ctx.translate(W/2, BANNER_BOTTOM - dh/2);
       ctx.scale(scale, scale);
       ctx.drawImage(rushActiveImg, -dw/2, -dh/2, dw, dh);
       // The art says RUSH but not what it pays, and the multiplier is the
@@ -3677,12 +3705,15 @@
     // thing is over" faster than anything new would.
     if (rushOver > 0 && rushActiveReady && rushActiveImg.naturalWidth){
       const k = rushOver / RUSH_OVER_MS;                 // 1 at the whistle, 0 gone
-      const dw = 360, dh = dw * (rushActiveImg.naturalHeight / rushActiveImg.naturalWidth);
+      // 245, not 360: this is the same art the active plaque above just
+      // shrank to clear BANNER_BOTTOM, and the exit beat has to be the same
+      // size as the thing it's putting away or the "same object" read breaks.
+      const dw = 245, dh = dw * (rushActiveImg.naturalHeight / rushActiveImg.naturalWidth);
       ctx.save();
       // Fades and settles rather than popping: it arrived with a bang, so it
       // should leave by dropping back down, which is the opposite gesture.
       ctx.globalAlpha = Math.min(1, k * 2.4);
-      ctx.translate(W/2, FLOOR_TOP - dh/2 - 12);
+      ctx.translate(W/2, BANNER_BOTTOM - dh/2);
       ctx.scale(1 - 0.06 * (1 - k), 1 - 0.06 * (1 - k));
       ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(rushActiveImg, -dw/2, -dh/2, dw, dh);
