@@ -3517,7 +3517,21 @@
     // calibration character (192-210px against a 208 target). A soft pool that
     // is roughly right on every sheet beats an exact number on one of twenty.
     const soleY = sheetReady() ? BODY.ground - 4 : BODY.ground;
-    const shr = player.size * 0.62;
+    // The vertical fix above was the whole story on a narrow-legged frame,
+    // but tyrone's own idle-down pose stands with its feet planted ~53px
+    // apart (measured off the rendered sprite, canvas pixels) -- hands on
+    // hips, dinosaur stance. The old 0.62/0.42 radii were sized for a single
+    // pair of close-together feet: at those widths the shadow's own edges
+    // fall at +/-32px and +/-22px, short of BOTH shoes' outer edges, so the
+    // dark shape sits stranded in the gap between the ankles instead of
+    // under either foot -- vertically correct, horizontally disconnected,
+    // which reads as floating just as badly as the original vertical gap
+    // did. Widened so the soft pool reaches past both shoes' outer edges
+    // and the tight core reaches their inner two-thirds; still one shadow
+    // rather than two, since most frames (walking, other characters) stand
+    // narrower than this one and a shadow a little wider than its feet
+    // reads as a shadow, where one narrower than its feet reads as a gap.
+    const shr = player.size * 1.05;
     const pool = ctx.createRadialGradient(0, soleY, 0, 0, soleY, shr);
     pool.addColorStop(0,    'rgba(0,0,0,0.34)');
     pool.addColorStop(0.55, 'rgba(0,0,0,0.20)');
@@ -3531,7 +3545,7 @@
     ctx.restore();
     ctx.fillStyle = 'rgba(0,0,0,0.26)';
     ctx.beginPath();
-    ctx.ellipse(0, soleY, player.size*0.42, player.size*0.13, 0, 0, Math.PI*2);
+    ctx.ellipse(0, soleY, player.size*0.75, player.size*0.13, 0, 0, Math.PI*2);
     ctx.fill();
 
     drawBody();
