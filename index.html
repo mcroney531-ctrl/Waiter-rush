@@ -3520,22 +3520,29 @@
     // The vertical fix above was the whole story on a narrow-legged frame,
     // but tyrone's own idle-down pose stands with its feet planted ~53px
     // apart (measured off the rendered sprite, canvas pixels) -- hands on
-    // hips, dinosaur stance. The old 0.62/0.42 radii were sized for a single
-    // pair of close-together feet: at those widths the shadow's own edges
-    // fall at +/-32px and +/-22px, short of BOTH shoes' outer edges, so the
-    // dark shape sits stranded in the gap between the ankles instead of
-    // under either foot -- vertically correct, horizontally disconnected,
-    // which reads as floating just as badly as the original vertical gap
-    // did. Widened so the soft pool reaches past both shoes' outer edges
-    // and the tight core reaches their inner two-thirds; still one shadow
-    // rather than two, since most frames (walking, other characters) stand
-    // narrower than this one and a shadow a little wider than its feet
-    // reads as a shadow, where one narrower than its feet reads as a gap.
-    const shr = player.size * 1.05;
+    // hips, dinosaur stance, outer sole edges landing ~31px either side of
+    // player.x. Widening the radii to nominally reach that (previous pass,
+    // shr = size*1.05) still left the outer half of each shoe floating: a
+    // radial gradient is soft by design, and at 1.05x the true outer edge of
+    // each foot sits past the 0.55-stop where the fill has already faded to
+    // 20% and is diving toward 0 -- pixel-sampled after that pass, the true
+    // edge of the sole was landing on <9% black, indistinguishable from bare
+    // floor on a board this bright. The nominal radius covered the feet; the
+    // gradient's own falloff didn't.
+    //
+    // Pushed the radius past the feet (1.4x, edge at +/-36px) and pushed the
+    // gradient's own shoulder out with it (0.7 stop instead of 0.55, and
+    // 0.30 instead of 0.20 there) so most of that radius reads as solid
+    // shadow and only the last ~30% -- past where any sole actually is --
+    // does the softening. The tight core follows the same logic: widened to
+    // meet the feet (0.75x -> 1.05x) since a narrow solid disc surrounded by
+    // a wide soft one still reads as a spotlight on the arch with the heels
+    // and toes past its edge, not a shadow under the whole stance.
+    const shr = player.size * 1.4;
     const pool = ctx.createRadialGradient(0, soleY, 0, 0, soleY, shr);
-    pool.addColorStop(0,    'rgba(0,0,0,0.34)');
-    pool.addColorStop(0.55, 'rgba(0,0,0,0.20)');
-    pool.addColorStop(1,    'rgba(0,0,0,0)');
+    pool.addColorStop(0,   'rgba(0,0,0,0.34)');
+    pool.addColorStop(0.7, 'rgba(0,0,0,0.30)');
+    pool.addColorStop(1,   'rgba(0,0,0,0)');
     ctx.save();
     ctx.scale(1, 0.30);                       // squashed to the floor plane
     ctx.fillStyle = pool;
@@ -3545,7 +3552,7 @@
     ctx.restore();
     ctx.fillStyle = 'rgba(0,0,0,0.26)';
     ctx.beginPath();
-    ctx.ellipse(0, soleY, player.size*0.75, player.size*0.13, 0, 0, Math.PI*2);
+    ctx.ellipse(0, soleY, player.size*1.05, player.size*0.13, 0, 0, Math.PI*2);
     ctx.fill();
 
     drawBody();
