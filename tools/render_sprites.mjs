@@ -151,16 +151,19 @@ window.run = () => new Promise((res, rej) => {
     // anchor comes from what was actually drawn
     const d = sctx.getImageData(0, 0, sheet.width, sheet.height).data;
     let L = 1e9, T = 1e9, R = -1, B = -1;
+    const rowB = ROWS.map(() => -1);   // per-row deepest pixel -- see below
     for (let y = 0; y < sheet.height; y++) {
       for (let x = 0; x < sheet.width; x++) {
         if (d[(y * sheet.width + x) * 4 + 3] < 12) continue;
         const cx = x % CELL, cy = y % CELL;
         if (cx < L) L = cx; if (cx > R) R = cx;
         if (cy < T) T = cy; if (cy > B) B = cy;
+        const r = Math.floor(y / CELL);
+        if (cy > rowB[r]) rowB[r] = cy;
       }
     }
     res({ png: sheet.toDataURL('image/png'), clip: clip ? clip.name : null,
-          animated: !!clip, bbox: { L, T, R, B }, cell: CELL });
+          animated: !!clip, bbox: { L, T, R, B }, rowB, cell: CELL });
   }, undefined, e => rej(String(e)));
 });
 document.title = 'ready';
@@ -211,12 +214,27 @@ const { L, T, R, B } = out.bbox;
 const drawnW = R - L, drawnH = B - T;
 // aim for a character about 130px long on the 960px board
 const scale = +(130 / Math.max(drawnW, drawnH)).toFixed(3);
+// anchorY (= B/CELL) is the deepest pixel across ALL rows, which in practice
+// is always "down" -- a character facing the camera plants its feet lowest
+// in frame. "right" and "up" don't reach as deep in their own cell (a
+// back-facing pose is a different silhouette, not a rotated copy of the
+// facing-camera one), so drawing them through this same anchorY left every
+// character floating whenever they turned away from the camera -- confirmed
+// against all 20 shipped sheets, 12-19px of gap on "up" alone. groundGap{Right,Up}
+// is that row's own shortfall against "down", added back in drawSheetBody so
+// each direction's own feet land on BODY.ground the way "down"'s already did.
+// Math.max(0, ...) because a row occasionally measures a hair deeper than
+// "down" (rig noise, not a real difference) -- down is the one being drawn
+// correctly, so nothing should lift it to chase that.
+const rowB = out.rowB;
 const cfg = {
   src: `assets/sprites/${NAME}.png`,
   frameW: CELL, frameH: CELL,
   scale,
   anchorX: +(((L + R) / 2) / CELL).toFixed(3),
   anchorY: +(B / CELL).toFixed(3),
+  groundGapRight: +Math.max(0, (B - rowB[1]) / CELL).toFixed(3),
+  groundGapUp: +Math.max(0, (B - rowB[2]) / CELL).toFixed(3),
   idleFps: 5,
   dirs: { down: { row: 0 }, right: { row: 1 }, left: { mirror: 'right' }, up: { row: 2 } },
   walk: { first: 0, count: FRAMES },
@@ -228,12 +246,14 @@ console.log(`${NAME}: ${out.animated ? 'clip "' + out.clip + '"' : 'NO ANIMATION
 console.log(`  sheet   ${pngPath.replace(ROOT + '/', '')}  ${CELL * FRAMES}x${CELL * ROWS.length}`);
 console.log(`  drawn   ${drawnW}x${drawnH} inside a ${CELL}px cell`);
 console.log(`  anchor  x ${cfg.anchorX}  y ${cfg.anchorY}   scale ${cfg.scale}`);
+console.log(`  groundGap  right ${cfg.groundGapRight}  up ${cfg.groundGapUp}`);
 // The roster in index.html keeps sheet configs inline so the game still runs
 // from a file:// double-click. Printing the exact line means adding a tier is a
 // paste rather than a transcription of four measured numbers.
 console.log('  roster  ' +
   `{ src: '${cfg.src}', scale: ${cfg.scale}, ` +
-  `anchorX: ${cfg.anchorX}, anchorY: ${cfg.anchorY} },`);
+  `anchorX: ${cfg.anchorX}, anchorY: ${cfg.anchorY}, ` +
+  `groundGapRight: ${cfg.groundGapRight}, groundGapUp: ${cfg.groundGapUp} },`);
 if (cfg.frameW !== 192 || FRAMES !== 8) {
   console.log(`  ! SHEET_BASE in index.html assumes 192px cells and 8 walk frames; ` +
               `this is ${cfg.frameW}px / ${FRAMES}. Override them in the roster entry.`);

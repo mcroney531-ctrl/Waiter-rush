@@ -1791,50 +1791,64 @@
   // Order is the order the carousel walks, and the first entry is where a
   // new player starts. Kept as the order they joined the cast rather than
   // alphabetical, so the flagship opens the picker.
+  // groundGapRight/groundGapUp: render_sprites.mjs measures anchorY as the
+  // deepest drawn pixel across the WHOLE sheet, which in practice is always
+  // the "down" row (a character facing the camera plants its feet lowest in
+  // frame). Rows for "right" and "up" are shallower -- a raptor's back-facing
+  // pose simply doesn't reach as far down its own 192px cell as its
+  // facing-camera pose does -- so drawing them through that same anchorY
+  // left every character floating whenever they turned away from the camera,
+  // worst on "up" (measured 12-19px of gap across all 20 sheets, this file's
+  // own down/right/up bottom-pixel scan). These two are that gap expressed as
+  // a fraction of the cell, applied in drawSheetBody so each direction's own
+  // feet land on BODY.ground the way "down"'s already did. 0 where a row
+  // happens to reach exactly as deep as "down" (measurement noise on a couple
+  // of sheets even reads a hair negative -- left at 0 rather than lifting
+  // "down" to chase it, since down is the one being played correctly).
   const ROSTER = {
     tyrone: {
       name: 'Tyrone', species: 'T-Rex',
       tiers: [
-        { src: 'assets/sprites/tyrone-t1.png', scale: 0.743, anchorX: 0.529, anchorY: 0.911 },
-        { src: 'assets/sprites/tyrone-t2.png', scale: 0.739, anchorX: 0.539, anchorY: 0.922 },
-        { src: 'assets/sprites/tyrone-t3.png', scale: 0.739, anchorX: 0.529, anchorY: 0.917 },
-        { src: 'assets/sprites/tyrone-t4.png', scale: 0.756, anchorX: 0.549, anchorY: 0.896 }
+        { src: 'assets/sprites/tyrone-t1.png', scale: 0.743, anchorX: 0.529, anchorY: 0.911, groundGapRight: 0.026, groundGapUp: 0.068 },
+        { src: 'assets/sprites/tyrone-t2.png', scale: 0.739, anchorX: 0.539, anchorY: 0.922, groundGapRight: 0.021, groundGapUp: 0.062 },
+        { src: 'assets/sprites/tyrone-t3.png', scale: 0.739, anchorX: 0.529, anchorY: 0.917, groundGapRight: 0,     groundGapUp: 0.062 },
+        { src: 'assets/sprites/tyrone-t4.png', scale: 0.756, anchorX: 0.549, anchorY: 0.896, groundGapRight: 0.021, groundGapUp: 0 }
       ]
     },
     velo: {
       name: 'Velo', species: 'Raptor',
       tiers: [
-        { src: 'assets/sprites/velo-t1.png', scale: 0.747, anchorX: 0.552, anchorY: 0.906 },
-        { src: 'assets/sprites/velo-t2.png', scale: 0.756, anchorX: 0.526, anchorY: 0.896 },
-        { src: 'assets/sprites/velo-t3.png', scale: 0.739, anchorX: 0.573, anchorY: 0.917 },
-        { src: 'assets/sprites/velo-t4.png', scale: 0.76,  anchorX: 0.51,  anchorY: 0.891 }
+        { src: 'assets/sprites/velo-t1.png', scale: 0.747, anchorX: 0.552, anchorY: 0.906, groundGapRight: 0.031, groundGapUp: 0.062 },
+        { src: 'assets/sprites/velo-t2.png', scale: 0.756, anchorX: 0.526, anchorY: 0.896, groundGapRight: 0,     groundGapUp: 0.021 },
+        { src: 'assets/sprites/velo-t3.png', scale: 0.739, anchorX: 0.573, anchorY: 0.917, groundGapRight: 0.036, groundGapUp: 0.068 },
+        { src: 'assets/sprites/velo-t4.png', scale: 0.76,  anchorX: 0.51,  anchorY: 0.891, groundGapRight: 0,     groundGapUp: 0.026 }
       ]
     },
     pip: {
       name: 'Pip', species: 'Pterosaur',
       tiers: [
-        { src: 'assets/sprites/pip-t1.png', scale: 0.726, anchorX: 0.531, anchorY: 0.932 },
-        { src: 'assets/sprites/pip-t2.png', scale: 0.774, anchorX: 0.552, anchorY: 0.875 },
-        { src: 'assets/sprites/pip-t3.png', scale: 0.774, anchorX: 0.542, anchorY: 0.875 },
-        { src: 'assets/sprites/pip-t4.png', scale: 0.783, anchorX: 0.531, anchorY: 0.865 }
+        { src: 'assets/sprites/pip-t1.png', scale: 0.726, anchorX: 0.531, anchorY: 0.932, groundGapRight: 0.083, groundGapUp: 0.042 },
+        { src: 'assets/sprites/pip-t2.png', scale: 0.774, anchorX: 0.552, anchorY: 0.875, groundGapRight: 0.062, groundGapUp: 0.068 },
+        { src: 'assets/sprites/pip-t3.png', scale: 0.774, anchorX: 0.542, anchorY: 0.875, groundGapRight: 0.042, groundGapUp: 0.052 },
+        { src: 'assets/sprites/pip-t4.png', scale: 0.783, anchorX: 0.531, anchorY: 0.865, groundGapRight: 0.031, groundGapUp: 0.031 }
       ]
     },
     trixie: {
       name: 'Trixie', species: 'Triceratops',
       tiers: [
-        { src: 'assets/sprites/trixie-t1.png', scale: 0.756, anchorX: 0.518, anchorY: 0.896 },
-        { src: 'assets/sprites/trixie-t2.png', scale: 0.743, anchorX: 0.516, anchorY: 0.911 },
-        { src: 'assets/sprites/trixie-t3.png', scale: 0.743, anchorX: 0.521, anchorY: 0.911 },
-        { src: 'assets/sprites/trixie-t4.png', scale: 0.76,  anchorX: 0.529, anchorY: 0.891 }
+        { src: 'assets/sprites/trixie-t1.png', scale: 0.756, anchorX: 0.518, anchorY: 0.896, groundGapRight: 0.031, groundGapUp: 0.068 },
+        { src: 'assets/sprites/trixie-t2.png', scale: 0.743, anchorX: 0.516, anchorY: 0.911, groundGapRight: 0.042, groundGapUp: 0.073 },
+        { src: 'assets/sprites/trixie-t3.png', scale: 0.743, anchorX: 0.521, anchorY: 0.911, groundGapRight: 0.036, groundGapUp: 0.078 },
+        { src: 'assets/sprites/trixie-t4.png', scale: 0.76,  anchorX: 0.529, anchorY: 0.891, groundGapRight: 0.036, groundGapUp: 0.078 }
       ]
     },
     bronte: {
       name: 'Bronte', species: 'Brontosaurus',
       tiers: [
-        { src: 'assets/sprites/bronte-t1.png', scale: 0.734, anchorX: 0.552, anchorY: 0.922 },
-        { src: 'assets/sprites/bronte-t2.png', scale: 0.714, anchorX: 0.549, anchorY: 0.948 },
-        { src: 'assets/sprites/bronte-t3.png', scale: 0.747, anchorX: 0.544, anchorY: 0.906 },
-        { src: 'assets/sprites/bronte-t4.png', scale: 0.756, anchorX: 0.539, anchorY: 0.896 }
+        { src: 'assets/sprites/bronte-t1.png', scale: 0.734, anchorX: 0.552, anchorY: 0.922, groundGapRight: 0.062, groundGapUp: 0.099 },
+        { src: 'assets/sprites/bronte-t2.png', scale: 0.714, anchorX: 0.549, anchorY: 0.948, groundGapRight: 0.083, groundGapUp: 0.068 },
+        { src: 'assets/sprites/bronte-t3.png', scale: 0.747, anchorX: 0.544, anchorY: 0.906, groundGapRight: 0.047, groundGapUp: 0.068 },
+        { src: 'assets/sprites/bronte-t4.png', scale: 0.756, anchorX: 0.539, anchorY: 0.896, groundGapRight: 0.057, groundGapUp: 0.083 }
       ]
     }
   };
@@ -2040,7 +2054,14 @@
     const scale = S.scale || 1;
     const dw = S.frameW * scale, dh = S.frameH * scale;
     const dx = -dw * (S.anchorX == null ? 0.5 : S.anchorX);
-    const dy = BODY.ground - dh * (S.anchorY == null ? 0.9 : S.anchorY);
+    // anchorY is measured against the "down" row only (see ROSTER's comment) --
+    // every other row needs its own share of the frame added back in, or its
+    // feet land above BODY.ground by exactly the amount that row is shallower
+    // than "down" is.
+    const groundGap = player.facing === 'up' ? (S.groundGapUp || 0)
+                     : (player.facing === 'left' || player.facing === 'right') ? (S.groundGapRight || 0)
+                     : 0;
+    const dy = BODY.ground - dh * (S.anchorY == null ? 0.9 : S.anchorY) + dh * groundGap;
 
     ctx.save();
     if (flip){ ctx.scale(-1, 1); ctx.translate(-dw - dx * 2, 0); }
