@@ -620,7 +620,9 @@
     // because the renderer places tables exactly there, where the painting did not.
     ? { floorTop: 430, r1: { y: 631, padY: 709, barY: 522 },
                        r2: { y: 850, padY: 927, barY: 741 },
-        passY: 480, busY: 760, padAtX: true, ticketBase: 315 }
+        // busY moved 760->900 with the dish-return prop in render_room.mjs's
+        // LAYOUT, which traded places with the floor-inlay medallion.
+        passY: 480, busY: 900, padAtX: true, ticketBase: 315 }
     // Measured off the painting, and out of spec on every band by 45-115px --
     // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
     : { floorTop: 300, r1: { y: 465, padY: 590, barY: 398 },

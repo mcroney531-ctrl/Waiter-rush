@@ -131,9 +131,11 @@ const LAYOUT = [
   ...COLS_BACK.map(x  => ({ prop: 'table', x, y: ROW_BACK,  upright: 'none' })),
   ...COLS_FRONT.map(x => ({ prop: 'table', x, y: ROW_FRONT, upright: 'none' })),
 
-  // Against each side wall, clear of the walkable lanes.
-  { prop: 'dish-return', x: 115,  y: 760, upright: 'none' },
-  { prop: 'dish-return', x: 1425, y: 760, upright: 'none', mirror: true },
+  // Against each side wall, clear of the walkable lanes. y swapped with
+  // floor-inlay below on Rone's call -- was 760, level with the back pads;
+  // now 900, level with the front pads, trading places with the medallion.
+  { prop: 'dish-return', x: 115,  y: 900, upright: 'none' },
+  { prop: 'dish-return', x: 1425, y: 900, upright: 'none', mirror: true },
 
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },
@@ -214,8 +216,9 @@ const LAYOUT = [
   // no fossil visible at all, and against yaw 180 the yaw 0 render is the one
   // where the gold corner accents catch the key light -- the same motif the
   // pillar, wall-panel and pendant-lamp all carry.
-  { prop: 'floor-inlay', x: 70,   y: 900, upright: 'z+', flush: true },
-  { prop: 'floor-inlay', x: 1466, y: 900, upright: 'z+', flush: true },
+  // y swapped with dish-return above -- was 900, now 760, trading places.
+  { prop: 'floor-inlay', x: 70,   y: 760, upright: 'z+', flush: true },
+  { prop: 'floor-inlay', x: 1466, y: 760, upright: 'z+', flush: true },
 ];
 
 // Every prop's size in art px. **Width, not height**, and that took a wrong
