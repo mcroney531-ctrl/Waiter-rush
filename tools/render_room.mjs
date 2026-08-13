@@ -134,8 +134,15 @@ const LAYOUT = [
   // Against each side wall, clear of the walkable lanes. y swapped with
   // floor-inlay below on Rone's call -- was 760, level with the back pads;
   // now 900, level with the front pads, trading places with the medallion.
-  { prop: 'dish-return', x: 60,  y: 950, upright: 'none' },
-  { prop: 'dish-return', x: 1476, y: 950, upright: 'none', mirror: true },
+  //
+  // x went 115 -> 60 on the first "further into the corner" pass and came
+  // back out to 95: the side wall itself sits at art x ~61 (the "just inside
+  // the frame" note below this array), so 60 put the prop behind the wall
+  // plane -- the dark clipped-looking patch Rone flagged was that wall's
+  // basalt texture painted over half the unit. 95 keeps ~34 art px clear of
+  // it, tighter than the original 115 but not touching.
+  { prop: 'dish-return', x: 95,  y: 950, upright: 'none' },
+  { prop: 'dish-return', x: 1441, y: 950, upright: 'none', mirror: true },
 
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },

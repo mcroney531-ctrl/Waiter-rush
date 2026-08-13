@@ -622,12 +622,14 @@
                        r2: { y: 850, padY: 927, barY: 741 },
         // busY moved 760->900 with the dish-return prop in render_room.mjs's
         // LAYOUT, which traded places with the floor-inlay medallion, then
-        // 900->950 and busXL/R 115/1425->60/1476 tucking it further into the
-        // corner. Both boards now carry busXL/busXR rather than BUS_STATIONS
-        // hardcoding them, since this board's dish-return moved and the
-        // painted one's has not -- one shared constant would have forced them
-        // to match.
-        passY: 480, busY: 950, busXL: 60, busXR: 1476, padAtX: true, ticketBase: 315 }
+        // 900->950. busXL/R went 115/1425 -> 60/1476 tucking it into the
+        // corner, then back out to 95/1441 -- at 60 the prop sat behind the
+        // room's side wall plane (art x ~61, see render_room.mjs), which
+        // rendered as a dark clipped-looking patch over half the unit. Both
+        // boards now carry busXL/busXR rather than BUS_STATIONS hardcoding
+        // them, since this board's dish-return moved and the painted one's
+        // has not -- one shared constant would have forced them to match.
+        passY: 480, busY: 950, busXL: 95, busXR: 1441, padAtX: true, ticketBase: 315 }
     // Measured off the painting, and out of spec on every band by 45-115px --
     // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
     : { floorTop: 300, r1: { y: 465, padY: 590, barY: 398 },
