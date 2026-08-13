@@ -1798,6 +1798,20 @@
   // row; everything else needs its own correction off that. drawSheetBody has
   // the reasoning for why walking and standing get separate numbers.
   //
+  // The "up" entries are measured to the FEET, not to the deepest pixel. Facing
+  // away, a tail sweeps toward the camera, and toward the camera is downward on
+  // screen -- so the tail lands below the soles and every one of these numbers
+  // was being set by a tail tip, which lifted the character off the floor by
+  // exactly its overhang. Pip's tail hangs 35 sprite px past his feet; bronte's
+  // 32. Found by scanning the silhouette upward from the bottom for the width
+  // discontinuity where a narrow tail taper meets legs (pip: width 19 to 42 in
+  // one row). Only "up" uses it: measured on the side row that same scan cuts
+  // through the ankle on trixie and bronte, which would bury them in the floor,
+  // and neither of the other two rows has the problem anyway -- facing the
+  // camera the tail is behind the body, and side-on it extends backward rather
+  // than down. Grounding the feet leaves the tail drawn below the shadow, which
+  // is correct: it is lying on the floor nearer the viewer.
+  //
   // scale is NOT what render_sprites.mjs prints. Its rule -- fit the sheet's
   // union bounding box into 130px -- is height-limited on all 20 sheets, so a
   // single extreme frame anywhere in the sheet (a tail at full swing, a lean
@@ -1812,46 +1826,46 @@
     tyrone: {
       name: 'Tyrone', species: 'T-Rex',
       tiers: [
-        { src: 'assets/sprites/tyrone-t1.png', scale: 0.744, anchorX: 0.529, anchorY: 0.911, groundWalk: [0.0308, 0.0438, 0.1376], groundIdle: [0.0308, 0.0412, 0.1454], idleFrames: [4, 0, 4] },
-        { src: 'assets/sprites/tyrone-t2.png', scale: 0.725, anchorX: 0.539, anchorY: 0.922, groundWalk: [0.0314, 0.0496, 0.1486], groundIdle: [0.0314, 0.047, 0.1408], idleFrames: [4, 0, 4] },
-        { src: 'assets/sprites/tyrone-t3.png', scale: 0.754, anchorX: 0.529, anchorY: 0.917, groundWalk: [0.0316, 0.0524, 0.1358], groundIdle: [0.0212, 0.0524, 0.1462], idleFrames: [4, 0, 4] },
-        { src: 'assets/sprites/tyrone-t4.png', scale: 0.754, anchorX: 0.549, anchorY: 0.896, groundWalk: [0.0314, 0.0523, 0.0236], groundIdle: [0.0314, 0.0523, 0.0106], idleFrames: [0, 0, 0] }
+        { src: 'assets/sprites/tyrone-t1.png', scale: 0.744, anchorX: 0.529, anchorY: 0.911, groundWalk: [0.0308, 0.0438, 0.187], groundIdle: [0.0308, 0.0412, 0.1662], idleFrames: [4, 0, 4] },
+        { src: 'assets/sprites/tyrone-t2.png', scale: 0.725, anchorX: 0.539, anchorY: 0.922, groundWalk: [0.0314, 0.0496, 0.1538], groundIdle: [0.0314, 0.047, 0.1772], idleFrames: [4, 0, 4] },
+        { src: 'assets/sprites/tyrone-t3.png', scale: 0.754, anchorX: 0.529, anchorY: 0.917, groundWalk: [0.0316, 0.0524, 0.1956], groundIdle: [0.0212, 0.0524, 0.167], idleFrames: [4, 0, 4] },
+        { src: 'assets/sprites/tyrone-t4.png', scale: 0.754, anchorX: 0.549, anchorY: 0.896, groundWalk: [0.0314, 0.0523, 0.0783], groundIdle: [0.0314, 0.0523, 0.0106], idleFrames: [0, 0, 0] }
       ]
     },
     velo: {
       name: 'Velo', species: 'Raptor',
       tiers: [
-        { src: 'assets/sprites/velo-t1.png', scale: 0.764, anchorX: 0.552, anchorY: 0.906, groundWalk: [0.0336, 0.0622, 0.1352], groundIdle: [0.0414, 0.0622, 0.1612], idleFrames: [0, 0, 4] },
-        { src: 'assets/sprites/velo-t2.png', scale: 0.754, anchorX: 0.526, anchorY: 0.896, groundWalk: [0.034, 0.0418, 0.0965], groundIdle: [0.0418, 0.0418, 0.1304], idleFrames: [5, 0, 4] },
-        { src: 'assets/sprites/velo-t3.png', scale: 0.744, anchorX: 0.573, anchorY: 0.917, groundWalk: [0.0446, 0.0811, 0.154], groundIdle: [0.0472, 0.0837, 0.1983], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/velo-t1.png', scale: 0.764, anchorX: 0.552, anchorY: 0.906, groundWalk: [0.0336, 0.0622, 0.1846], groundIdle: [0.0414, 0.0622, 0.182], idleFrames: [0, 0, 4] },
+        { src: 'assets/sprites/velo-t2.png', scale: 0.754, anchorX: 0.526, anchorY: 0.896, groundWalk: [0.034, 0.0418, 0.1486], groundIdle: [0.0418, 0.0418, 0.1408], idleFrames: [5, 0, 4] },
+        { src: 'assets/sprites/velo-t3.png', scale: 0.744, anchorX: 0.573, anchorY: 0.917, groundWalk: [0.0446, 0.0811, 0.2217], groundIdle: [0.0472, 0.0837, 0.2087], idleFrames: [0, 0, 0] },
         { src: 'assets/sprites/velo-t4.png', scale: 0.74, anchorX: 0.51, anchorY: 0.891, groundWalk: [0.0394, 0.0473, 0.0473], groundIdle: [0.0316, 0.0577, 0.0473], idleFrames: [4, 0, 0] }
       ]
     },
     pip: {
       name: 'Pip', species: 'Pterosaur',
       tiers: [
-        { src: 'assets/sprites/pip-t1.png', scale: 0.753, anchorX: 0.531, anchorY: 0.932, groundWalk: [0.0362, 0.1065, 0.07], groundIdle: [0.0466, 0.0987, 0.0518], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/pip-t2.png', scale: 0.783, anchorX: 0.552, anchorY: 0.875, groundWalk: [0.0234, 0.0729, 0.1146], groundIdle: [0.0573, 0.0625, 0.1615], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/pip-t3.png', scale: 0.773, anchorX: 0.542, anchorY: 0.875, groundWalk: [0.0234, 0.0521, 0.1146], groundIdle: [0.0625, 0.0521, 0.1615], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/pip-t4.png', scale: 0.748, anchorX: 0.531, anchorY: 0.865, groundWalk: [0.0212, 0.0473, 0.0551], groundIdle: [0.0212, 0.0369, 0.0421], idleFrames: [5, 0, 0] }
+        { src: 'assets/sprites/pip-t1.png', scale: 0.753, anchorX: 0.531, anchorY: 0.932, groundWalk: [0.0362, 0.1065, 0.1299], groundIdle: [0.0466, 0.0987, 0.2341], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/pip-t2.png', scale: 0.783, anchorX: 0.552, anchorY: 0.875, groundWalk: [0.0234, 0.0729, 0.151], groundIdle: [0.0573, 0.0625, 0.1823], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/pip-t3.png', scale: 0.773, anchorX: 0.542, anchorY: 0.875, groundWalk: [0.0234, 0.0521, 0.1302], groundIdle: [0.0625, 0.0521, 0.1667], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/pip-t4.png', scale: 0.748, anchorX: 0.531, anchorY: 0.865, groundWalk: [0.0212, 0.0473, 0.0707], groundIdle: [0.0212, 0.0369, 0.0421], idleFrames: [5, 0, 0] }
       ]
     },
     trixie: {
       name: 'Trixie', species: 'Triceratops',
       tiers: [
-        { src: 'assets/sprites/trixie-t1.png', scale: 0.744, anchorX: 0.518, anchorY: 0.896, groundWalk: [0.0314, 0.0549, 0.1278], groundIdle: [0.0366, 0.0523, 0.1408], idleFrames: [0, 0, 4] },
-        { src: 'assets/sprites/trixie-t2.png', scale: 0.734, anchorX: 0.516, anchorY: 0.911, groundWalk: [0.0334, 0.0725, 0.148], groundIdle: [0.0412, 0.0725, 0.1714], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/trixie-t3.png', scale: 0.765, anchorX: 0.521, anchorY: 0.911, groundWalk: [0.0308, 0.0646, 0.1532], groundIdle: [0.0308, 0.062, 0.1714], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/trixie-t4.png', scale: 0.759, anchorX: 0.529, anchorY: 0.891, groundWalk: [0.0316, 0.0551, 0.1254], groundIdle: [0.0316, 0.0525, 0.1514], idleFrames: [4, 0, 4] }
+        { src: 'assets/sprites/trixie-t1.png', scale: 0.744, anchorX: 0.518, anchorY: 0.896, groundWalk: [0.0314, 0.0549, 0.1278], groundIdle: [0.0366, 0.0523, 0.1564], idleFrames: [0, 0, 4] },
+        { src: 'assets/sprites/trixie-t2.png', scale: 0.734, anchorX: 0.516, anchorY: 0.911, groundWalk: [0.0334, 0.0725, 0.1506], groundIdle: [0.0412, 0.0725, 0.1766], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/trixie-t3.png', scale: 0.765, anchorX: 0.521, anchorY: 0.911, groundWalk: [0.0308, 0.0646, 0.1558], groundIdle: [0.0308, 0.062, 0.1714], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/trixie-t4.png', scale: 0.759, anchorX: 0.529, anchorY: 0.891, groundWalk: [0.0316, 0.0551, 0.1332], groundIdle: [0.0316, 0.0525, 0.1566], idleFrames: [4, 0, 4] }
       ]
     },
     bronte: {
       name: 'Bronte', species: 'Brontosaurus',
       tiers: [
-        { src: 'assets/sprites/bronte-t1.png', scale: 0.742, anchorX: 0.552, anchorY: 0.922, groundWalk: [0.0366, 0.0835, 0.1277], groundIdle: [0.0522, 0.0783, 0.1199], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/bronte-t2.png', scale: 0.747, anchorX: 0.549, anchorY: 0.948, groundWalk: [0.0365, 0.1016, 0.0912], groundIdle: [0.047, 0.0938, 0.0782], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/bronte-t3.png', scale: 0.731, anchorX: 0.544, anchorY: 0.906, groundWalk: [0.031, 0.0727, 0.0883], groundIdle: [0.0414, 0.0675, 0.0779], idleFrames: [0, 0, 0] },
-        { src: 'assets/sprites/bronte-t4.png', scale: 0.731, anchorX: 0.539, anchorY: 0.896, groundWalk: [0.021, 0.0757, 0.1095], groundIdle: [0.0314, 0.0679, 0.12], idleFrames: [0, 0, 0] }
+        { src: 'assets/sprites/bronte-t1.png', scale: 0.742, anchorX: 0.552, anchorY: 0.922, groundWalk: [0.0366, 0.0835, 0.1538], groundIdle: [0.0522, 0.0783, 0.1199], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/bronte-t2.png', scale: 0.747, anchorX: 0.549, anchorY: 0.948, groundWalk: [0.0365, 0.1016, 0.1537], groundIdle: [0.047, 0.0938, 0.2449], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/bronte-t3.png', scale: 0.731, anchorX: 0.544, anchorY: 0.906, groundWalk: [0.031, 0.0727, 0.1482], groundIdle: [0.0414, 0.0675, 0.1716], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/bronte-t4.png', scale: 0.731, anchorX: 0.539, anchorY: 0.896, groundWalk: [0.021, 0.0757, 0.1095], groundIdle: [0.0314, 0.0679, 0.2033], idleFrames: [0, 0, 0] }
       ]
     }
   };

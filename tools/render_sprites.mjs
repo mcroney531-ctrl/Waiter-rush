@@ -195,6 +195,30 @@ window.run = () => new Promise((res, rej) => {
     // so frame 0 -- both feet down, the calmest of them.
     const idleFrames = ROWS.map((rn, r) =>
       rn === 'right' ? 0 : cellSym[r].indexOf(Math.max(...cellSym[r])));
+    // Deepest FOOT pixel of a cell, as opposed to its deepest pixel. Facing
+    // away the tail sweeps toward the camera, which is downward on screen, so
+    // it lands below the soles and would otherwise set the ground line and
+    // lift the character clear of the floor. Scans upward for the width
+    // discontinuity where a narrow tail taper meets legs. Used for the "up"
+    // row only -- on the side row the same scan cuts through the ankle, and
+    // neither of the other rows puts a tail below the feet in the first place.
+    const footLine = (r, f) => {
+      let top = 1e9, bot = -1;
+      const w = new Array(CELL).fill(0);
+      for (let cy = 0; cy < CELL; cy++) {
+        let lo = -1, hi = -1;
+        for (let cx = 0; cx < CELL; cx++)
+          if (at(r, f, cx, cy)) { if (lo < 0) lo = cx; hi = cx; }
+        if (hi >= 0) { w[cy] = hi - lo + 1; if (cy < top) top = cy; bot = cy; }
+      }
+      if (bot < 0) return bot;
+      const limit = bot - Math.floor(0.45 * (bot - top));
+      for (let cy = bot - 1; cy >= limit; cy--)
+        if (w[cy] >= 1.9 * w[cy + 1] && w[cy] - w[cy + 1] >= 14) return cy;
+      return bot;
+    };
+    const groundOf = (r, f) => (r === 2 ? footLine(r, f) : cellB[r][f]);
+
     // How tall the character stands in its held down-facing frame. This, not
     // the union bounding box, is what scale is set from -- see cfg below.
     let sTop = 1e9, sBot = -1;
@@ -203,6 +227,7 @@ window.run = () => new Promise((res, rej) => {
         if (at(0, idleFrames[0], cx, cy)) { if (cy < sTop) sTop = cy; if (cy > sBot) sBot = cy; }
     res({ png: sheet.toDataURL('image/png'), clip: clip ? clip.name : null,
           animated: !!clip, bbox: { L, T, R, B }, rowB, cellB, idleFrames,
+          cellG: ROWS.map((_, r) => cellB[r].map((_, f) => groundOf(r, f))),
           standSpan: sBot - sTop, cell: CELL });
   }, undefined, e => rej(String(e)));
 });
@@ -252,7 +277,7 @@ await writeFile(pngPath, Buffer.from(out.png.split(',')[1], 'base64'));
 
 const { L, T, R, B, } = out.bbox;
 const drawnW = R - L, drawnH = B - T;
-const { cellB, idleFrames, standSpan } = out;
+const { cellB, cellG, idleFrames, standSpan } = out;
 // How tall a character stands on the 960px board, in rendered px. Every tier of
 // a character must share one value or promoting resizes the player mid-shift;
 // the five characters are allowed to differ from each other. Existing sheets
@@ -272,7 +297,7 @@ const TARGET_STAND = +opt('stand', 111);
 // row's MEDIAN frame rather than its deepest, so the error is centred instead
 // of always lifting the character off the floor.
 const rowMedian = r => {
-  const s = [...cellB[r]].sort((a, b) => a - b);
+  const s = [...cellG[r]].sort((a, b) => a - b);
   return (s[(FRAMES >> 1) - 1] + s[FRAMES >> 1]) / 2;
 };
 const frac = v => +(v / CELL).toFixed(4);
@@ -290,7 +315,7 @@ const cfg = {
   anchorX: +(((L + R) / 2) / CELL).toFixed(3),
   anchorY: +(B / CELL).toFixed(3),
   groundWalk: [0, 1, 2].map(r => frac(B - rowMedian(r))),
-  groundIdle: [0, 1, 2].map(r => frac(B - cellB[r][idleFrames[r]])),
+  groundIdle: [0, 1, 2].map(r => frac(B - cellG[r][idleFrames[r]])),
   // Which frame each row holds while standing still. There is no idle clip --
   // standing is the walk cycle paused -- and frame 0 is simply where the clip
   // starts, not where a foot is down. See index.html's drawSheetBody.
