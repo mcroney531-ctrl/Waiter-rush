@@ -134,8 +134,8 @@ const LAYOUT = [
   // Against each side wall, clear of the walkable lanes. y swapped with
   // floor-inlay below on Rone's call -- was 760, level with the back pads;
   // now 900, level with the front pads, trading places with the medallion.
-  { prop: 'dish-return', x: 115,  y: 900, upright: 'none' },
-  { prop: 'dish-return', x: 1425, y: 900, upright: 'none', mirror: true },
+  { prop: 'dish-return', x: 60,  y: 950, upright: 'none' },
+  { prop: 'dish-return', x: 1476, y: 950, upright: 'none', mirror: true },
 
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },

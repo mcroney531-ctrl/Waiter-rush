@@ -621,13 +621,18 @@
     ? { floorTop: 430, r1: { y: 631, padY: 709, barY: 522 },
                        r2: { y: 850, padY: 927, barY: 741 },
         // busY moved 760->900 with the dish-return prop in render_room.mjs's
-        // LAYOUT, which traded places with the floor-inlay medallion.
-        passY: 480, busY: 900, padAtX: true, ticketBase: 315 }
+        // LAYOUT, which traded places with the floor-inlay medallion, then
+        // 900->950 and busXL/R 115/1425->60/1476 tucking it further into the
+        // corner. Both boards now carry busXL/busXR rather than BUS_STATIONS
+        // hardcoding them, since this board's dish-return moved and the
+        // painted one's has not -- one shared constant would have forced them
+        // to match.
+        passY: 480, busY: 950, busXL: 60, busXR: 1476, padAtX: true, ticketBase: 315 }
     // Measured off the painting, and out of spec on every band by 45-115px --
     // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
     : { floorTop: 300, r1: { y: 465, padY: 590, barY: 398 },
                        r2: { y: 700, padY: 855, barY: 612 },
-        passY: 357, busY: 760, padAtX: false, ticketBase: 404 };
+        passY: 357, busY: 760, busXL: 115, busXR: 1425, padAtX: false, ticketBase: 404 };
 
   const counterRect = { x: 0, y: 0, w: W, h: A(430) };
   // The player stands in front of the counter, overlapping its lower face, so
@@ -786,8 +791,8 @@
   // Both painted dish returns are live, one per section, so clearing a table
   // is a trip to your own end of the room rather than across the whole floor.
   const BUS_STATIONS = [
-    { side: 'left',  x: A(115),  y: A(GEO.busY), w: A(200), h: A(240) },
-    { side: 'right', x: A(1425), y: A(GEO.busY), w: A(200), h: A(240) }
+    { side: 'left',  x: A(GEO.busXL), y: A(GEO.busY), w: A(200), h: A(240) },
+    { side: 'right', x: A(GEO.busXR), y: A(GEO.busY), w: A(200), h: A(240) }
   ];
 
   let tables = [];
