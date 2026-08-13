@@ -152,6 +152,12 @@ window.run = () => new Promise((res, rej) => {
     const d = sctx.getImageData(0, 0, sheet.width, sheet.height).data;
     let L = 1e9, T = 1e9, R = -1, B = -1;
     const rowB = ROWS.map(() => -1);   // per-row deepest pixel -- see below
+    // per (row, frame): deepest pixel, and how wide the silhouette is in the
+    // bottom 18px of it. The first picks the frame that stands on the floor,
+    // the second breaks ties toward feet together rather than mid-stride.
+    const cellB = ROWS.map(() => new Array(FRAMES).fill(-1));
+    const cellFootL = ROWS.map(() => new Array(FRAMES).fill(1e9));
+    const cellFootR = ROWS.map(() => new Array(FRAMES).fill(-1));
     for (let y = 0; y < sheet.height; y++) {
       for (let x = 0; x < sheet.width; x++) {
         if (d[(y * sheet.width + x) * 4 + 3] < 12) continue;
@@ -160,10 +166,32 @@ window.run = () => new Promise((res, rej) => {
         if (cy < T) T = cy; if (cy > B) B = cy;
         const r = Math.floor(y / CELL);
         if (cy > rowB[r]) rowB[r] = cy;
+        const f = Math.floor(x / CELL);
+        if (cy > cellB[r][f]) cellB[r][f] = cy;
       }
     }
+    for (let y = 0; y < sheet.height; y++) {
+      for (let x = 0; x < sheet.width; x++) {
+        if (d[(y * sheet.width + x) * 4 + 3] < 12) continue;
+        const cy = y % CELL, cx = x % CELL;
+        const r = Math.floor(y / CELL), f = Math.floor(x / CELL);
+        if (cy < cellB[r][f] - 18) continue;
+        if (cx < cellFootL[r][f]) cellFootL[r][f] = cx;
+        if (cx > cellFootR[r][f]) cellFootR[r][f] = cx;
+      }
+    }
+    const idleFrames = ROWS.map((_, r) => {
+      const mx = Math.max(...cellB[r]);
+      let best = 0, bestW = Infinity;
+      for (let f = 0; f < FRAMES; f++) {
+        if (cellB[r][f] < mx - 2) continue;
+        const w = cellFootR[r][f] - cellFootL[r][f];
+        if (w < bestW) { bestW = w; best = f; }
+      }
+      return (cellB[r][best] - cellB[r][0] >= 4) ? best : 0;
+    });
     res({ png: sheet.toDataURL('image/png'), clip: clip ? clip.name : null,
-          animated: !!clip, bbox: { L, T, R, B }, rowB, cell: CELL });
+          animated: !!clip, bbox: { L, T, R, B }, rowB, idleFrames, cell: CELL });
   }, undefined, e => rej(String(e)));
 });
 document.title = 'ready';
@@ -227,6 +255,7 @@ const scale = +(130 / Math.max(drawnW, drawnH)).toFixed(3);
 // "down" (rig noise, not a real difference) -- down is the one being drawn
 // correctly, so nothing should lift it to chase that.
 const rowB = out.rowB;
+const out_idleFrames = out.idleFrames;
 const cfg = {
   src: `assets/sprites/${NAME}.png`,
   frameW: CELL, frameH: CELL,
@@ -235,6 +264,10 @@ const cfg = {
   anchorY: +(B / CELL).toFixed(3),
   groundGapRight: +Math.max(0, (B - rowB[1]) / CELL).toFixed(3),
   groundGapUp: +Math.max(0, (B - rowB[2]) / CELL).toFixed(3),
+  // Which frame each row holds while standing still. There is no idle clip --
+  // standing is the walk cycle paused -- and frame 0 is simply where the clip
+  // starts, not where a foot is down. See index.html's drawSheetBody.
+  idleFrames: out_idleFrames,
   idleFps: 5,
   dirs: { down: { row: 0 }, right: { row: 1 }, left: { mirror: 'right' }, up: { row: 2 } },
   walk: { first: 0, count: FRAMES },
@@ -247,13 +280,15 @@ console.log(`  sheet   ${pngPath.replace(ROOT + '/', '')}  ${CELL * FRAMES}x${CE
 console.log(`  drawn   ${drawnW}x${drawnH} inside a ${CELL}px cell`);
 console.log(`  anchor  x ${cfg.anchorX}  y ${cfg.anchorY}   scale ${cfg.scale}`);
 console.log(`  groundGap  right ${cfg.groundGapRight}  up ${cfg.groundGapUp}`);
+console.log(`  idleFrames ${JSON.stringify(cfg.idleFrames)}  (down, right, up)`);
 // The roster in index.html keeps sheet configs inline so the game still runs
 // from a file:// double-click. Printing the exact line means adding a tier is a
 // paste rather than a transcription of four measured numbers.
 console.log('  roster  ' +
   `{ src: '${cfg.src}', scale: ${cfg.scale}, ` +
   `anchorX: ${cfg.anchorX}, anchorY: ${cfg.anchorY}, ` +
-  `groundGapRight: ${cfg.groundGapRight}, groundGapUp: ${cfg.groundGapUp} },`);
+  `groundGapRight: ${cfg.groundGapRight}, groundGapUp: ${cfg.groundGapUp}, ` +
+  `idleFrames: ${JSON.stringify(cfg.idleFrames)} },`);
 if (cfg.frameW !== 192 || FRAMES !== 8) {
   console.log(`  ! SHEET_BASE in index.html assumes 192px cells and 8 walk frames; ` +
               `this is ${cfg.frameW}px / ${FRAMES}. Override them in the roster entry.`);
