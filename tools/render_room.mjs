@@ -213,20 +213,10 @@ const LAYOUT = [
   // decoration -- outside the lanes, and nowhere near the pads.
   { prop: 'planter', x: 70,   y: 520, upright: 'none' },
   { prop: 'planter', x: 1466, y: 520, upright: 'none' },
-  // No override: floor-inlay is the one prop whose default shortest-axis guess
-  // lays it flat, which is exactly what a floor medallion wants.
-  // No yaw. There was a yaw: 180 here on the reasoning that laying a standing
-  // prop down turns its own "up" toward the camera -- but 'z+' is already the
-  // face-up flip (that is what distinguishes it from 'z', which lays the same
-  // prop face-down), so the extra half turn re-introduced exactly the flip it
-  // was added to cancel. Rone reported it still reading upside down, and the
-  // four-yaw comparison settles it: 90 and 270 show the medallion edge-on with
-  // no fossil visible at all, and against yaw 180 the yaw 0 render is the one
-  // where the gold corner accents catch the key light -- the same motif the
-  // pillar, wall-panel and pendant-lamp all carry.
-  // y swapped with dish-return above -- was 900, now 760, trading places.
-  { prop: 'floor-inlay', x: 70,   y: 760, upright: 'z+', flush: true },
-  { prop: 'floor-inlay', x: 1466, y: 760, upright: 'z+', flush: true },
+  // floor-inlay (a round fossil medallion) lived here through several passes --
+  // upside-down, flipped, moved, swapped with dish-return -- and Rone was never
+  // quite sold on it even fixed. Removed rather than tuned again; a procedural
+  // dino-track rug takes the same margin slot below the shell, near RUG_TEX.
 ];
 
 // Every prop's size in art px. **Width, not height**, and that took a wrong
@@ -258,7 +248,6 @@ const PROP_ART_WIDTH = {
   'wall-panel': 210,
   'pendant-lamp': 80,
   planter: 130,
-  'floor-inlay': 150,
 };
 
 // Meshy normalises every export so its longest axis is 1.9, and on all ten
@@ -266,7 +255,7 @@ const PROP_ART_WIDTH = {
 // therefore wrong far more often than right, so orientation is stated per prop
 // here rather than inferred. See ROOM-BRIEF.md for the four ways it broke.
 const PROPS = ['table', 'counter', 'dish-return', 'pass-sign',
-               'shelf-unit', 'wall-panel', 'pendant-lamp', 'planter', 'floor-inlay'];
+               'shelf-unit', 'wall-panel', 'pendant-lamp', 'planter'];
 
 // --------------------------------------------------------------------------
 const three = resolve(ROOT, 'node_modules/three');
@@ -399,6 +388,102 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+
+// RUG_TEX: a long "runway" rug in each side margin, replacing floor-inlay (see
+// the note where that used to sit, above). A rug is a flat pattern rather than
+// a silhouette, so unlike the rest of LAYOUT it is drawn here as a canvas
+// texture on its own plane instead of going through the Meshy prop pipeline --
+// the same reasoning that already puts the floor and walls here rather than
+// in LAYOUT.
+//
+// Drawn once at the rug's own aspect ratio rather than through paint()'s tiled
+// square canvas: paint() is built for a repeating pattern with no fixed edges
+// (floorboards, wall blocks), and a rug has both -- a border and two ends --
+// that a tiled square would either cut off arbitrarily or repeat into a
+// second rug. One direct draw, sized to the rug's own proportions, gets a
+// clean border and lets the track spacing be chosen rather than whatever the
+// tile size happens to produce.
+function paintRug(w, h){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+
+  // Base weave: a deep terracotta rather than the wall's basalt or the floor's
+  // wood, so the rug reads as fabric and not as more room shell. Thin vertical
+  // threads step the value slightly, the same trick the floorboards use for
+  // grain, so the field is not one flat rectangle of colour.
+  g.fillStyle = '#6b2a22'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 3){
+    const v = 0.92 + 0.16 * Math.sin(x * 1.7);
+    g.fillStyle = 'rgba(0,0,0,' + ((1 - v) * 0.4) + ')';
+    g.fillRect(x, 0, 1, h);
+  }
+
+  // Border: the gold the rest of the room already uses for accents (COLORS.
+  // mustard in index.html, and the fossil-fitting's corner trim) rather than a
+  // new colour, so the rug reads as this room's rather than a generic import.
+  const M = w * 0.1;
+  g.strokeStyle = '#E0A72E'; g.lineWidth = Math.max(2, w * 0.025);
+  g.strokeRect(M, M, w - 2 * M, h - 2 * M);
+  g.strokeStyle = 'rgba(224,167,46,0.45)'; g.lineWidth = Math.max(1, w * 0.012);
+  g.strokeRect(M * 1.7, M * 1.7, w - 3.4 * M, h - 3.4 * M);
+
+  // A trail of three-toed tracks down the centre, dinosaur rather than
+  // generic-rug ornament per Rone's ask. Alternating left/right like an actual
+  // gait, each print a heel pad plus three splayed toes, angled slightly
+  // outward the way a real theropod print does rather than pointing straight
+  // ahead of the last one.
+  const stepH = h / 6.4, printW = w * 0.3;
+  const track = (cx, cy, side, scale) => {
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(side * 0.22);
+    g.scale(scale, scale);
+    g.fillStyle = '#EDE0C8';
+    g.strokeStyle = 'rgba(60,20,14,0.5)';
+    g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(0, printW * 0.34, printW * 0.24, printW * 0.3, 0, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    for (const a of [-0.62, 0, 0.62]){
+      g.save();
+      g.rotate(a);
+      g.beginPath();
+      g.ellipse(0, -printW * 0.22, printW * 0.12, printW * 0.32, 0, 0, Math.PI * 2);
+      g.fill(); g.stroke();
+      g.restore();
+    }
+    g.restore();
+  };
+  let side = 1;
+  for (let y = stepH * 0.7; y < h - stepH * 0.4; y += stepH){
+    track(w / 2 + side * w * 0.1, y, side, 1);
+    side *= -1;
+  }
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+// Same margin x as the planters (art 70 / 1466), running the corridor between
+// them (art y 520) and the dish returns (art y 950) -- clear of both with
+// ~40px to spare at either end. Flat, so unlike an upright prop it cannot
+// clip the side walls the way the dish-return move did; the wall clearance
+// that constrained that move does not apply here.
+const RUG_ART = { x: [70, 1466], y0: 560, y1: 910, artWidth: 120 };
+const rugWorldW = RUG_ART.artWidth / PPU;
+const rugWorldL = (RUG_ART.y1 - RUG_ART.y0) / (SIN_E * PPU);
+const rugTex = paintRug(140, 730);
+for (const x of RUG_ART.x){
+  const rug = new THREE.Mesh(
+    new THREE.PlaneGeometry(rugWorldW, rugWorldL),
+    new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.92, metalness: 0 }));
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(artXToWorld(x), 0.004, artYToWorldZ((RUG_ART.y0 + RUG_ART.y1) / 2));
+  rug.receiveShadow = true;
+  scene.add(rug);
+}
 
 // Carved basalt, per the house style: dark, coarse, and deliberately quieter in
 // value than the floor so the props read against it rather than into it.
