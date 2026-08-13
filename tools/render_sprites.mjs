@@ -152,12 +152,13 @@ window.run = () => new Promise((res, rej) => {
     const d = sctx.getImageData(0, 0, sheet.width, sheet.height).data;
     let L = 1e9, T = 1e9, R = -1, B = -1;
     const rowB = ROWS.map(() => -1);   // per-row deepest pixel -- see below
-    // per (row, frame): deepest pixel, and how wide the silhouette is in the
-    // bottom 18px of it. The first picks the frame that stands on the floor,
-    // the second breaks ties toward feet together rather than mid-stride.
+    // per (row, frame): deepest pixel, and mirror symmetry of the silhouette.
+    // Depth says how far the frame has to drop to reach the floor; symmetry
+    // says whether it looks like standing. They are different questions --
+    // the deepest frame of a walk is the one where the legs pass each other,
+    // which grounds perfectly and reads as a stride frozen mid-step.
     const cellB = ROWS.map(() => new Array(FRAMES).fill(-1));
-    const cellFootL = ROWS.map(() => new Array(FRAMES).fill(1e9));
-    const cellFootR = ROWS.map(() => new Array(FRAMES).fill(-1));
+    const cellSym = ROWS.map(() => new Array(FRAMES).fill(0));
     for (let y = 0; y < sheet.height; y++) {
       for (let x = 0; x < sheet.width; x++) {
         if (d[(y * sheet.width + x) * 4 + 3] < 12) continue;
@@ -170,28 +171,36 @@ window.run = () => new Promise((res, rej) => {
         if (cy > cellB[r][f]) cellB[r][f] = cy;
       }
     }
-    for (let y = 0; y < sheet.height; y++) {
-      for (let x = 0; x < sheet.width; x++) {
-        if (d[(y * sheet.width + x) * 4 + 3] < 12) continue;
-        const cy = y % CELL, cx = x % CELL;
-        const r = Math.floor(y / CELL), f = Math.floor(x / CELL);
-        if (cy < cellB[r][f] - 18) continue;
-        if (cx < cellFootL[r][f]) cellFootL[r][f] = cx;
-        if (cx > cellFootR[r][f]) cellFootR[r][f] = cx;
+    const at = (r, f, cx, cy) =>
+      d[(((r * CELL + cy) * sheet.width) + (f * CELL + cx)) * 4 + 3] >= 12;
+    for (let r = 0; r < ROWS.length; r++) {
+      for (let f = 0; f < FRAMES; f++) {
+        let lo = 1e9, hi = -1;
+        for (let cy = 0; cy < CELL; cy++)
+          for (let cx = 0; cx < CELL; cx++)
+            if (at(r, f, cx, cy)) { if (cx < lo) lo = cx; if (cx > hi) hi = cx; }
+        if (hi < 0) continue;
+        const mid = Math.round((lo + hi) / 2), half = Math.min(mid - lo, hi - mid);
+        let both = 0, either = 0;
+        for (let cy = 0; cy < CELL; cy++)
+          for (let k = 1; k <= half; k++) {
+            const a = at(r, f, mid - k, cy), b = at(r, f, mid + k, cy);
+            if (a && b) both++; if (a || b) either++;
+          }
+        cellSym[r][f] = either ? both / either : 0;
       }
     }
-    const idleFrames = ROWS.map((_, r) => {
-      const mx = Math.max(...cellB[r]);
-      let best = 0, bestW = Infinity;
-      for (let f = 0; f < FRAMES; f++) {
-        if (cellB[r][f] < mx - 2) continue;
-        const w = cellFootR[r][f] - cellFootL[r][f];
-        if (w < bestW) { bestW = w; best = f; }
-      }
-      return (cellB[r][best] - cellB[r][0] >= 4) ? best : 0;
-    });
+    // Head-on rows (down, up): the most symmetric frame is the squared-up
+    // standing one. The side row has no standing pose in a walk cycle at all,
+    // so frame 0 -- both feet down, the calmest of them.
+    const idleFrames = ROWS.map((rn, r) =>
+      rn === 'right' ? 0 : cellSym[r].indexOf(Math.max(...cellSym[r])));
+    // ...and how far that chosen frame still has to drop, since it was picked
+    // on looks and groundGap only lands the row's deepest frame.
+    const idleGround = ROWS.map((_, r) =>
+      +((Math.max(...cellB[r]) - cellB[r][idleFrames[r]]) / CELL).toFixed(4));
     res({ png: sheet.toDataURL('image/png'), clip: clip ? clip.name : null,
-          animated: !!clip, bbox: { L, T, R, B }, rowB, idleFrames, cell: CELL });
+          animated: !!clip, bbox: { L, T, R, B }, rowB, idleFrames, idleGround, cell: CELL });
   }, undefined, e => rej(String(e)));
 });
 document.title = 'ready';
@@ -256,6 +265,7 @@ const scale = +(130 / Math.max(drawnW, drawnH)).toFixed(3);
 // correctly, so nothing should lift it to chase that.
 const rowB = out.rowB;
 const out_idleFrames = out.idleFrames;
+const out_idleGround = out.idleGround;
 const cfg = {
   src: `assets/sprites/${NAME}.png`,
   frameW: CELL, frameH: CELL,
@@ -268,6 +278,7 @@ const cfg = {
   // standing is the walk cycle paused -- and frame 0 is simply where the clip
   // starts, not where a foot is down. See index.html's drawSheetBody.
   idleFrames: out_idleFrames,
+  idleGround: out_idleGround,
   idleFps: 5,
   dirs: { down: { row: 0 }, right: { row: 1 }, left: { mirror: 'right' }, up: { row: 2 } },
   walk: { first: 0, count: FRAMES },
@@ -280,7 +291,7 @@ console.log(`  sheet   ${pngPath.replace(ROOT + '/', '')}  ${CELL * FRAMES}x${CE
 console.log(`  drawn   ${drawnW}x${drawnH} inside a ${CELL}px cell`);
 console.log(`  anchor  x ${cfg.anchorX}  y ${cfg.anchorY}   scale ${cfg.scale}`);
 console.log(`  groundGap  right ${cfg.groundGapRight}  up ${cfg.groundGapUp}`);
-console.log(`  idleFrames ${JSON.stringify(cfg.idleFrames)}  (down, right, up)`);
+console.log(`  idleFrames ${JSON.stringify(cfg.idleFrames)}  idleGround ${JSON.stringify(cfg.idleGround)}  (down, right, up)`);
 // The roster in index.html keeps sheet configs inline so the game still runs
 // from a file:// double-click. Printing the exact line means adding a tier is a
 // paste rather than a transcription of four measured numbers.
@@ -288,7 +299,8 @@ console.log('  roster  ' +
   `{ src: '${cfg.src}', scale: ${cfg.scale}, ` +
   `anchorX: ${cfg.anchorX}, anchorY: ${cfg.anchorY}, ` +
   `groundGapRight: ${cfg.groundGapRight}, groundGapUp: ${cfg.groundGapUp}, ` +
-  `idleFrames: ${JSON.stringify(cfg.idleFrames)} },`);
+  `idleFrames: ${JSON.stringify(cfg.idleFrames)}, ` +
+  `idleGround: ${JSON.stringify(cfg.idleGround)} },`);
 if (cfg.frameW !== 192 || FRAMES !== 8) {
   console.log(`  ! SHEET_BASE in index.html assumes 192px cells and 8 walk frames; ` +
               `this is ${cfg.frameW}px / ${FRAMES}. Override them in the roster entry.`);
