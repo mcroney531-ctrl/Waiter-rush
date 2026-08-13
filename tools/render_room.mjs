@@ -131,17 +131,23 @@ const LAYOUT = [
   ...COLS_BACK.map(x  => ({ prop: 'table', x, y: ROW_BACK,  upright: 'none' })),
   ...COLS_FRONT.map(x => ({ prop: 'table', x, y: ROW_FRONT, upright: 'none' })),
 
-  // Against each side wall, clear of the walkable lanes. y swapped with
-  // floor-inlay below on Rone's call -- was 760, level with the back pads;
-  // now 900, level with the front pads, trading places with the medallion.
+  // Clear of the walkable lanes. y swapped with floor-inlay below on Rone's
+  // call -- was 760, level with the back pads; now 900, level with the front
+  // pads, trading places with the medallion.
   //
-  // x: 115 -> 60 (first "further into the corner" pass) -> 95 -> 120. 60 put
-  // the prop behind the side wall plane, which sits at art x ~61 (see the
-  // "just inside the frame" note below this array) -- the wall's basalt
-  // texture painted over half the unit. 95 cleared the wall outright but
-  // still read as uncomfortably tight against it at a glance (33 art px).
-  // 120 keeps 58 art px clear, close to double, while still sitting a
-  // little tighter into the corner than the original 115.
+  // x: 115 -> 60 (first "further into the corner" pass) -> 95 -> 120. 60
+  // produced a dark clipped-looking patch over half the unit, which this
+  // filed as the prop sitting behind a side wall at art x ~61. Wrong -- there
+  // is no side wall mesh (see the "No side walls" note below this array,
+  // which is the file's current and correct state; a stale sentence just
+  // above it still describes one that was since removed). Re-tested this
+  // prop alone at x 60 after the rug's own run-off-the-frame pass proved the
+  // room's edge renders clean with nothing there, and it rendered fine, no
+  // artifact. Whatever actually caused the original patch was not
+  // re-diagnosed -- 95, then 120, both measurably fixed it, and neither
+  // number changes -- but the wall explanation in this comment's earlier
+  // version was fabricated after the fact and did not point at anything
+  // that exists in the scene.
   { prop: 'dish-return', x: 120, y: 950, upright: 'none' },
   { prop: 'dish-return', x: 1416, y: 950, upright: 'none', mirror: true },
 
@@ -449,7 +455,7 @@ function paintRug(w, h){
 // short of the front row's own left edge (art 279 = COLS_FRONT[0] - half the
 // table's own 190px width) so the rug's inward end doesn't reach the table.
 // yCenter is the old run's own midpoint, unchanged.
-const RUG_ART = { xNear: [70, 1466], xFar: [250, 1286], yCenter: 735, depth: 120 };
+const RUG_ART = { xNear: [-60, 1596], xFar: [250, 1286], yCenter: 735, depth: 120 };
 const rugWorldLen   = Math.abs(RUG_ART.xFar[0] - RUG_ART.xNear[0]) / PPU;
 const rugWorldDepth = RUG_ART.depth / (SIN_E * PPU);
 // Canvas swaps to landscape with the geometry -- paintRug draws its border as
@@ -494,11 +500,6 @@ back.position.set(0, WALL_H / 2, BACK_Z);
 back.receiveShadow = true;
 scene.add(back);
 
-// Just inside the frame rather than just outside it. At HALF_W * 1.02 the side
-// walls fell off the edge of the camera entirely and the floor ran to the
-// margin, which reads as a floor rather than as a room. 0.92 leaves about 60
-// art px of wall showing on each side -- enough to close the room, and still
-// clear of the dish returns at art x 115 and 1425.
 // No side walls, and this is geometry rather than taste. A vertical plane at a
 // fixed x runs parallel to the view direction, and an orthographic camera with
 // no yaw projects it to a line -- it is invisible however it is positioned,
