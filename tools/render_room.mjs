@@ -442,21 +442,27 @@ function paintRug(w, h){
   return t;
 }
 
-// Same margin x as the planters (art 70 / 1466), running the corridor between
-// them (art y 520) and the dish returns (art y 950) -- clear of both with
-// ~40px to spare at either end. Flat, so unlike an upright prop it cannot
-// clip the side walls the way the dish-return move did; the wall clearance
-// that constrained that move does not apply here.
-const RUG_ART = { x: [70, 1466], y0: 560, y1: 910, artWidth: 120 };
-const rugWorldW = RUG_ART.artWidth / PPU;
-const rugWorldL = (RUG_ART.y1 - RUG_ART.y0) / (SIN_E * PPU);
-const rugTex = paintRug(140, 730);
-for (const x of RUG_ART.x){
+// Rotated 90 -- Rone's call -- from running along the depth (parallel to the
+// wall) to running along X, starting near the wall and pointing inward at
+// the room. depth (art px, was the long dimension, now the short one) stays
+// 120; xNear is the old margin x (70/1466, matching the planters); xFar is
+// short of the front row's own left edge (art 279 = COLS_FRONT[0] - half the
+// table's own 190px width) so the rug's inward end doesn't reach the table.
+// yCenter is the old run's own midpoint, unchanged.
+const RUG_ART = { xNear: [70, 1466], xFar: [250, 1286], yCenter: 735, depth: 120 };
+const rugWorldLen   = Math.abs(RUG_ART.xFar[0] - RUG_ART.xNear[0]) / PPU;
+const rugWorldDepth = RUG_ART.depth / (SIN_E * PPU);
+// Canvas swaps to landscape with the geometry -- paintRug draws its border as
+// a fraction of whichever w/h it is given, so a portrait canvas on a
+// landscape plane would carry the old proportions over sideways.
+const rugTex = paintRug(300, 190);
+for (let i = 0; i < RUG_ART.xNear.length; i++){
+  const xCenter = (RUG_ART.xNear[i] + RUG_ART.xFar[i]) / 2;
   const rug = new THREE.Mesh(
-    new THREE.PlaneGeometry(rugWorldW, rugWorldL),
+    new THREE.PlaneGeometry(rugWorldLen, rugWorldDepth),
     new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.92, metalness: 0 }));
   rug.rotation.x = -Math.PI / 2;
-  rug.position.set(artXToWorld(x), 0.004, artYToWorldZ((RUG_ART.y0 + RUG_ART.y1) / 2));
+  rug.position.set(artXToWorld(xCenter), 0.004, artYToWorldZ(RUG_ART.yCenter));
   rug.receiveShadow = true;
   scene.add(rug);
 }
