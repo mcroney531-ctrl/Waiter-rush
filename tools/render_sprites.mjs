@@ -195,12 +195,15 @@ window.run = () => new Promise((res, rej) => {
     // so frame 0 -- both feet down, the calmest of them.
     const idleFrames = ROWS.map((rn, r) =>
       rn === 'right' ? 0 : cellSym[r].indexOf(Math.max(...cellSym[r])));
-    // ...and how far that chosen frame still has to drop, since it was picked
-    // on looks and groundGap only lands the row's deepest frame.
-    const idleGround = ROWS.map((_, r) =>
-      +((Math.max(...cellB[r]) - cellB[r][idleFrames[r]]) / CELL).toFixed(4));
+    // How tall the character stands in its held down-facing frame. This, not
+    // the union bounding box, is what scale is set from -- see cfg below.
+    let sTop = 1e9, sBot = -1;
+    for (let cy = 0; cy < CELL; cy++)
+      for (let cx = 0; cx < CELL; cx++)
+        if (at(0, idleFrames[0], cx, cy)) { if (cy < sTop) sTop = cy; if (cy > sBot) sBot = cy; }
     res({ png: sheet.toDataURL('image/png'), clip: clip ? clip.name : null,
-          animated: !!clip, bbox: { L, T, R, B }, rowB, idleFrames, idleGround, cell: CELL });
+          animated: !!clip, bbox: { L, T, R, B }, rowB, cellB, idleFrames,
+          standSpan: sBot - sTop, cell: CELL });
   }, undefined, e => rej(String(e)));
 });
 document.title = 'ready';
@@ -247,38 +250,51 @@ await mkdir(join(ROOT, 'assets/sprites'), { recursive: true });
 const pngPath = join(ROOT, 'assets/sprites', NAME + '.png');
 await writeFile(pngPath, Buffer.from(out.png.split(',')[1], 'base64'));
 
-const { L, T, R, B } = out.bbox;
+const { L, T, R, B, } = out.bbox;
 const drawnW = R - L, drawnH = B - T;
-// aim for a character about 130px long on the 960px board
-const scale = +(130 / Math.max(drawnW, drawnH)).toFixed(3);
-// anchorY (= B/CELL) is the deepest pixel across ALL rows, which in practice
-// is always "down" -- a character facing the camera plants its feet lowest
-// in frame. "right" and "up" don't reach as deep in their own cell (a
-// back-facing pose is a different silhouette, not a rotated copy of the
-// facing-camera one), so drawing them through this same anchorY left every
-// character floating whenever they turned away from the camera -- confirmed
-// against all 20 shipped sheets, 12-19px of gap on "up" alone. groundGap{Right,Up}
-// is that row's own shortfall against "down", added back in drawSheetBody so
-// each direction's own feet land on BODY.ground the way "down"'s already did.
-// Math.max(0, ...) because a row occasionally measures a hair deeper than
-// "down" (rig noise, not a real difference) -- down is the one being drawn
-// correctly, so nothing should lift it to chase that.
-const rowB = out.rowB;
-const out_idleFrames = out.idleFrames;
-const out_idleGround = out.idleGround;
+const { cellB, idleFrames, standSpan } = out;
+// How tall a character stands on the 960px board, in rendered px. Every tier of
+// a character must share one value or promoting resizes the player mid-shift;
+// the five characters are allowed to differ from each other. Existing sheets
+// were normalised to their own former averages (103.9 - 116.7), so a new
+// character should be given the value of the one it is replacing, or ~111 for
+// a genuinely new face.
+const TARGET_STAND = +opt('stand', 111);
+// anchorY (= B/CELL) is the deepest pixel across ALL rows and frames, which in
+// practice is one frame of the "down" row -- a character facing the camera
+// plants its feet lowest. Every other row and frame falls short of it by its
+// own amount, so each needs its own correction or it renders above the floor.
+//
+// Two sets, because standing and walking want different targets. groundIdle
+// lands the single held idle frame exactly on its own soles. groundWalk gets
+// one constant per row -- a per-frame one would flatten the gait and hop where
+// the cycle's feet fail to return to a common plane -- and that constant is the
+// row's MEDIAN frame rather than its deepest, so the error is centred instead
+// of always lifting the character off the floor.
+const rowMedian = r => {
+  const s = [...cellB[r]].sort((a, b) => a - b);
+  return (s[(FRAMES >> 1) - 1] + s[FRAMES >> 1]) / 2;
+};
+const frac = v => +(v / CELL).toFixed(4);
 const cfg = {
   src: `assets/sprites/${NAME}.png`,
   frameW: CELL, frameH: CELL,
-  scale,
+  // NOT the old "fit the union bbox into 130px" rule. That is height-limited on
+  // every sheet in practice, so one extreme frame anywhere -- a tail at full
+  // swing, a lean at the end of a stride -- sized the whole character, and a
+  // promotion to the next tier resized the player by up to 6% mid-shift. Size
+  // off the STANDING pose instead, which is what the player actually reads as
+  // how big this character is. TARGET_STAND is in rendered px on the 960 board;
+  // keep a character's four tiers on one value or promotions will pop.
+  scale: +(TARGET_STAND / standSpan).toFixed(3),
   anchorX: +(((L + R) / 2) / CELL).toFixed(3),
   anchorY: +(B / CELL).toFixed(3),
-  groundGapRight: +Math.max(0, (B - rowB[1]) / CELL).toFixed(3),
-  groundGapUp: +Math.max(0, (B - rowB[2]) / CELL).toFixed(3),
+  groundWalk: [0, 1, 2].map(r => frac(B - rowMedian(r))),
+  groundIdle: [0, 1, 2].map(r => frac(B - cellB[r][idleFrames[r]])),
   // Which frame each row holds while standing still. There is no idle clip --
   // standing is the walk cycle paused -- and frame 0 is simply where the clip
   // starts, not where a foot is down. See index.html's drawSheetBody.
-  idleFrames: out_idleFrames,
-  idleGround: out_idleGround,
+  idleFrames,
   idleFps: 5,
   dirs: { down: { row: 0 }, right: { row: 1 }, left: { mirror: 'right' }, up: { row: 2 } },
   walk: { first: 0, count: FRAMES },
@@ -290,17 +306,18 @@ console.log(`${NAME}: ${out.animated ? 'clip "' + out.clip + '"' : 'NO ANIMATION
 console.log(`  sheet   ${pngPath.replace(ROOT + '/', '')}  ${CELL * FRAMES}x${CELL * ROWS.length}`);
 console.log(`  drawn   ${drawnW}x${drawnH} inside a ${CELL}px cell`);
 console.log(`  anchor  x ${cfg.anchorX}  y ${cfg.anchorY}   scale ${cfg.scale}`);
-console.log(`  groundGap  right ${cfg.groundGapRight}  up ${cfg.groundGapUp}`);
-console.log(`  idleFrames ${JSON.stringify(cfg.idleFrames)}  idleGround ${JSON.stringify(cfg.idleGround)}  (down, right, up)`);
+console.log(`  stands  ${(standSpan * cfg.scale).toFixed(1)}px tall (target ${TARGET_STAND})`);
+console.log(`  ground  walk ${JSON.stringify(cfg.groundWalk)}  idle ${JSON.stringify(cfg.groundIdle)}`);
+console.log(`  idleFrames ${JSON.stringify(cfg.idleFrames)}  (down, right, up)`);
 // The roster in index.html keeps sheet configs inline so the game still runs
 // from a file:// double-click. Printing the exact line means adding a tier is a
 // paste rather than a transcription of four measured numbers.
 console.log('  roster  ' +
   `{ src: '${cfg.src}', scale: ${cfg.scale}, ` +
   `anchorX: ${cfg.anchorX}, anchorY: ${cfg.anchorY}, ` +
-  `groundGapRight: ${cfg.groundGapRight}, groundGapUp: ${cfg.groundGapUp}, ` +
-  `idleFrames: ${JSON.stringify(cfg.idleFrames)}, ` +
-  `idleGround: ${JSON.stringify(cfg.idleGround)} },`);
+  `groundWalk: ${JSON.stringify(cfg.groundWalk)}, ` +
+  `groundIdle: ${JSON.stringify(cfg.groundIdle)}, ` +
+  `idleFrames: ${JSON.stringify(cfg.idleFrames)} },`);
 if (cfg.frameW !== 192 || FRAMES !== 8) {
   console.log(`  ! SHEET_BASE in index.html assumes 192px cells and 8 walk frames; ` +
               `this is ${cfg.frameW}px / ${FRAMES}. Override them in the roster entry.`);

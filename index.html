@@ -1791,64 +1791,67 @@
   // Order is the order the carousel walks, and the first entry is where a
   // new player starts. Kept as the order they joined the cast rather than
   // alphabetical, so the flagship opens the picker.
-  // groundGapRight/groundGapUp: render_sprites.mjs measures anchorY as the
-  // deepest drawn pixel across the WHOLE sheet, which in practice is always
-  // the "down" row (a character facing the camera plants its feet lowest in
-  // frame). Rows for "right" and "up" are shallower -- a raptor's back-facing
-  // pose simply doesn't reach as far down its own 192px cell as its
-  // facing-camera pose does -- so drawing them through that same anchorY
-  // left every character floating whenever they turned away from the camera,
-  // worst on "up" (measured 12-19px of gap across all 20 sheets, this file's
-  // own down/right/up bottom-pixel scan). These two are that gap expressed as
-  // a fraction of the cell, applied in drawSheetBody so each direction's own
-  // feet land on BODY.ground the way "down"'s already did. 0 where a row
-  // happens to reach exactly as deep as "down" (measurement noise on a couple
-  // of sheets even reads a hair negative -- left at 0 rather than lifting
-  // "down" to chase it, since down is the one being played correctly).
+  // groundWalk / groundIdle / idleFrames, one entry per row (down, right, up):
+  // how far that row has to drop to stand on BODY.ground, as a fraction of the
+  // 192px cell, and which frame is held while standing still. anchorY alone is
+  // measured across the whole sheet and so only ever lands one frame of one
+  // row; everything else needs its own correction off that. drawSheetBody has
+  // the reasoning for why walking and standing get separate numbers.
+  //
+  // scale is NOT what render_sprites.mjs prints. Its rule -- fit the sheet's
+  // union bounding box into 130px -- is height-limited on all 20 sheets, so a
+  // single extreme frame anywhere in the sheet (a tail at full swing, a lean
+  // at the end of a stride) sets the size of the whole character. Each tier is
+  // its own sheet with its own extreme, so a promotion resized the player by
+  // up to 6.8px on a ~110px character, in both directions, at the exact moment
+  // the promotion splash puts their eye on him. These are rescaled so every
+  // tier of a character renders the same STANDING height, centred on that
+  // character's own former average so nobody's silhouette moved much. The
+  // five characters still differ from each other; that part is deliberate.
   const ROSTER = {
     tyrone: {
       name: 'Tyrone', species: 'T-Rex',
       tiers: [
-        { src: 'assets/sprites/tyrone-t1.png', scale: 0.743, anchorX: 0.529, anchorY: 0.911, groundGapRight: 0.026, groundGapUp: 0.068, idleFrames: [4, 0, 4], idleGround: [0.0312, 0.0156, 0.0781] },
-        { src: 'assets/sprites/tyrone-t2.png', scale: 0.739, anchorX: 0.539, anchorY: 0.922, groundGapRight: 0.021, groundGapUp: 0.062, idleFrames: [4, 0, 4], idleGround: [0.0312, 0.026, 0.0781] },
-        { src: 'assets/sprites/tyrone-t3.png', scale: 0.739, anchorX: 0.529, anchorY: 0.917, groundGapRight: 0,     groundGapUp: 0.062, idleFrames: [4, 0, 4], idleGround: [0.0208, 0.0521, 0.0833] },
-        { src: 'assets/sprites/tyrone-t4.png', scale: 0.756, anchorX: 0.549, anchorY: 0.896, groundGapRight: 0.021, groundGapUp: 0, idleFrames: [0, 0, 0], idleGround: [0.026, 0.026, 0.0104] }
+        { src: 'assets/sprites/tyrone-t1.png', scale: 0.744, anchorX: 0.529, anchorY: 0.911, groundWalk: [0.0308, 0.0438, 0.1376], groundIdle: [0.0308, 0.0412, 0.1454], idleFrames: [4, 0, 4] },
+        { src: 'assets/sprites/tyrone-t2.png', scale: 0.725, anchorX: 0.539, anchorY: 0.922, groundWalk: [0.0314, 0.0496, 0.1486], groundIdle: [0.0314, 0.047, 0.1408], idleFrames: [4, 0, 4] },
+        { src: 'assets/sprites/tyrone-t3.png', scale: 0.754, anchorX: 0.529, anchorY: 0.917, groundWalk: [0.0316, 0.0524, 0.1358], groundIdle: [0.0212, 0.0524, 0.1462], idleFrames: [4, 0, 4] },
+        { src: 'assets/sprites/tyrone-t4.png', scale: 0.754, anchorX: 0.549, anchorY: 0.896, groundWalk: [0.0314, 0.0523, 0.0236], groundIdle: [0.0314, 0.0523, 0.0106], idleFrames: [0, 0, 0] }
       ]
     },
     velo: {
       name: 'Velo', species: 'Raptor',
       tiers: [
-        { src: 'assets/sprites/velo-t1.png', scale: 0.747, anchorX: 0.552, anchorY: 0.906, groundGapRight: 0.031, groundGapUp: 0.062, idleFrames: [0, 0, 4], idleGround: [0.0417, 0.0312, 0.099] },
-        { src: 'assets/sprites/velo-t2.png', scale: 0.756, anchorX: 0.526, anchorY: 0.896, groundGapRight: 0,     groundGapUp: 0.021, idleFrames: [5, 0, 4], idleGround: [0.0365, 0.0417, 0.1042] },
-        { src: 'assets/sprites/velo-t3.png', scale: 0.739, anchorX: 0.573, anchorY: 0.917, groundGapRight: 0.036, groundGapUp: 0.068, idleFrames: [0, 0, 0], idleGround: [0.0469, 0.0469, 0.1302] },
-        { src: 'assets/sprites/velo-t4.png', scale: 0.76,  anchorX: 0.51,  anchorY: 0.891, groundGapRight: 0,     groundGapUp: 0.026, idleFrames: [4, 0, 0], idleGround: [0.026, 0.0573, 0.0156] }
+        { src: 'assets/sprites/velo-t1.png', scale: 0.764, anchorX: 0.552, anchorY: 0.906, groundWalk: [0.0336, 0.0622, 0.1352], groundIdle: [0.0414, 0.0622, 0.1612], idleFrames: [0, 0, 4] },
+        { src: 'assets/sprites/velo-t2.png', scale: 0.754, anchorX: 0.526, anchorY: 0.896, groundWalk: [0.034, 0.0418, 0.0965], groundIdle: [0.0418, 0.0418, 0.1304], idleFrames: [5, 0, 4] },
+        { src: 'assets/sprites/velo-t3.png', scale: 0.744, anchorX: 0.573, anchorY: 0.917, groundWalk: [0.0446, 0.0811, 0.154], groundIdle: [0.0472, 0.0837, 0.1983], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/velo-t4.png', scale: 0.74, anchorX: 0.51, anchorY: 0.891, groundWalk: [0.0394, 0.0473, 0.0473], groundIdle: [0.0316, 0.0577, 0.0473], idleFrames: [4, 0, 0] }
       ]
     },
     pip: {
       name: 'Pip', species: 'Pterosaur',
       tiers: [
-        { src: 'assets/sprites/pip-t1.png', scale: 0.726, anchorX: 0.531, anchorY: 0.932, groundGapRight: 0.083, groundGapUp: 0.042, idleFrames: [0, 0, 0], idleGround: [0.0469, 0.0156, 0.0104] },
-        { src: 'assets/sprites/pip-t2.png', scale: 0.774, anchorX: 0.552, anchorY: 0.875, groundGapRight: 0.062, groundGapUp: 0.068, idleFrames: [0, 0, 0], idleGround: [0.0573, 0.0, 0.0938] },
-        { src: 'assets/sprites/pip-t3.png', scale: 0.774, anchorX: 0.542, anchorY: 0.875, groundGapRight: 0.042, groundGapUp: 0.052, idleFrames: [0, 0, 0], idleGround: [0.0625, 0.0104, 0.1094] },
-        { src: 'assets/sprites/pip-t4.png', scale: 0.783, anchorX: 0.531, anchorY: 0.865, groundGapRight: 0.031, groundGapUp: 0.031, idleFrames: [5, 0, 0], idleGround: [0.0208, 0.0052, 0.0104] }
+        { src: 'assets/sprites/pip-t1.png', scale: 0.753, anchorX: 0.531, anchorY: 0.932, groundWalk: [0.0362, 0.1065, 0.07], groundIdle: [0.0466, 0.0987, 0.0518], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/pip-t2.png', scale: 0.783, anchorX: 0.552, anchorY: 0.875, groundWalk: [0.0234, 0.0729, 0.1146], groundIdle: [0.0573, 0.0625, 0.1615], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/pip-t3.png', scale: 0.773, anchorX: 0.542, anchorY: 0.875, groundWalk: [0.0234, 0.0521, 0.1146], groundIdle: [0.0625, 0.0521, 0.1615], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/pip-t4.png', scale: 0.748, anchorX: 0.531, anchorY: 0.865, groundWalk: [0.0212, 0.0473, 0.0551], groundIdle: [0.0212, 0.0369, 0.0421], idleFrames: [5, 0, 0] }
       ]
     },
     trixie: {
       name: 'Trixie', species: 'Triceratops',
       tiers: [
-        { src: 'assets/sprites/trixie-t1.png', scale: 0.756, anchorX: 0.518, anchorY: 0.896, groundGapRight: 0.031, groundGapUp: 0.068, idleFrames: [0, 0, 4], idleGround: [0.0365, 0.0208, 0.0729] },
-        { src: 'assets/sprites/trixie-t2.png', scale: 0.743, anchorX: 0.516, anchorY: 0.911, groundGapRight: 0.042, groundGapUp: 0.073, idleFrames: [0, 0, 0], idleGround: [0.0417, 0.0312, 0.099] },
-        { src: 'assets/sprites/trixie-t3.png', scale: 0.743, anchorX: 0.521, anchorY: 0.911, groundGapRight: 0.036, groundGapUp: 0.078, idleFrames: [0, 0, 0], idleGround: [0.0312, 0.026, 0.0938] },
-        { src: 'assets/sprites/trixie-t4.png', scale: 0.76,  anchorX: 0.529, anchorY: 0.891, groundGapRight: 0.036, groundGapUp: 0.078, idleFrames: [4, 0, 4], idleGround: [0.0312, 0.0156, 0.0729] }
+        { src: 'assets/sprites/trixie-t1.png', scale: 0.744, anchorX: 0.518, anchorY: 0.896, groundWalk: [0.0314, 0.0549, 0.1278], groundIdle: [0.0366, 0.0523, 0.1408], idleFrames: [0, 0, 4] },
+        { src: 'assets/sprites/trixie-t2.png', scale: 0.734, anchorX: 0.516, anchorY: 0.911, groundWalk: [0.0334, 0.0725, 0.148], groundIdle: [0.0412, 0.0725, 0.1714], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/trixie-t3.png', scale: 0.765, anchorX: 0.521, anchorY: 0.911, groundWalk: [0.0308, 0.0646, 0.1532], groundIdle: [0.0308, 0.062, 0.1714], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/trixie-t4.png', scale: 0.759, anchorX: 0.529, anchorY: 0.891, groundWalk: [0.0316, 0.0551, 0.1254], groundIdle: [0.0316, 0.0525, 0.1514], idleFrames: [4, 0, 4] }
       ]
     },
     bronte: {
       name: 'Bronte', species: 'Brontosaurus',
       tiers: [
-        { src: 'assets/sprites/bronte-t1.png', scale: 0.734, anchorX: 0.552, anchorY: 0.922, groundGapRight: 0.062, groundGapUp: 0.099, idleFrames: [0, 0, 0], idleGround: [0.0521, 0.0156, 0.0208] },
-        { src: 'assets/sprites/bronte-t2.png', scale: 0.714, anchorX: 0.549, anchorY: 0.948, groundGapRight: 0.083, groundGapUp: 0.068, idleFrames: [0, 0, 0], idleGround: [0.0469, 0.0104, 0.0104] },
-        { src: 'assets/sprites/bronte-t3.png', scale: 0.747, anchorX: 0.544, anchorY: 0.906, groundGapRight: 0.047, groundGapUp: 0.068, idleFrames: [0, 0, 0], idleGround: [0.0417, 0.0208, 0.0104] },
-        { src: 'assets/sprites/bronte-t4.png', scale: 0.756, anchorX: 0.539, anchorY: 0.896, groundGapRight: 0.057, groundGapUp: 0.083, idleFrames: [0, 0, 0], idleGround: [0.0312, 0.0104, 0.0365] }
+        { src: 'assets/sprites/bronte-t1.png', scale: 0.742, anchorX: 0.552, anchorY: 0.922, groundWalk: [0.0366, 0.0835, 0.1277], groundIdle: [0.0522, 0.0783, 0.1199], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/bronte-t2.png', scale: 0.747, anchorX: 0.549, anchorY: 0.948, groundWalk: [0.0365, 0.1016, 0.0912], groundIdle: [0.047, 0.0938, 0.0782], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/bronte-t3.png', scale: 0.731, anchorX: 0.544, anchorY: 0.906, groundWalk: [0.031, 0.0727, 0.0883], groundIdle: [0.0414, 0.0675, 0.0779], idleFrames: [0, 0, 0] },
+        { src: 'assets/sprites/bronte-t4.png', scale: 0.731, anchorX: 0.539, anchorY: 0.896, groundWalk: [0.021, 0.0757, 0.1095], groundIdle: [0.0314, 0.0679, 0.12], idleFrames: [0, 0, 0] }
       ]
     }
   };
@@ -2067,9 +2070,9 @@
     // mirror-symmetric frame, which is the squared-up both-feet-planted one;
     // for the side row frame 0, which already stands on both feet (no side
     // view of a walk is truly a standing pose, and 0 is the calmest of them).
-    // idleGround then drops that specific frame the rest of the way onto the
-    // floor. That extra offset is safe precisely because idle is ONE held
-    // frame: there is no neighbouring frame for it to disagree with.
+    // groundIdle below then lands that specific frame on the floor. Grounding
+    // one exact frame is safe precisely because idle is ONE held frame: there
+    // is no neighbouring frame for it to disagree with.
     //
     // Only the held frame moves. The walk itself still runs every frame in
     // order: pinning each walk frame to its own depth would flatten the gait
@@ -2088,20 +2091,24 @@
     const scale = S.scale || 1;
     const dw = S.frameW * scale, dh = S.frameH * scale;
     const dx = -dw * (S.anchorX == null ? 0.5 : S.anchorX);
-    // anchorY is measured against the "down" row only (see ROSTER's comment) --
-    // every other row needs its own share of the frame added back in, or its
-    // feet land above BODY.ground by exactly the amount that row is shallower
-    // than "down" is.
-    const groundGap = player.facing === 'up' ? (S.groundGapUp || 0)
-                     : (player.facing === 'left' || player.facing === 'right') ? (S.groundGapRight || 0)
-                     : 0;
-    // groundGap lands the row's deepest frame. The held idle frame is chosen
-    // for how it looks rather than how deep it sits, so it needs the rest of
-    // the drop -- only while standing, and only for the frame it was measured
-    // against.
-    const idleDrop = (!player.moving && S.idleGround && S.idleGround[row]) || 0;
-    const dy = BODY.ground - dh * (S.anchorY == null ? 0.9 : S.anchorY)
-               + dh * groundGap + dh * idleDrop;
+    // anchorY is measured against the whole sheet, which in practice means the
+    // "down" row's deepest frame (see ROSTER). Every row and both states need
+    // their own correction off that, or the feet sit above BODY.ground by
+    // however much the drawn frame falls short of it.
+    //
+    // Two numbers rather than one because standing and walking want different
+    // targets. Standing holds ONE frame, so it can be landed exactly on that
+    // frame's own soles. Walking cycles through eight frames whose feet do not
+    // all reach a common plane, so it gets a single per-row constant -- a
+    // per-frame one would flatten the gait and hop at the foot swap. That
+    // constant is the row's MEDIAN frame, not its deepest: anchoring on the
+    // deepest made every other frame float, all error in one direction and
+    // upward, which is the direction that reads as broken. Centred, the
+    // shallow frames still lift but the deep ones settle a little into the
+    // boards instead, which reads as contact.
+    const drop = (player.moving ? (S.groundWalk && S.groundWalk[row])
+                                : (S.groundIdle && S.groundIdle[row])) || 0;
+    const dy = BODY.ground - dh * (S.anchorY == null ? 0.9 : S.anchorY) + dh * drop;
 
     ctx.save();
     if (flip){ ctx.scale(-1, 1); ctx.translate(-dw - dx * 2, 0); }
