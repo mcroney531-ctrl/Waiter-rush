@@ -400,9 +400,15 @@ scene.add(floor);
 // square canvas: paint() is built for a repeating pattern with no fixed edges
 // (floorboards, wall blocks), and a rug has both -- a border and two ends --
 // that a tiled square would either cut off arbitrarily or repeat into a
-// second rug. One direct draw, sized to the rug's own proportions, gets a
-// clean border and lets the track spacing be chosen rather than whatever the
-// tile size happens to produce.
+// second rug.
+//
+// Plain for now: the field and border only, no decoration drawn in the middle.
+// Rone is bringing in a custom motif from DALL-E instead of the procedural
+// three-toed tracks this had -- the plan is a mock first, sized/spec'd against
+// this base, then a finished transparent-background version composited onto
+// this same canvas with drawImage() before the texture is built. Nothing
+// about the geometry, placement or border below needs to change for that; only
+// this function grows a g.drawImage() call once the art exists.
 function paintRug(w, h){
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -427,38 +433,6 @@ function paintRug(w, h){
   g.strokeRect(M, M, w - 2 * M, h - 2 * M);
   g.strokeStyle = 'rgba(224,167,46,0.45)'; g.lineWidth = Math.max(1, w * 0.012);
   g.strokeRect(M * 1.7, M * 1.7, w - 3.4 * M, h - 3.4 * M);
-
-  // A trail of three-toed tracks down the centre, dinosaur rather than
-  // generic-rug ornament per Rone's ask. Alternating left/right like an actual
-  // gait, each print a heel pad plus three splayed toes, angled slightly
-  // outward the way a real theropod print does rather than pointing straight
-  // ahead of the last one.
-  const stepH = h / 6.4, printW = w * 0.3;
-  const track = (cx, cy, side, scale) => {
-    g.save();
-    g.translate(cx, cy);
-    g.rotate(side * 0.22);
-    g.scale(scale, scale);
-    g.fillStyle = '#EDE0C8';
-    g.strokeStyle = 'rgba(60,20,14,0.5)';
-    g.lineWidth = 1.5;
-    g.beginPath(); g.ellipse(0, printW * 0.34, printW * 0.24, printW * 0.3, 0, 0, Math.PI * 2);
-    g.fill(); g.stroke();
-    for (const a of [-0.62, 0, 0.62]){
-      g.save();
-      g.rotate(a);
-      g.beginPath();
-      g.ellipse(0, -printW * 0.22, printW * 0.12, printW * 0.32, 0, 0, Math.PI * 2);
-      g.fill(); g.stroke();
-      g.restore();
-    }
-    g.restore();
-  };
-  let side = 1;
-  for (let y = stepH * 0.7; y < h - stepH * 0.4; y += stepH){
-    track(w / 2 + side * w * 0.1, y, side, 1);
-    side *= -1;
-  }
 
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
