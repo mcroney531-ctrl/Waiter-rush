@@ -135,14 +135,15 @@ const LAYOUT = [
   // floor-inlay below on Rone's call -- was 760, level with the back pads;
   // now 900, level with the front pads, trading places with the medallion.
   //
-  // x went 115 -> 60 on the first "further into the corner" pass and came
-  // back out to 95: the side wall itself sits at art x ~61 (the "just inside
-  // the frame" note below this array), so 60 put the prop behind the wall
-  // plane -- the dark clipped-looking patch Rone flagged was that wall's
-  // basalt texture painted over half the unit. 95 keeps ~34 art px clear of
-  // it, tighter than the original 115 but not touching.
-  { prop: 'dish-return', x: 95,  y: 950, upright: 'none' },
-  { prop: 'dish-return', x: 1441, y: 950, upright: 'none', mirror: true },
+  // x: 115 -> 60 (first "further into the corner" pass) -> 95 -> 120. 60 put
+  // the prop behind the side wall plane, which sits at art x ~61 (see the
+  // "just inside the frame" note below this array) -- the wall's basalt
+  // texture painted over half the unit. 95 cleared the wall outright but
+  // still read as uncomfortably tight against it at a glance (33 art px).
+  // 120 keeps 58 art px clear, close to double, while still sitting a
+  // little tighter into the corner than the original 115.
+  { prop: 'dish-return', x: 120, y: 950, upright: 'none' },
+  { prop: 'dish-return', x: 1416, y: 950, upright: 'none', mirror: true },
 
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },
