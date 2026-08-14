@@ -284,6 +284,13 @@ if (CALIBRATE) {
   if (!existsSync(c)) { console.error('no tyrone-t1.glb to calibrate against'); process.exit(1); }
   await cp(c, join(STAGE, 'models/character.glb'));
 }
+// Rug fossil overlays: DALL-E art, transparent PNGs, cropped down from a wider
+// sheet (see art-source/room/rug-fossil-*.png for the crop). Staged like the
+// GLBs and loaded by relative URL rather than embedded as base64 in this file
+// -- keeps the diff readable and the asset a normal binary the repo already
+// knows how to handle, rather than a multi-hundred-KB string in source.
+await cp(resolve(ROOT, 'art-source/room/rug-fossil-claw.png'), join(STAGE, 'rug-fossil-claw.png'));
+await cp(resolve(ROOT, 'art-source/room/rug-fossil-ammonite.png'), join(STAGE, 'rug-fossil-ammonite.png'));
 
 const PAGE = `<canvas id="c" width="${ART_W}" height="${ART_H}"></canvas>
 <style>@font-face{font-family:'Galindo';src:url('galindo.woff2') format('woff2');}</style>
@@ -408,14 +415,23 @@ scene.add(floor);
 // that a tiled square would either cut off arbitrarily or repeat into a
 // second rug.
 //
-// Plain for now: the field and border only, no decoration drawn in the middle.
-// Rone is bringing in a custom motif from DALL-E instead of the procedural
-// three-toed tracks this had -- the plan is a mock first, sized/spec'd against
-// this base, then a finished transparent-background version composited onto
-// this same canvas with drawImage() before the texture is built. Nothing
-// about the geometry, placement or border below needs to change for that; only
-// this function grows a g.drawImage() call once the art exists.
-function paintRug(w, h){
+// Fossil overlay: DALL-E art (art-source/room/rug-fossil-*.png, a claw print
+// and an ammonite, cropped from a wider generated sheet), composited onto the
+// field with drawImage() before the texture is built. Went through two
+// preview rounds first -- one motif each at 34% of the rug's own height read
+// fine alone, but Rone asked for smaller and scattered, and that first
+// scattered pass clipped two marks into the border because the hand-picked
+// positions weren't checked against the inner strokeRect's own bounds. This
+// version keeps every mark's centre, at its own drawn half-size plus a
+// margin, inside that inner line -- checked by arithmetic, not by eye.
+const loadImg = src => new Promise((res, rej) => {
+  const img = new Image();
+  img.onload = () => res(img);
+  img.onerror = rej;
+  img.src = src;
+});
+
+async function paintRug(w, h){
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const g = c.getContext('2d');
@@ -439,8 +455,36 @@ function paintRug(w, h){
   const M = w * 0.1;
   g.strokeStyle = '#E0A72E'; g.lineWidth = Math.max(2, w * 0.025);
   g.strokeRect(M, M, w - 2 * M, h - 2 * M);
+  const innerX = M * 1.7, innerY = M * 1.7, innerW = w - 3.4 * M, innerH = h - 3.4 * M;
   g.strokeStyle = 'rgba(224,167,46,0.45)'; g.lineWidth = Math.max(1, w * 0.012);
-  g.strokeRect(M * 1.7, M * 1.7, w - 3.4 * M, h - 3.4 * M);
+  g.strokeRect(innerX, innerY, innerW, innerH);
+
+  const claw = await loadImg('rug-fossil-claw.png');
+  const ammo = await loadImg('rug-fossil-ammonite.png');
+  // xf/yf are fractions of the INNER box (innerX..innerX+innerW), not of the
+  // whole canvas -- so a mark placed at xf 0/1 sits exactly on the inner
+  // line before its own half-size is subtracted, which is what guarantees it
+  // clears the border rather than merely tending to.
+  const place = (img, xf, yf, boxH, rot) => {
+    const s = boxH / img.height, dw = img.width * s, dh = img.height * s;
+    const cx = innerX + innerW * xf, cy = innerY + innerH * yf;
+    const margin = Math.max(dw, dh) * 0.5;   // covers rotation's corner swing
+    const clampedCx = Math.min(innerX + innerW - margin, Math.max(innerX + margin, cx));
+    const clampedCy = Math.min(innerY + innerH - margin, Math.max(innerY + margin, cy));
+    g.save();
+    g.translate(clampedCx, clampedCy);
+    g.rotate(rot);
+    g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    g.restore();
+  };
+  const scatter = [
+    [claw, 0.10, 0.30, 0.15, -0.15],
+    [ammo, 0.30, 0.68, 0.14,  0.20],
+    [claw, 0.50, 0.25, 0.15,  0.10],
+    [ammo, 0.70, 0.70, 0.16, -0.18],
+    [claw, 0.90, 0.32, 0.14,  0.05],
+  ];
+  for (const [img, xf, yf, boxHf, rot] of scatter) place(img, xf, yf, h * boxHf, rot);
 
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -461,7 +505,7 @@ const rugWorldDepth = RUG_ART.depth / (SIN_E * PPU);
 // Canvas swaps to landscape with the geometry -- paintRug draws its border as
 // a fraction of whichever w/h it is given, so a portrait canvas on a
 // landscape plane would carry the old proportions over sideways.
-const rugTex = paintRug(300, 190);
+const rugTex = await paintRug(300, 190);
 for (let i = 0; i < RUG_ART.xNear.length; i++){
   const xCenter = (RUG_ART.xNear[i] + RUG_ART.xFar[i]) / 2;
   const rug = new THREE.Mesh(
@@ -737,7 +781,7 @@ document.title = 'ready';
 </script>`;
 await writeFile(join(STAGE, 'index.html'), PAGE);
 
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.glb': 'model/gltf-binary' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.glb': 'model/gltf-binary', '.png': 'image/png' };
 const server = createServer(async (req, res) => {
   try {
     const p = join(STAGE, req.url === '/' ? 'index.html' : decodeURIComponent(req.url.slice(1)));
