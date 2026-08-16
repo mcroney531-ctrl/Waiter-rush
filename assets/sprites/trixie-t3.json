@@ -2,9 +2,24 @@
   "src": "assets/sprites/trixie-t3.png",
   "frameW": 192,
   "frameH": 192,
-  "scale": 0.743,
+  "scale": 0.764,
   "anchorX": 0.521,
   "anchorY": 0.911,
+  "groundWalk": [
+    0.0313,
+    0.0651,
+    0.1563
+  ],
+  "groundIdle": [
+    0.0313,
+    0.0625,
+    0.1719
+  ],
+  "idleFrames": [
+    0,
+    0,
+    0
+  ],
   "idleFps": 5,
   "dirs": {
     "down": {

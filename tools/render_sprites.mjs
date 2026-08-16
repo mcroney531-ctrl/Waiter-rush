@@ -94,7 +94,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 scene.add(new THREE.AmbientLight(0xffffff, 2.1));
-const key = new THREE.DirectionalLight(0xfff2dd, 2.4); key.position.set(-4, 7, 6); scene.add(key);
+const key = new THREE.DirectionalLight(0xfff2dd, 2.4); key.position.set(-4, 11, 6); scene.add(key);
 const fill = new THREE.DirectionalLight(0xbcd4ff, 0.7); fill.position.set(5, 3, -4); scene.add(fill);
 
 const sheet = document.getElementById('c');

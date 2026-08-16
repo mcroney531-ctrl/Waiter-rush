@@ -2,9 +2,24 @@
   "src": "assets/sprites/tyrone-t4.png",
   "frameW": 192,
   "frameH": 192,
-  "scale": 0.756,
+  "scale": 0.754,
   "anchorX": 0.549,
   "anchorY": 0.896,
+  "groundWalk": [
+    0.0313,
+    0.0521,
+    0.0781
+  ],
+  "groundIdle": [
+    0.0313,
+    0.0521,
+    0.0104
+  ],
+  "idleFrames": [
+    0,
+    0,
+    0
+  ],
   "idleFps": 5,
   "dirs": {
     "down": {

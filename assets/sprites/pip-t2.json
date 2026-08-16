@@ -2,9 +2,24 @@
   "src": "assets/sprites/pip-t2.png",
   "frameW": 192,
   "frameH": 192,
-  "scale": 0.774,
+  "scale": 0.783,
   "anchorX": 0.552,
   "anchorY": 0.875,
+  "groundWalk": [
+    0.0234,
+    0.0729,
+    0.151
+  ],
+  "groundIdle": [
+    0.0573,
+    0.0625,
+    0.1823
+  ],
+  "idleFrames": [
+    0,
+    0,
+    0
+  ],
   "idleFps": 5,
   "dirs": {
     "down": {

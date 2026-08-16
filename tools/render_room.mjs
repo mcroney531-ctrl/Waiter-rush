@@ -344,7 +344,7 @@ const scene = new THREE.Scene();
 // Copied verbatim from render_sprites.mjs. A room lit from a different sun than
 // the cast will always look wrong, so this must change in both or neither.
 scene.add(new THREE.AmbientLight(0xffffff, 2.1));
-const key  = new THREE.DirectionalLight(0xfff2dd, 2.4); key.position.set(-4, 7, 6);
+const key  = new THREE.DirectionalLight(0xfff2dd, 2.4); key.position.set(-4, 11, 6);
 const fill = new THREE.DirectionalLight(0xbcd4ff, 0.7); fill.position.set(5, 3, -4);
 scene.add(key); scene.add(fill);
 key.castShadow = true;

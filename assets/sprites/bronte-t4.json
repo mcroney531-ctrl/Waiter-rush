@@ -2,9 +2,24 @@
   "src": "assets/sprites/bronte-t4.png",
   "frameW": 192,
   "frameH": 192,
-  "scale": 0.756,
+  "scale": 0.731,
   "anchorX": 0.539,
   "anchorY": 0.896,
+  "groundWalk": [
+    0.0208,
+    0.0755,
+    0.1094
+  ],
+  "groundIdle": [
+    0.0313,
+    0.0677,
+    0.2031
+  ],
+  "idleFrames": [
+    0,
+    0,
+    0
+  ],
   "idleFps": 5,
   "dirs": {
     "down": {

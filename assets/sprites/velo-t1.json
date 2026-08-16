@@ -2,9 +2,24 @@
   "src": "assets/sprites/velo-t1.png",
   "frameW": 192,
   "frameH": 192,
-  "scale": 0.747,
+  "scale": 0.749,
   "anchorX": 0.552,
   "anchorY": 0.906,
+  "groundWalk": [
+    0.0339,
+    0.0625,
+    0.1849
+  ],
+  "groundIdle": [
+    0.0313,
+    0.0625,
+    0.1875
+  ],
+  "idleFrames": [
+    4,
+    0,
+    0
+  ],
   "idleFps": 5,
   "dirs": {
     "down": {
