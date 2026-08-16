@@ -217,8 +217,16 @@ const LAYOUT = [
 
   // The far margins, which is the one place the spec calls safe for floor
   // decoration -- outside the lanes, and nowhere near the pads.
+  //
+  // Same GLB on both sides, at the same (unrotated) yaw -- there is only one
+  // planter model, so left and right were rendering as an exact duplicate,
+  // not even a mirror of each other, just two copies. yaw turns the right
+  // one so its fronds don't silhouette identically; tint (a uniform RGB
+  // scalar -- see the material-clone note below) is a touch darker/deeper
+  // rather than a hue shift, reading as a different pot/plant age rather
+  // than a colour mismatch.
   { prop: 'planter', x: 70,   y: 520, upright: 'none' },
-  { prop: 'planter', x: 1466, y: 520, upright: 'none' },
+  { prop: 'planter', x: 1466, y: 520, upright: 'none', yaw: 140, tint: 0.9 },
   // floor-inlay (a round fossil medallion) lived here through several passes --
   // upside-down, flipped, moved, swapped with dish-return -- and Rone was never
   // quite sold on it even fixed. Removed rather than tuned again; a procedural
@@ -543,6 +551,22 @@ const back = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2.4, WALL_H), wallM
 back.position.set(0, WALL_H / 2, BACK_Z);
 back.receiveShadow = true;
 scene.add(back);
+
+// Baseboard trim where the back wall meets the floor: the same gold every
+// other accent in the room uses, closing the seam between two textures that
+// otherwise just touch. A separate thin plane rather than baked into wallTex
+// -- wallTex repeats 3x up WALL_H (see its own comment), so a line drawn into
+// the canvas would print three times up the wall, not once at the bottom.
+// Offset 0.01 toward the camera (larger Z, since BACK_Z is negative) so it
+// does not z-fight with the wall it is flush against; two coplanar surfaces
+// at 34 degrees would flicker between them at render time otherwise.
+const TRIM_H = WALL_H * 0.035;
+const trim = new THREE.Mesh(
+  new THREE.PlaneGeometry(HALF_W * 2.4, TRIM_H),
+  new THREE.MeshStandardMaterial({ color: 0xE0A72E, roughness: 0.6, metalness: 0.15 }));
+trim.position.set(0, TRIM_H / 2, BACK_Z + 0.01);
+trim.receiveShadow = true;
+scene.add(trim);
 
 // No side walls, and this is geometry rather than taste. A vertical plane at a
 // fixed x runs parallel to the view direction, and an orthographic camera with
