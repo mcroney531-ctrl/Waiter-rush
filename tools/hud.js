@@ -149,14 +149,14 @@ check('they sit in a row', r[0].r.top === r[2].r.top && r[0].r.left < r[2].r.lef
 await p.evaluate(() => { window.__dbg.lives = 1; });
 await p.waitForTimeout(80);
 r = await row();
-check('losing tables spends stones from the right',
-      !r[0].lost && r[1].lost && r[2].lost,
+check('losing tables spends stones from the left',
+      r[0].lost && r[1].lost && !r[2].lost,
       r.map(s => s.lost ? 'x' : 'o').join(''));
 check('a spent stone actually looks spent',
-      r[1].filter !== r[0].filter && +r[1].opacity < +r[0].opacity,
-      `${r[1].opacity} vs ${r[0].opacity}`);
-check('but it stays in the row', r[1].r.width === r[0].r.width && r[1].r.width > 0,
-      `${r[1].r.width}px`);
+      r[0].filter !== r[2].filter && +r[0].opacity < +r[2].opacity,
+      `${r[0].opacity} vs ${r[2].opacity}`);
+check('but it stays in the row', r[0].r.width === r[2].r.width && r[0].r.width > 0,
+      `${r[0].r.width}px`);
 
 // The row hangs under a right-aligned label, so its right edge is the one that
 // has to line up -- and the whole stat has to stay on the board.

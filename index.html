@@ -1229,9 +1229,15 @@
     checkTierUp();
     const livesEl = document.getElementById('lives');
     livesEl.innerHTML = '';
+    // Spends left to right -- the first stone you'd read is the first one
+    // lost, rather than the last. i counts up from 0 (leftmost, since #lives
+    // is a plain left-to-right flex row) but which stones survive is judged
+    // from the far end: stone i has (2-i) stones to its right, and it is
+    // still intact as long as that many-or-fewer lives remain, so the
+    // right-hand stones are what's left standing as lives run out.
     for (let i=0;i<3;i++){
       const d = document.createElement('div');
-      d.className = 'life' + (i < lives ? '' : ' lost');
+      d.className = 'life' + ((2 - i) < lives ? '' : ' lost');
       livesEl.appendChild(d);
     }
   }
