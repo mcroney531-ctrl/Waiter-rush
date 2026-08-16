@@ -60,6 +60,13 @@ const GRID = has('grid');
 // gets measured; whatever the projection actually does then shows up as a
 // number instead of as a room that looks subtly wrong.
 const MARKERS = has('markers');
+// Render only one named prop (every LAYOUT entry for it, e.g. both dish
+// returns), with the floor/walls/rug/trim left out and true alpha kept in the
+// output. Same camera and light as the full room, so the result lines up
+// pixel-for-pixel with where that prop sits on the real board -- it exists to
+// produce runtime masks (a rim-glow silhouette, say) without a second,
+// hand-aligned asset to keep in sync by eye.
+const ISOLATE = opt('isolate', null);
 
 // --------------------------------------------------------------------------
 // Scale
@@ -321,6 +328,7 @@ const LAYOUT = ${JSON.stringify(LAYOUT)};
 const PROP_ART_WIDTH = ${JSON.stringify(PROP_ART_WIDTH)};
 const CALIBRATE = ${CALIBRATE};
 const MARKERS = ${MARKERS};
+const ISOLATE = ${JSON.stringify(ISOLATE)};
 const MARKER_PTS = ${JSON.stringify([[256,300],[768,300],[1280,300],
                                      [256,512],[768,512],[1280,512],
                                      [256,700],[768,700],[1280,700],
@@ -408,7 +416,7 @@ const floor = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, metalness: 0 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
-scene.add(floor);
+if (!ISOLATE) scene.add(floor);
 
 // RUG_TEX: a long "runway" rug in each side margin, replacing floor-inlay (see
 // the note where that used to sit, above). A rug is a flat pattern rather than
@@ -522,7 +530,7 @@ for (let i = 0; i < RUG_ART.xNear.length; i++){
   rug.rotation.x = -Math.PI / 2;
   rug.position.set(artXToWorld(xCenter), 0.004, artYToWorldZ(RUG_ART.yCenter));
   rug.receiveShadow = true;
-  scene.add(rug);
+  if (!ISOLATE) scene.add(rug);
 }
 
 // Carved basalt, per the house style: dark, coarse, and deliberately quieter in
@@ -550,7 +558,7 @@ const WALL_H = 1.35;
 const back = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2.4, WALL_H), wallMat);
 back.position.set(0, WALL_H / 2, BACK_Z);
 back.receiveShadow = true;
-scene.add(back);
+if (!ISOLATE) scene.add(back);
 
 // Baseboard trim where the back wall meets the floor: the same gold every
 // other accent in the room uses, closing the seam between two textures that
@@ -566,7 +574,7 @@ const trim = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xE0A72E, roughness: 0.6, metalness: 0.15 }));
 trim.position.set(0, TRIM_H / 2, BACK_Z + 0.01);
 trim.receiveShadow = true;
-scene.add(trim);
+if (!ISOLATE) scene.add(trim);
 
 // No side walls, and this is geometry rather than taste. A vertical plane at a
 // fixed x runs parallel to the view direction, and an orthographic camera with
@@ -630,7 +638,7 @@ const tableTops = [];
 const cache = {};
 for (const name of ${JSON.stringify(PROPS)}) cache[name] = (await load('models/' + name + '.glb')).scene;
 
-for (const item of (MARKERS ? [] : LAYOUT)) {
+for (const item of (MARKERS ? [] : LAYOUT.filter(it => !ISOLATE || it.prop === ISOLATE))) {
   const root = clone(cache[item.prop]);
   root.traverse(o => {
     if (!o.isMesh) return;
@@ -792,12 +800,14 @@ tableTops.forEach((v, i) => {
 // wall recede instead of filling it with ornament nobody would look at, and it
 // happens to sit under the HUD band (art y 0-100), which the spec already
 // reserves for score and lives.
-const vig = g.createLinearGradient(0, 0, 0, 320);
-vig.addColorStop(0,    'rgba(22,16,11,0.55)');
-vig.addColorStop(0.55, 'rgba(22,16,11,0.22)');
-vig.addColorStop(1,    'rgba(22,16,11,0)');
-g.fillStyle = vig;
-g.fillRect(0, 0, ART_W, 320);
+if (!ISOLATE) {
+  const vig = g.createLinearGradient(0, 0, 0, 320);
+  vig.addColorStop(0,    'rgba(22,16,11,0.55)');
+  vig.addColorStop(0.55, 'rgba(22,16,11,0.22)');
+  vig.addColorStop(1,    'rgba(22,16,11,0)');
+  g.fillStyle = vig;
+  g.fillRect(0, 0, ART_W, 320);
+}
 
 out.png = flat.toDataURL('image/png');
 window.__out = out;

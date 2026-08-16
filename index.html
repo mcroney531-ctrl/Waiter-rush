@@ -699,6 +699,14 @@
   const padImg = new Image();  padImg.src  = 'assets/ui/set-down.webp';
   const passImg = new Image(); passImg.src = 'assets/ui/pick-up.webp';
   const ready = im => im.complete && im.naturalWidth > 0;
+  // The dish return's silhouette, isolated from the room render with the same
+  // camera and light as the real board, so the hover glow can hug the
+  // basin's actual shape instead of a generic box. One full-canvas image;
+  // each bus station crops its own region out of it (see BUS_STATIONS.mask).
+  const busMaskImg = new Image();
+  let busMaskReady = false;
+  busMaskImg.onload = () => { busMaskReady = true; };
+  busMaskImg.src = 'assets/ui/dish-return-mask.png';
 
   const rushActiveImg = new Image();
   let rushActiveReady = false;
@@ -796,9 +804,15 @@
 
   // Both painted dish returns are live, one per section, so clearing a table
   // is a trip to your own end of the room rather than across the whole floor.
+  // mask: the crop rect (art px, into dish-return-mask.png) for each side's
+  // basin, plus (ax, ay) -- that crop's own top-left offset from this
+  // station's x/y anchor. Measured off an --isolate render of the 3D board;
+  // meaningless for the painted board, which has no such asset.
   const BUS_STATIONS = [
-    { side: 'left',  x: A(GEO.busXL), y: A(GEO.busY), w: A(200), h: A(240) },
-    { side: 'right', x: A(GEO.busXR), y: A(GEO.busY), w: A(200), h: A(240) }
+    { side: 'left',  x: A(GEO.busXL), y: A(GEO.busY), w: A(200), h: A(240),
+      mask: { sx: 0,    sy: 734, sw: 259, sh: 290, ax: 120, ay: 216 } },
+    { side: 'right', x: A(GEO.busXR), y: A(GEO.busY), w: A(200), h: A(240),
+      mask: { sx: 1276, sy: 734, sw: 260, sh: 290, ax: 140, ay: 216 } }
   ];
 
   let tables = [];
@@ -3365,6 +3379,53 @@
     }
   }
 
+  // The 3D board's rim-glow highlight: a soft halo that hugs each basin's
+  // own silhouette (via dish-return-mask.png) rather than a bounding box.
+  // Built lazily, once, the first time the mask image is ready to read.
+  let busGlowCache = null;
+  function buildBusGlowStencils(){
+    busGlowCache = {};
+    for (const b of BUS_STATIONS){
+      if (!b.mask) continue;
+      const m = b.mask;
+      const c = document.createElement('canvas');
+      c.width = m.sw; c.height = m.sh;
+      const cx = c.getContext('2d');
+      cx.drawImage(busMaskImg, m.sx, m.sy, m.sw, m.sh, 0, 0, m.sw, m.sh);
+      // Flatten the basin's own colours out to a plain white silhouette --
+      // the glow's colour comes from the drop-shadow filter below, and
+      // keeping this neutral means it never has to match the board's baked
+      // lighting pixel-for-pixel.
+      cx.globalCompositeOperation = 'source-in';
+      cx.fillStyle = '#fff';
+      cx.fillRect(0, 0, m.sw, m.sh);
+      busGlowCache[b.side] = c;
+    }
+  }
+  let busRimScratch = null;
+  // Draws just the halo, not the silhouette itself: render shape+shadow to a
+  // scratch canvas, then punch the shape back out with destination-out so
+  // only the blur that bled past the basin's own edge remains.
+  function drawBusRim(b, filterStr){
+    const stencil = busGlowCache && busGlowCache[b.side];
+    if (!stencil) return false;
+    const m = b.mask;
+    const dw = Math.round(A(m.sw)), dh = Math.round(A(m.sh));
+    if (!busRimScratch) busRimScratch = document.createElement('canvas');
+    if (busRimScratch.width !== dw) busRimScratch.width = dw;
+    if (busRimScratch.height !== dh) busRimScratch.height = dh;
+    const sx = busRimScratch.getContext('2d');
+    sx.clearRect(0, 0, dw, dh);
+    sx.filter = filterStr;
+    sx.drawImage(stencil, 0, 0, dw, dh);
+    sx.filter = 'none';
+    sx.globalCompositeOperation = 'destination-out';
+    sx.drawImage(stencil, 0, 0, dw, dh);
+    sx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(busRimScratch, b.x - A(m.ax), b.y - A(m.ay));
+    return true;
+  }
+
   // Both dish returns are painted into the board. The code highlights the one
   // you are standing at, and outlines both in amber while you are carrying
   // dishes so it is obvious where they go.
@@ -3389,9 +3450,16 @@
         ctx.restore();
       }
     }
+    if (USE_3D && busMaskReady && !busGlowCache) buildBusGlowStencils();
     for (const b of BUS_STATIONS){
       const standing = at === b;
       if (!standing && !holding) continue;
+      if (USE_3D && busGlowCache){
+        const filterStr = standing
+          ? `drop-shadow(0 0 ${A(4)}px rgba(61,135,131,1)) drop-shadow(0 0 ${A(18)}px rgba(61,135,131,0.7))`
+          : `drop-shadow(0 0 ${A(4)}px rgba(224,167,46,0.9)) drop-shadow(0 0 ${A(18)}px rgba(224,167,46,0.6))`;
+        if (drawBusRim(b, filterStr)) continue;
+      }
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.fillStyle = standing ? 'rgba(47,111,107,0.30)' : 'rgba(224,167,46,0.14)';
