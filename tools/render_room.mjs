@@ -916,6 +916,30 @@ if (LAVA_FLOOR && !ISOLATE) {
   }
 }
 
+// Darker contact shadow right at the base edge, on top of the light patch
+// above rather than instead of it: the light patch answers "does this object
+// separate from the floor", a tight dark ring answers "does it actually sit
+// on the floor or hover slightly above it". Drawn smaller and closer to the
+// footprint than the light patch, and last, so it stays a crisp line against
+// the object rather than getting washed out by the wider soft glow under it.
+// Runs for the counter too -- the room's largest prop, and the one thing
+// the original light-patch pass never touched.
+if (LAVA_FLOOR && !ISOLATE) {
+  for (const p of out.placed) {
+    if (p.prop !== 'table' && p.prop !== 'dish-return' && p.prop !== 'counter') continue;
+    const cx = p.artX, cy = p.artY + p.artH * 0.44;
+    const rx = p.artW * 0.4, ry = p.artW * 0.4 * 0.4;
+    const rg = g.createRadialGradient(cx, cy, rx * 0.35, cx, cy, rx);
+    rg.addColorStop(0,   'rgba(8,6,5,0.42)');
+    rg.addColorStop(0.7, 'rgba(8,6,5,0.18)');
+    rg.addColorStop(1,   'rgba(8,6,5,0)');
+    g.fillStyle = rg;
+    g.beginPath();
+    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
 // Floor fossil impressions: the same DALL-E claw/ammonite art already used on
 // the rug, stamped faint and desaturated-by-alpha onto open floor plates --
 // away from the pickup floor (art y 430-580, which board_audit.py requires
