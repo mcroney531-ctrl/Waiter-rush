@@ -3166,6 +3166,61 @@
     }
   }
 
+  // The animation layer from ROOM-ENVIRONMENT-BRIEF.md: the one thing a
+  // static baked board.jpg genuinely cannot do on its own. 3D board only --
+  // the painted board has no lava seams to shimmer and this is themed to
+  // the molten floor specifically, not floor-agnostic like the fossils/
+  // shadows baked into the render itself.
+  //
+  // Lava shimmer: three fixed hotspots at art-space crack intersections
+  // (eyeballed off the shipped board, just below the counter, where the
+  // seam lines actually cross), each a soft pulsing glow rather than an
+  // attempt to track every crack pixel -- there is no per-pixel mask at
+  // runtime, only the flat image, so "a few points breathe" is the honest
+  // version of "the lava is alive" this can deliver.
+  const LAVA_HOTSPOTS = [
+    { x: A(768), y: A(460), r: A(46), phase: 0 },
+    { x: A(530), y: A(460), r: A(38), phase: 1.7 },
+    { x: A(1000), y: A(460), r: A(38), phase: 3.4 },
+  ];
+  // Dust motes: computed purely from elapsed + a per-mote seed rather than
+  // kept as mutable particle state -- each mote's position is a closed-form
+  // function of time, so there is nothing to initialise, reset on a shift
+  // restart, or leak.
+  const DUST_N = 13;
+  function drawFloorAmbience(){
+    if (!USE_3D) return;
+    ctx.save();
+    for (const h of LAVA_HOTSPOTS){
+      const pulse = 0.5 + 0.5 * Math.sin(elapsed * 0.0011 + h.phase);
+      const rg = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, h.r);
+      rg.addColorStop(0,   `rgba(255,150,60,${(0.16 + 0.14 * pulse).toFixed(3)})`);
+      rg.addColorStop(0.6, `rgba(255,120,40,${(0.07 + 0.07 * pulse).toFixed(3)})`);
+      rg.addColorStop(1,   'rgba(255,120,40,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < DUST_N; i++){
+      // A cheap deterministic "random" per mote from its own index, stable
+      // across frames without a seeded RNG library.
+      const seed = i * 12.9898;
+      const rx = ((Math.sin(seed) * 43758.5453) % 1 + 1) % 1;
+      const ry = ((Math.sin(seed * 1.37) * 24634.1) % 1 + 1) % 1;
+      const speed = 6 + rx * 8;                    // px/s drifting upward
+      const wobbleAmp = A(6) + ry * A(10);
+      const x = rx * W + Math.sin(elapsed * 0.0007 + i) * wobbleAmp;
+      const y = H - ((elapsed / 1000 * speed + ry * H) % (H + 20));
+      const alpha = 0.10 + 0.10 * (0.5 + 0.5 * Math.sin(elapsed * 0.0009 + i * 2.1));
+      ctx.fillStyle = `rgba(232,214,180,${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.1 + rx * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // ---------- The tips sign ----------
   // Painted on the board rather than laid over it in the DOM. The floor runs to
   // the left wall and a sprite is much taller than its feet, so a player at the
@@ -4196,6 +4251,7 @@
   function render(){
     ctx.clearRect(0,0,W,H);
     drawFloor();
+    drawFloorAmbience();
     drawRushLight();
     drawTipsSign();   // scenery: everything below draws over it, the player included
     drawDropZones();
