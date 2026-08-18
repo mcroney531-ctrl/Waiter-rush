@@ -633,12 +633,24 @@
         // BUS_STATIONS hardcoding them, since this board's dish-return moved
         // and the painted one's has not -- one shared constant would have
         // forced them to match.
-        passY: 480, busY: 950, busXL: 120, busXR: 1416, padAtX: true, ticketBase: 315 }
+        // ticketAnchorL/R: the queue's outermost slot, i=0. 291/1238 (the
+        // painted board's values, below) put an i=0 plate's left/right edge
+        // past the modelled counter's own timber edge (art x 373-1163, see
+        // render_room.mjs) once tickets moved onto that surface (ticketBase
+        // 404->315, note above) -- invisible on the floor, obvious on a
+        // narrower slab. Pulled in just enough to clear it at the current
+        // (tag-only, see drawCounter) slot width; pitch stays 70 so a queue
+        // 4 deep doesn't collide with its mirror at the counter's centre --
+        // that headroom shrinks if the full-width plate art ever comes back
+        // here, and would need re-checking then.
+        passY: 480, busY: 950, busXL: 120, busXR: 1416, padAtX: true, ticketBase: 315,
+        ticketAnchorL: 350, ticketAnchorR: 1186 }
     // Measured off the painting, and out of spec on every band by 45-115px --
     // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
     : { floorTop: 300, r1: { y: 465, padY: 590, barY: 398 },
                        r2: { y: 700, padY: 855, barY: 612 },
-        passY: 357, busY: 760, busXL: 115, busXR: 1425, padAtX: false, ticketBase: 404 };
+        passY: 357, busY: 760, busXL: 115, busXR: 1425, padAtX: false, ticketBase: 404,
+        ticketAnchorL: 291, ticketAnchorR: 1238 };
 
   const counterRect = { x: 0, y: 0, w: W, h: A(430) };
   // The player stands in front of the counter, overlapping its lower face, so
@@ -3490,13 +3502,19 @@
     for (const p of PASSES){
       queueFor(p.side).forEach((tk, i) => {
         const slotX = p.side === 'left'
-          ? A(291) + TICKET.slot/2 + i * TICKET.pitch
-          : A(1238) - TICKET.slot/2 - i * TICKET.pitch;
-        const box = foodBox(tk.icon);
+          ? A(GEO.ticketAnchorL) + TICKET.slot/2 + i * TICKET.pitch
+          : A(GEO.ticketAnchorR) - TICKET.slot/2 - i * TICKET.pitch;
+        // The plated-food art (foodImg) is 2D holdover sprites -- there is no
+        // GLB counterpart for most of them yet, and mixing that flat art in
+        // on top of a modelled counter made it hard to read the counter
+        // itself. Hidden here until real food props exist to replace it;
+        // the table tag alone still says which order it is. The painted
+        // board is unaffected -- its plates are the room's own art style.
+        const box = USE_3D ? null : foodBox(tk.icon);
         ctx.save();
         if (box){
           ctx.drawImage(box.im, slotX - box.w/2, TICKET.base - box.h, box.w, box.h);
-        } else {
+        } else if (!USE_3D) {
           // art still loading — a plain card keeps the queue readable
           ctx.fillStyle = '#F4EEDB';
           roundRect(ctx, slotX - 30, TICKET.base - 46, 60, 42, 6);
@@ -3506,7 +3524,8 @@
           ctx.fillStyle = COLORS.mustard;
           ctx.font = '10px Galindo, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('NEXT UP', slotX, TICKET.base - (box ? box.h : 46) - 6);
+          ctx.fillText('NEXT UP', slotX,
+            USE_3D ? TICKET.base - 26 : TICKET.base - (box ? box.h : 46) - 6);
         }
         drawTableTag(slotX, TICKET.base - 8, tk.tableId, false);
         ctx.restore();
