@@ -886,6 +886,32 @@ tableTops.forEach((v, i) => {
   g.fillText(n, px, py + yAdj);
 });
 
+// Lava floor only: a soft lightened patch under each table and dish-return,
+// where the paved-slab floor's own dark value otherwise reads almost the
+// same as the stone furniture sitting on it (see the lightstone texture
+// swap above, which fixes the objects; this fixes the floor around them).
+// Tried as a "worn stone" story first and it didn't read that way even
+// pushed further -- Rone's read was that it still measurably helps
+// separation regardless, so it stays for that reason alone, not the
+// original one. Drawn from out.placed's own artX/artY/artW rather than a
+// second hand-kept position list, so it can't drift from where the props
+// actually landed.
+if (LAVA_FLOOR && !ISOLATE) {
+  for (const p of out.placed) {
+    if (p.prop !== 'table' && p.prop !== 'dish-return') continue;
+    const cx = p.artX, cy = p.artY + p.artH * 0.38;
+    const rx = p.artW * 0.62, ry = p.artW * 0.62 * 0.42;
+    const rg = g.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    rg.addColorStop(0,   'rgba(150,140,128,0.34)');
+    rg.addColorStop(0.6, 'rgba(150,140,128,0.16)');
+    rg.addColorStop(1,   'rgba(150,140,128,0)');
+    g.fillStyle = rg;
+    g.beginPath();
+    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
 // The top strip is flat wall with nothing on it, and flat dead value reads as
 // unfinished. The spec asks for warm ambient fill with nothing in true black,
 // so this is a gentle darkening rather than a black vignette -- it lets the
