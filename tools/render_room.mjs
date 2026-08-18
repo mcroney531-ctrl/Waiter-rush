@@ -314,6 +314,21 @@ await cp(resolve(ROOT, 'art-source/room/rug-fossil-ammonite.png'), join(STAGE, '
 if (LAVA_FLOOR) {
   await cp(resolve(ROOT, 'art-source/room/lava-floor.png'), join(STAGE, 'lava-floor.png'));
   await cp(resolve(ROOT, 'art-source/room/lava-floor-emissive.png'), join(STAGE, 'lava-floor-emissive.png'));
+  // table.glb and dish-return.glb's stone regions read as dark grey stone
+  // against the wood floor, and dark grey stone against dark basalt-and-lava
+  // is a different problem: the table's legs and the whole dish-return basin
+  // nearly vanish. These are the same base_color.jpg textures baked into
+  // those GLBs, lightened only where the source is already low-saturation
+  // (i.e. the stone) -- the wood grain and the dish-return's gold accents,
+  // which are what still say "table" and "dish return" at a glance, are
+  // left alone. Built by extracting each GLB's base_color image, boosting
+  // value toward a floor in proportion to (1 - saturation), and re-saving;
+  // see the room's HANDOFF notes for the exact numbers if this needs redoing
+  // against a different table/dish-return model later. Lava-floor-only, like
+  // the floor art above -- the painted board's table/dish-return rendering
+  // doesn't go through this file at all.
+  await cp(resolve(ROOT, 'art-source/room/table-lightstone.png'), join(STAGE, 'table-lightstone.png'));
+  await cp(resolve(ROOT, 'art-source/room/dish-return-lightstone.png'), join(STAGE, 'dish-return-lightstone.png'));
 }
 
 const PAGE = `<canvas id="c" width="${ART_W}" height="${ART_H}"></canvas>
@@ -465,6 +480,25 @@ const lavaFloorImg = LAVA_FLOOR ? await loadImg('lava-floor.png') : null;
 const lavaFloorEmissiveImg = LAVA_FLOOR ? await loadImg('lava-floor-emissive.png') : null;
 const lavaFloorTex = LAVA_FLOOR ? paintFromImage(lavaFloorImg, 8, 8) : null;
 const lavaFloorEmissive = LAVA_FLOOR ? paintFromImage(lavaFloorEmissiveImg, 8, 8) : null;
+
+// Lightened base_color replacements for table.glb/dish-return.glb, only under
+// --lavafloor (see the staging note above). A 1:1 UV-space swap, not a tiled
+// pattern -- flipY has to match what GLTFLoader already set on the original
+// texture (false; glTF's UV origin is top-left, the opposite of a canvas's),
+// or the replacement lands mirrored against the model's own UVs.
+function replacementMap(img){
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.flipY = false;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const lightstoneMap = LAVA_FLOOR ? {
+  table: replacementMap(await loadImg('table-lightstone.png')),
+  'dish-return': replacementMap(await loadImg('dish-return-lightstone.png')),
+} : {};
 
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
@@ -702,6 +736,10 @@ for (const item of (MARKERS ? [] : LAYOUT.filter(it => !ISOLATE || it.prop === I
     if (item.tint) {
       o.material = o.material.clone();
       o.material.color.multiplyScalar(item.tint);
+    }
+    if (lightstoneMap[item.prop]) {
+      o.material = o.material.clone();
+      o.material.map = lightstoneMap[item.prop];
     }
   });
   upright(root, item.upright);
