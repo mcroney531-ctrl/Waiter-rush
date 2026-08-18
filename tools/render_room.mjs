@@ -916,6 +916,44 @@ if (LAVA_FLOOR && !ISOLATE) {
   }
 }
 
+// Floor fossil impressions: the same DALL-E claw/ammonite art already used on
+// the rug, stamped faint and desaturated-by-alpha onto open floor plates --
+// away from the pickup floor (art y 430-580, which board_audit.py requires
+// clear) and away from every table/counter/dish-return footprint. Reuses the
+// existing art rather than asking DALL-E for new floor-specific fossils,
+// since the same "carved into the stone" motif already reads as this room's.
+if (!ISOLATE) {
+  const floorClaw = await loadImg('rug-fossil-claw.png');
+  const floorAmmo = await loadImg('rug-fossil-ammonite.png');
+  const stampFossil = (img, cx, cy, h, rot, alpha) => {
+    const s = h / img.height, dw = img.width * s, dh = h;
+    g.save();
+    g.globalAlpha = alpha;
+    g.translate(cx, cy);
+    g.rotate(rot);
+    g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    g.restore();
+  };
+  // Centre aisle, between the two table columns -- open at every queue depth.
+  stampFossil(floorAmmo, 768, 735, 70, 0.35, 0.4);
+  // Open floor between table 5 and the left dish return.
+  stampFossil(floorClaw, 500, 955, 60, -0.5, 0.38);
+}
+
+// A soft warm bloom on the counter top under the pendant lamp -- the room's
+// one real light fixture, otherwise lighting only what the shared directional
+// key light already reaches. Counter top, not the floor: the lamp hangs over
+// the counter (LAYOUT x 768, y 505) and that is what it would actually pool
+// light on.
+if (!ISOLATE) {
+  const lg = g.createRadialGradient(768, 230, 0, 768, 230, 190);
+  lg.addColorStop(0,   'rgba(255,205,130,0.42)');
+  lg.addColorStop(0.55,'rgba(255,175,95,0.20)');
+  lg.addColorStop(1,   'rgba(255,170,90,0)');
+  g.fillStyle = lg;
+  g.fillRect(598, 60, 340, 340);
+}
+
 // The top strip is flat wall with nothing on it, and flat dead value reads as
 // unfinished. The spec asks for warm ambient fill with nothing in true black,
 // so this is a gentle darkening rather than a black vignette -- it lets the
