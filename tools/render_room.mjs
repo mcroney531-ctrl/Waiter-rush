@@ -310,6 +310,11 @@ if (CALIBRATE) {
 // knows how to handle, rather than a multi-hundred-KB string in source.
 await cp(resolve(ROOT, 'art-source/room/rug-fossil-claw.png'), join(STAGE, 'rug-fossil-claw.png'));
 await cp(resolve(ROOT, 'art-source/room/rug-fossil-ammonite.png'), join(STAGE, 'rug-fossil-ammonite.png'));
+// Lava floor art (see --lavafloor below), staged only when asked for.
+if (LAVA_FLOOR) {
+  await cp(resolve(ROOT, 'art-source/room/lava-floor.png'), join(STAGE, 'lava-floor.png'));
+  await cp(resolve(ROOT, 'art-source/room/lava-floor-emissive.png'), join(STAGE, 'lava-floor-emissive.png'));
+}
 
 const PAGE = `<canvas id="c" width="${ART_W}" height="${ART_H}"></canvas>
 <style>@font-face{font-family:'Galindo';src:url('galindo.woff2') format('woff2');}</style>
@@ -389,6 +394,31 @@ function paint(side, repeatX, repeatY, draw){
   return t;
 }
 
+// Hoisted above its first use (the lava floor, below) rather than staying
+// down by paintRug where it originated -- both need it, and floor setup
+// runs first.
+const loadImg = src => new Promise((res, rej) => {
+  const img = new Image();
+  img.onload = () => res(img);
+  img.onerror = rej;
+  img.src = src;
+});
+
+/** Same contract as paint(), but the pixels come from an already-loaded
+ * image instead of a draw callback -- for real art (DALL-E, a render) going
+ * onto a tiled plane the way paint()'s procedural patterns do. */
+function paintFromImage(img, repeatX, repeatY){
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeatX, repeatY);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
 // "Floorboards running away from the camera, which gives depth and scale free"
 // -- the spec's words, and the reason the seams run along Z rather than across
 // it. On screen that puts them near-vertical, which is what reads as recession;
@@ -416,83 +446,25 @@ const floorTex = paint(512, 52, 52, (g, S) => {
   }
 });
 
-// Molten-rock alternative to the wood floor above: cracked basalt plates with
-// glowing lava veins running through the seams. A lower repeat count than the
-// planks (10 against 52) on purpose -- cracked ground reads as large irregular
-// plates, and at plank scale the network would look like fine gravel instead.
+// Molten-rock alternative to the wood floor above: Rone's own DALL-E art
+// (art-source/room/lava-floor.png, generated from the brief in this file's
+// first --lavafloor commit), not the procedural crack-walk that shipped
+// there first. That first pass proved the idea -- real self-illumination
+// via emissiveMap, no bloom pass needed -- but "boost its appearance" meant
+// more than a canvas script was going to buy cheaply: real rock grain in
+// the plates, a crack network with actual depth to its glow, not a stroked
+// line. The photo already tiles clean (checked in a 2x2 grid, no seam), so
+// it goes on the plane the same way the procedural version did.
 //
-// One path list feeds two canvases rather than two separate random walks, so
-// the glow drawn into the diffuse map and the true self-illumination in the
-// emissive map always agree on exactly where the cracks are.
-function genCracks(S){
-  const branches = [];
-  const N = 5 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < N; i++){
-    let x = S * 0.15 + Math.random() * S * 0.7;
-    let y = S * 0.15 + Math.random() * S * 0.7;
-    let a = Math.random() * Math.PI * 2;
-    const pts = [{ x, y }];
-    const steps = 10 + Math.floor(Math.random() * 8);
-    for (let s = 0; s < steps; s++){
-      a += (Math.random() - 0.5) * 1.1;
-      x += Math.cos(a) * (S * 0.045);
-      y += Math.sin(a) * (S * 0.045);
-      if (x < S * 0.05 || x > S * 0.95 || y < S * 0.05 || y > S * 0.95) break;
-      pts.push({ x, y });
-      // A short fork partway along, so the network reads as fractured rock
-      // rather than a set of disconnected scratches.
-      if (s > 3 && s < steps - 2 && Math.random() < 0.18){
-        let fx = x, fy = y, fa = a + (Math.random() < 0.5 ? 1 : -1) * (0.9 + Math.random() * 0.6);
-        const fpts = [{ x: fx, y: fy }];
-        const fsteps = 4 + Math.floor(Math.random() * 5);
-        for (let fs = 0; fs < fsteps; fs++){
-          fa += (Math.random() - 0.5) * 1.0;
-          fx += Math.cos(fa) * (S * 0.04);
-          fy += Math.sin(fa) * (S * 0.04);
-          if (fx < S * 0.05 || fx > S * 0.95 || fy < S * 0.05 || fy > S * 0.95) break;
-          fpts.push({ x: fx, y: fy });
-        }
-        if (fpts.length > 2) branches.push(fpts);
-      }
-    }
-    if (pts.length > 2) branches.push(pts);
-  }
-  return branches;
-}
-function strokeCracks(g, branches, { core, glow, glowWidth, coreWidth }){
-  g.lineJoin = 'round'; g.lineCap = 'round';
-  for (const pts of branches){
-    g.beginPath();
-    g.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
-    g.strokeStyle = glow; g.lineWidth = glowWidth; g.stroke();
-    g.strokeStyle = core; g.lineWidth = coreWidth; g.stroke();
-  }
-}
-const lavaCracks512 = genCracks(512);
-const lavaFloorTex = paint(512, 10, 10, (g, S) => {
-  g.fillStyle = '#221a15'; g.fillRect(0, 0, S, S);
-  // Coarse plate mottling, same idea as the wall's per-block value jitter --
-  // a handful of soft irregular patches rather than a uniform fill, so the
-  // rock has some visual weight even where no crack runs through it.
-  for (let i = 0; i < 40; i++){
-    const v = 0.75 + Math.random() * 0.5;
-    g.fillStyle = 'rgba(' + Math.round(38*v) + ',' + Math.round(29*v) + ',' + Math.round(23*v) + ',0.5)';
-    const r = S * (0.05 + Math.random() * 0.09);
-    g.beginPath(); g.arc(Math.random()*S, Math.random()*S, r, 0, Math.PI*2); g.fill();
-  }
-  g.filter = 'blur(6px)';
-  strokeCracks(g, lavaCracks512, { core: 'rgba(255,150,40,0.9)', glow: 'rgba(255,90,20,0.55)', glowWidth: 10, coreWidth: 3 });
-  g.filter = 'none';
-  strokeCracks(g, lavaCracks512, { core: '#ffdca0', glow: 'rgba(255,120,30,0.8)', glowWidth: 4, coreWidth: 1.4 });
-});
-const lavaFloorEmissive = paint(512, 10, 10, (g, S) => {
-  g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
-  g.filter = 'blur(7px)';
-  strokeCracks(g, lavaCracks512, { core: 'rgba(255,140,30,1)', glow: 'rgba(255,80,10,0.9)', glowWidth: 11, coreWidth: 3.5 });
-  g.filter = 'none';
-  strokeCracks(g, lavaCracks512, { core: '#fff0c8', glow: 'rgba(255,150,40,1)', glowWidth: 4, coreWidth: 1.4 });
-});
+// lava-floor-emissive.png is derived from the same source (not hand-painted):
+// thresholded on warmth (R-B) and brightness, so it lights up exactly where
+// the photo is already glowing and stays black everywhere else, the same
+// diffuse/emissive agreement the procedural version got from one path list
+// feeding two canvases.
+const lavaFloorImg = LAVA_FLOOR ? await loadImg('lava-floor.png') : null;
+const lavaFloorEmissiveImg = LAVA_FLOOR ? await loadImg('lava-floor-emissive.png') : null;
+const lavaFloorTex = LAVA_FLOOR ? paintFromImage(lavaFloorImg, 8, 8) : null;
+const lavaFloorEmissive = LAVA_FLOOR ? paintFromImage(lavaFloorEmissiveImg, 8, 8) : null;
 
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
@@ -527,12 +499,7 @@ if (!ISOLATE) scene.add(floor);
 // positions weren't checked against the inner strokeRect's own bounds. This
 // version keeps every mark's centre, at its own drawn half-size plus a
 // margin, inside that inner line -- checked by arithmetic, not by eye.
-const loadImg = src => new Promise((res, rej) => {
-  const img = new Image();
-  img.onload = () => res(img);
-  img.onerror = rej;
-  img.src = src;
-});
+// (loadImg is defined up by paint()/paintFromImage, which need it first.)
 
 async function paintRug(w, h){
   const c = document.createElement('canvas');
