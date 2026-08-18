@@ -940,6 +940,42 @@ if (!ISOLATE) {
   stampFossil(floorClaw, 500, 955, 60, -0.5, 0.38);
 }
 
+// Wall cracks: hand-placed on the flat overlay, not baked into wallTex.
+// wallTex tiles 6x3 across the back wall (paint(512, 6, 3, ...)), so anything
+// drawn into that one 512px tile repeats identically 18 times -- fine for the
+// brick coursing, which is supposed to look regular, but an organic crack
+// repeating in an exact grid reads as an obvious tiling artefact instead of
+// wear. Placed in the two gaps that are actually open wall: between each
+// pass-sign and the wall-panel next to it -- everywhere else on the wall is
+// a prop.
+if (!ISOLATE) {
+  // Random walk, many short segments and small heading changes -- a hand-
+  // picked handful of points (tried first) comes out as a sharp zigzag that
+  // reads as a lightning bolt or a scratch, not a fracture in stone.
+  const wander = (x, y, steps, seg, wobble, seed) => {
+    let a = Math.PI / 2, s = seed;
+    const rand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    const pts = [[x, y]];
+    for (let i = 0; i < steps; i++) {
+      a += (rand() - 0.5) * wobble;
+      x += Math.cos(a) * seg; y += Math.sin(a) * seg;
+      pts.push([x, y]);
+    }
+    return pts;
+  };
+  const drawCrack = (pts, w) => {
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+    g.strokeStyle = 'rgba(12,10,8,0.5)'; g.lineWidth = w;
+    g.stroke();
+  };
+  // Gap between the left pass-sign and the left wall-panel, art x ~450-510.
+  drawCrack(wander(460, 78, 14, 8, 1.1, 17), 2);
+  // Gap between the right wall-panel and the right pass-sign, art x ~1010-1080.
+  drawCrack(wander(1038, 65, 16, 8, 1.0, 53), 2);
+}
+
 // A soft warm bloom on the counter top under the pendant lamp -- the room's
 // one real light fixture, otherwise lighting only what the shared directional
 // key light already reaches. Counter top, not the floor: the lamp hangs over
