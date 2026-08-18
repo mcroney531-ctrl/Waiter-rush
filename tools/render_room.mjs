@@ -67,6 +67,10 @@ const MARKERS = has('markers');
 // produce runtime masks (a rim-glow silhouette, say) without a second,
 // hand-aligned asset to keep in sync by eye.
 const ISOLATE = opt('isolate', null);
+// Swaps the floor's wood-plank texture for cracked basalt with glowing lava
+// veins -- a preview flag, kept around after it ships as the default so the
+// two can still be A/B'd against each other by eye.
+const LAVA_FLOOR = has('lavafloor');
 
 // --------------------------------------------------------------------------
 // Scale
@@ -329,6 +333,7 @@ const PROP_ART_WIDTH = ${JSON.stringify(PROP_ART_WIDTH)};
 const CALIBRATE = ${CALIBRATE};
 const MARKERS = ${MARKERS};
 const ISOLATE = ${JSON.stringify(ISOLATE)};
+const LAVA_FLOOR = ${LAVA_FLOOR};
 const MARKER_PTS = ${JSON.stringify([[256,300],[768,300],[1280,300],
                                      [256,512],[768,512],[1280,512],
                                      [256,700],[768,700],[1280,700],
@@ -411,9 +416,91 @@ const floorTex = paint(512, 52, 52, (g, S) => {
   }
 });
 
+// Molten-rock alternative to the wood floor above: cracked basalt plates with
+// glowing lava veins running through the seams. A lower repeat count than the
+// planks (10 against 52) on purpose -- cracked ground reads as large irregular
+// plates, and at plank scale the network would look like fine gravel instead.
+//
+// One path list feeds two canvases rather than two separate random walks, so
+// the glow drawn into the diffuse map and the true self-illumination in the
+// emissive map always agree on exactly where the cracks are.
+function genCracks(S){
+  const branches = [];
+  const N = 5 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < N; i++){
+    let x = S * 0.15 + Math.random() * S * 0.7;
+    let y = S * 0.15 + Math.random() * S * 0.7;
+    let a = Math.random() * Math.PI * 2;
+    const pts = [{ x, y }];
+    const steps = 10 + Math.floor(Math.random() * 8);
+    for (let s = 0; s < steps; s++){
+      a += (Math.random() - 0.5) * 1.1;
+      x += Math.cos(a) * (S * 0.045);
+      y += Math.sin(a) * (S * 0.045);
+      if (x < S * 0.05 || x > S * 0.95 || y < S * 0.05 || y > S * 0.95) break;
+      pts.push({ x, y });
+      // A short fork partway along, so the network reads as fractured rock
+      // rather than a set of disconnected scratches.
+      if (s > 3 && s < steps - 2 && Math.random() < 0.18){
+        let fx = x, fy = y, fa = a + (Math.random() < 0.5 ? 1 : -1) * (0.9 + Math.random() * 0.6);
+        const fpts = [{ x: fx, y: fy }];
+        const fsteps = 4 + Math.floor(Math.random() * 5);
+        for (let fs = 0; fs < fsteps; fs++){
+          fa += (Math.random() - 0.5) * 1.0;
+          fx += Math.cos(fa) * (S * 0.04);
+          fy += Math.sin(fa) * (S * 0.04);
+          if (fx < S * 0.05 || fx > S * 0.95 || fy < S * 0.05 || fy > S * 0.95) break;
+          fpts.push({ x: fx, y: fy });
+        }
+        if (fpts.length > 2) branches.push(fpts);
+      }
+    }
+    if (pts.length > 2) branches.push(pts);
+  }
+  return branches;
+}
+function strokeCracks(g, branches, { core, glow, glowWidth, coreWidth }){
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  for (const pts of branches){
+    g.beginPath();
+    g.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+    g.strokeStyle = glow; g.lineWidth = glowWidth; g.stroke();
+    g.strokeStyle = core; g.lineWidth = coreWidth; g.stroke();
+  }
+}
+const lavaCracks512 = genCracks(512);
+const lavaFloorTex = paint(512, 10, 10, (g, S) => {
+  g.fillStyle = '#221a15'; g.fillRect(0, 0, S, S);
+  // Coarse plate mottling, same idea as the wall's per-block value jitter --
+  // a handful of soft irregular patches rather than a uniform fill, so the
+  // rock has some visual weight even where no crack runs through it.
+  for (let i = 0; i < 40; i++){
+    const v = 0.75 + Math.random() * 0.5;
+    g.fillStyle = 'rgba(' + Math.round(38*v) + ',' + Math.round(29*v) + ',' + Math.round(23*v) + ',0.5)';
+    const r = S * (0.05 + Math.random() * 0.09);
+    g.beginPath(); g.arc(Math.random()*S, Math.random()*S, r, 0, Math.PI*2); g.fill();
+  }
+  g.filter = 'blur(6px)';
+  strokeCracks(g, lavaCracks512, { core: 'rgba(255,150,40,0.9)', glow: 'rgba(255,90,20,0.55)', glowWidth: 10, coreWidth: 3 });
+  g.filter = 'none';
+  strokeCracks(g, lavaCracks512, { core: '#ffdca0', glow: 'rgba(255,120,30,0.8)', glowWidth: 4, coreWidth: 1.4 });
+});
+const lavaFloorEmissive = paint(512, 10, 10, (g, S) => {
+  g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+  g.filter = 'blur(7px)';
+  strokeCracks(g, lavaCracks512, { core: 'rgba(255,140,30,1)', glow: 'rgba(255,80,10,0.9)', glowWidth: 11, coreWidth: 3.5 });
+  g.filter = 'none';
+  strokeCracks(g, lavaCracks512, { core: '#fff0c8', glow: 'rgba(255,150,40,1)', glowWidth: 4, coreWidth: 1.4 });
+});
+
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
-  new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, metalness: 0 }));
+  LAVA_FLOOR
+    ? new THREE.MeshStandardMaterial({
+        map: lavaFloorTex, roughness: 0.9, metalness: 0,
+        emissiveMap: lavaFloorEmissive, emissive: 0xffffff, emissiveIntensity: 1.4 })
+    : new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, metalness: 0 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 if (!ISOLATE) scene.add(floor);
