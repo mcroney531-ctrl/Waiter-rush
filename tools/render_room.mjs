@@ -605,8 +605,9 @@ async function paintRug(w, h){
 // 120; xNear is the old margin x (70/1466, matching the planters); xFar is
 // short of the front row's own left edge (art 279 = COLS_FRONT[0] - half the
 // table's own 190px width) so the rug's inward end doesn't reach the table.
-// yCenter is the old run's own midpoint, unchanged.
-const RUG_ART = { xNear: [-60, 1596], xFar: [250, 1286], yCenter: 735, depth: 120 };
+// yCenter: 735 was the old run's own midpoint, unchanged through the 90
+// rotation above -- moved up 40 (toward the counter) on Rone's call.
+const RUG_ART = { xNear: [-60, 1596], xFar: [250, 1286], yCenter: 695, depth: 120 };
 const rugWorldLen   = Math.abs(RUG_ART.xFar[0] - RUG_ART.xNear[0]) / PPU;
 const rugWorldDepth = RUG_ART.depth / (SIN_E * PPU);
 // Canvas swaps to landscape with the geometry -- paintRug draws its border as
