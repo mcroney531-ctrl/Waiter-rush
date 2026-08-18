@@ -540,13 +540,16 @@ async function paintRug(w, h){
   c.width = w; c.height = h;
   const g = c.getContext('2d');
 
-  // Base weave: charcoal, on Rone's call (was a deep terracotta). Kept neutral
-  // rather than warm so it still doesn't read as the wall's basalt (#3b3229,
-  // brown-leaning) or the floor's wood despite being in the same dark range --
-  // #3a3a3e has none of basalt's red bias. Thin vertical threads step the
-  // value slightly, the same trick the floorboards use for grain, so the
-  // field is not one flat rectangle of colour.
-  g.fillStyle = '#3a3a3e'; g.fillRect(0, 0, w, h);
+  // Base weave: maroon, on Rone's call (was neutral charcoal, #3a3a3e, chosen
+  // specifically to avoid the wall's basalt and the floor's wood -- both warm
+  // browns at the time). The lava floor changed what it has to separate from:
+  // charcoal-on-charcoal-basalt is the same problem the tables and dish return
+  // just got fixed for, and a rug is a bigger, flatter field where it shows
+  // more, not less. Maroon keeps the weight dark without matching the floor's
+  // own hue, and reads as "restaurant rug" against either floor. Thin vertical
+  // threads step the value slightly, the same trick the floorboards use for
+  // grain, so the field is not one flat rectangle of colour.
+  g.fillStyle = '#5c2028'; g.fillRect(0, 0, w, h);
   for (let x = 0; x < w; x += 3){
     const v = 0.92 + 0.16 * Math.sin(x * 1.7);
     g.fillStyle = 'rgba(0,0,0,' + ((1 - v) * 0.4) + ')';
