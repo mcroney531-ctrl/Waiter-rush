@@ -579,7 +579,8 @@
     text: '#2B2620',
     angry: '#B33A3A',
     happy: '#4C8C5C',
-    mustard: '#E0A72E'
+    mustard: '#E0A72E',
+    cream: '#F4EEDB'
   };
 
   // ---------- Layout ----------
@@ -2597,7 +2598,11 @@
     if (lit)                   { label = 'FLOW  x' + FLOW_MULT; colour = COLORS.mustard; }
     else if (frac >= TIP_BIG)  { label = 'BIG TIP';  colour = COLORS.mustard; }
     else if (frac >= TIP_GOOD) { label = 'GOOD TIP'; colour = COLORS.happy; }
-    else if (tip > 0)          { label = 'TIP';      colour = COLORS.text; }
+    // COLORS.text (near-black) used to sit here -- fine against the painted
+    // board's light tables, unreadable with the floater's own dark stroke
+    // outline once tables sat on the darker 3D board. Every other tip tier
+    // already uses a colour the stroke can contrast against; this one hadn't.
+    else if (tip > 0)          { label = 'TIP';      colour = COLORS.cream; }
     else                       { label = 'NO TIP';   colour = COLORS.angry; }
     floaters.push({
       x, y, colour,
