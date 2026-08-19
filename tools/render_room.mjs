@@ -1000,6 +1000,82 @@ if (!ISOLATE) {
   drawCrack(wander(1038, 65, 16, 8, 1.0, 53), 2);
 }
 
+// A single specials chalkboard, hand-placed the same way as the cracks above:
+// found by scanning the baked render for wall columns that deviate from the
+// plain-stone baseline, not guessed from LAYOUT numbers alone -- the crack
+// gaps (~60-70px) turned out too narrow for anything legible, but the wider
+// gap between each shelf-unit and its neighbouring pass-sign (art x
+// ~190-325 left, mirrored ~1210-1345 right) had real room: about 135px wide
+// and clear from the wall's top edge down to the gold trim line at y~230.
+//
+// One board, not a mirrored pair. Every other prop in this room comes in
+// left/right pairs because the room itself is symmetric, but a restaurant
+// has one specials board -- two identical ones flanking the room would read
+// as a UI element repeating itself rather than as a real fixture.
+//
+// No literal text. This prop draws at roughly 90x70 art px on a 1536-wide
+// canvas the game then shows at up to 960 CSS px -- any word on it would be
+// a handful of real pixels, the same problem CHARACTER-RUNBOOK.md solves
+// for the roster by keeping species silhouette over costume detail. A
+// doodled plate plus a few chalk-stroke lines reads as "specials board"
+// from shape, colour and position alone; committing to actual words here
+// would only prove they cannot be read at this scale.
+if (!ISOLATE) {
+  const bx = 257, by = 165, bw = 92, bh = 72;
+  g.save();
+  g.translate(bx, by);
+
+  // drop shadow, the same warm-black the contact shadows use elsewhere
+  g.fillStyle = 'rgba(10,8,6,0.35)';
+  g.beginPath(); g.roundRect(-bw / 2 + 3, -bh / 2 + 4, bw, bh, 6); g.fill();
+
+  // frame: dark wood, matching the counter/table legs rather than the wall's
+  // cooler basalt, so it reads as furniture hung on the wall rather than
+  // more masonry
+  g.fillStyle = '#241d16';
+  g.beginPath(); g.roundRect(-bw / 2, -bh / 2, bw, bh, 6); g.fill();
+
+  // gold trim, in from the frame edge -- the same accent colour (E0A72E) as
+  // the baseboard trim and every prop's corner gems, so this reads as
+  // belonging to the room rather than as a pasted-in sticker
+  g.strokeStyle = '#E0A72E';
+  g.lineWidth = 1.5;
+  g.beginPath(); g.roundRect(-bw / 2 + 3, -bh / 2 + 3, bw - 6, bh - 6, 4); g.stroke();
+
+  // slate interior
+  g.fillStyle = '#232622';
+  g.beginPath(); g.roundRect(-bw / 2 + 6, -bh / 2 + 6, bw - 12, bh - 12, 3); g.fill();
+
+  // corner gems, matching the diamond accents on the pass-signs and wall-panels
+  g.fillStyle = '#E0A72E';
+  for (const [cx, cy] of [[-bw/2+3,-bh/2+3],[bw/2-3,-bh/2+3],[-bw/2+3,bh/2-3],[bw/2-3,bh/2-3]]) {
+    g.beginPath(); g.arc(cx, cy, 1.6, 0, Math.PI * 2); g.fill();
+  }
+
+  // the doodle: a plated dish with steam, drawn as chalk-stroke ellipses
+  // rather than anything literal -- legible as "food" in silhouette, the
+  // same shape-before-detail rule the character tiers use
+  g.strokeStyle = 'rgba(230,224,210,0.75)';
+  g.lineWidth = 1.6;
+  g.lineCap = 'round';
+  g.beginPath(); g.ellipse(0, -6, 16, 6, 0, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.ellipse(0, -6, 9, 3.4, 0, 0, Math.PI * 2); g.stroke();
+  g.beginPath();
+  g.moveTo(-3, -14); g.quadraticCurveTo(-6, -20, -3, -25);
+  g.moveTo(3, -14);  g.quadraticCurveTo(6, -20, 3, -25);
+  g.stroke();
+
+  // a few short scribble lines under the plate, standing in for handwritten
+  // specials without attempting words nobody could read at this scale
+  g.strokeStyle = 'rgba(230,224,210,0.55)';
+  g.lineWidth = 1.3;
+  for (const [x0, y0, len] of [[-20, 12, 20], [-16, 20, 24], [-20, 28, 14]]) {
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + len, y0); g.stroke();
+  }
+
+  g.restore();
+}
+
 // A soft warm bloom on the counter top under the pendant lamp -- the room's
 // one real light fixture, otherwise lighting only what the shared directional
 // key light already reaches. Counter top, not the floor: the lamp hangs over
