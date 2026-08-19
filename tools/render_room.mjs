@@ -382,6 +382,28 @@ const fill = new THREE.DirectionalLight(0xbcd4ff, 0.7); fill.position.set(5, 3, 
 scene.add(key); scene.add(fill);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
+// SHADOW_STRENGTH: how dark a cast shadow goes, 1 being full strength.
+//
+// At full strength the counter -- by far the room's largest prop, lit by a key
+// light low enough to throw a long shadow -- smeared a broad dark wedge from
+// its own foot down across the pickup floor and most of the way to the front
+// table row. Rone's read was too intense and too wide-ranging, and the width
+// is not separately tunable: it is the real shadow of a real object under this
+// light, so the only honest lever is how dark it lands.
+//
+// This is the one shadow control that is safe to touch here. The three lights
+// above are copied verbatim from render_sprites.mjs and must stay identical or
+// the cast is lit by a different sun than the room -- but that file sets up no
+// shadows at all (no castShadow, no receiveShadow, no shadowMap), so shadow
+// settings are room-only by construction. shadow.intensity also only scales
+// the shadowed regions; lit surfaces render exactly as before, so nothing
+// about how the room is lit changes, only how hard it is shadowed.
+//
+// The separately painted contact shadows further down (the tight dark ellipses
+// at each prop's foot) are untouched and do the grounding work -- which is why
+// this can come down this far without the props starting to float.
+const SHADOW_STRENGTH = 0.45;
+key.shadow.intensity = SHADOW_STRENGTH;
 // The shadow camera has to cover the whole floor or props at the edges drop
 // their shadows off the end of the map and float.
 const sc = key.shadow.camera;
