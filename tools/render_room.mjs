@@ -159,8 +159,8 @@ const LAYOUT = [
   // number changes -- but the wall explanation in this comment's earlier
   // version was fabricated after the fact and did not point at anything
   // that exists in the scene.
-  { prop: 'dish-return', x: 120, y: 950, upright: 'none' },
-  { prop: 'dish-return', x: 1416, y: 950, upright: 'none', mirror: true },
+  { prop: 'dish-return', x: 120, y: 950, upright: 'none', yaw: 90 },
+  { prop: 'dish-return', x: 1416, y: 950, upright: 'none', mirror: true, yaw: -90 },
 
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },
@@ -836,20 +836,25 @@ for (const item of (MARKERS ? [] : LAYOUT.filter(it => !ISOLATE || it.prop === I
     }
   });
   upright(root, item.upright);
-  spin(root, item.yaw);
 
   const holder = new THREE.Group();
   holder.add(root);
   scene.add(holder);
 
-  // Scale by the prop's intended WIDTH. Width is the only one of the three axes
-  // that maps to screen with no projection factor at all, so it is both the
-  // constraint that binds and the one with no trigonometry to get wrong.
+  // Scale by the prop's intended WIDTH, measured before any yaw spin. Width is
+  // the only one of the three axes that maps to screen with no projection
+  // factor at all, so it is both the constraint that binds and the one with no
+  // trigonometry to get wrong -- but only if "width" means the same physical
+  // axis every time. Measuring after spin() let a 90 rotation swap in the
+  // model's depth as if it were its width, inflating the whole prop (a
+  // dish-return tested at yaw:90 came out 200x198 instead of 200x140). yaw is
+  // orientation, not a resize, so it happens after scale is locked in.
   let box = new THREE.Box3().setFromObject(holder);
   let size = box.getSize(new THREE.Vector3());
   const s = (PROP_ART_WIDTH[item.prop] / PPU) / size.x;
   root.scale.setScalar(s);
   if (item.mirror) root.scale.x *= -1;
+  spin(root, item.yaw);
 
   box = new THREE.Box3().setFromObject(holder);
   size = box.getSize(new THREE.Vector3());
