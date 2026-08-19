@@ -236,8 +236,16 @@ const LAYOUT = [
   // scalar -- see the material-clone note below) is a touch darker/deeper
   // rather than a hue shift, reading as a different pot/plant age rather
   // than a colour mismatch.
+  //
+  // The right planter sits lower than the left on Rone's call: down against
+  // the top edge of the right rug rather than floating 113px above it. Both
+  // were at y 520, which read as unmoored once RUG_SHORTEN pulled the rugs
+  // back and left a gap between plant and rug. Measured rather than nudged --
+  // the rug's own top edge renders at art y 633 and the planter's pot bottom
+  // sits about 10px under its placement y, so 630 stands it on that edge.
+  // x stays 1466, which is centred over the rug's 1354-1535 span.
   { prop: 'planter', x: 70,   y: 520, upright: 'none' },
-  { prop: 'planter', x: 1466, y: 520, upright: 'none', yaw: 140, tint: 0.9 },
+  { prop: 'planter', x: 1466, y: 630, upright: 'none', yaw: 140, tint: 0.9 },
   // floor-inlay (a round fossil medallion) lived here through several passes --
   // upside-down, flipped, moved, swapped with dish-return -- and Rone was never
   // quite sold on it even fixed. Removed rather than tuned again; a procedural
