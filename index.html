@@ -735,6 +735,19 @@
   const padImg = new Image();  padImg.src  = 'assets/ui/set-down.webp';
   const passImg = new Image(); passImg.src = 'assets/ui/pick-up.webp';
   const ready = im => im.complete && im.naturalWidth > 0;
+  // The 3D board's SET DOWN pad, mocked against the real board and approved
+  // by Rone: two lava corner accents flanking the label instead of a full
+  // frame. A framed-box version (patching the old rope frame out with a
+  // rectangle) read as a floating panel that didn't sit on the floor, so
+  // there is no frame at all here -- just the corners and a soft glow.
+  // Idle sits cooled/obsidian; standing on the pad or carrying an order for
+  // it swaps to the molten pair. Painted-board only ever draws the old
+  // rope-frame padImg (see USE_3D gate in drawDropZones) -- Rone's call to
+  // stop spending further passes on that board.
+  const dropCornerHotL  = new Image(); dropCornerHotL.src  = 'assets/ui/pad-corner-hot-l.webp';
+  const dropCornerHotR  = new Image(); dropCornerHotR.src  = 'assets/ui/pad-corner-hot-r.webp';
+  const dropCornerCoolL = new Image(); dropCornerCoolL.src = 'assets/ui/pad-corner-cool-l.webp';
+  const dropCornerCoolR = new Image(); dropCornerCoolR.src = 'assets/ui/pad-corner-cool-r.webp';
   // The dish return's silhouette, isolated from the room render with the same
   // camera and light as the real board, so the hover glow can hug the
   // basin's actual shape instead of a generic box. One full-canvas image;
@@ -3405,6 +3418,59 @@
     ctx.restore();
   }
 
+  // The 3D board's SET DOWN pad: two lava corner accents flanking the label,
+  // no frame. A framed-box version (patching the old rope frame out with a
+  // rectangle to draw on) read as a floating panel that didn't sit on the
+  // floor -- Rone's call after mocking it against the real board -- so there
+  // is no frame here, just the corners, the label and a soft glow. Idle sits
+  // cooled/obsidian; standing on the pad swaps to the molten pair with the
+  // same pulsing shadowBlur drawPadArt's 'active' mode uses, plus a warm
+  // hotspot glow under the label. Carrying-but-not-standing (not something
+  // Rone mocked) gets the molten corners at flat reduced opacity, no pulse --
+  // a middle tier between idle and active, same escalation the old three-tier
+  // opacity scheme used.
+  //
+  // Sized off DROP.h/DROP.w rather than pixel constants copied from the
+  // mockup screenshot, since that mockup's browser viewport doesn't
+  // necessarily share the canvas's internal-resolution scale.
+  function drawSetDownCorners(standing, carrying, phase){
+    const hot = standing || carrying;
+    const cl = hot ? dropCornerHotL : dropCornerCoolL;
+    const cr = hot ? dropCornerHotR : dropCornerCoolR;
+    const ch = DROP.h * 0.9, off = DROP.h * 0.12;
+    const cwL = ch * (cl.naturalWidth / cl.naturalHeight);
+    const cwR = ch * (cr.naturalWidth / cr.naturalHeight);
+    const halfW = DROP.w / 2, halfH = DROP.h / 2;
+
+    if (standing){
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, DROP.w * 0.55);
+      g.addColorStop(0, 'rgba(255,150,40,0.20)');
+      g.addColorStop(1, 'rgba(255,150,40,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, DROP.w * 0.55, DROP.h * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    if (standing){
+      ctx.shadowColor = 'rgba(255,140,40,0.85)';
+      ctx.shadowBlur = A(14) * (0.72 + 0.28 * Math.sin(phase / 240));
+    } else if (hot){
+      ctx.globalAlpha = 0.8;
+    }
+    ctx.drawImage(cl, -halfW - off, halfH + off - ch, cwL, ch);
+    ctx.drawImage(cr, halfW + off - cwR, halfH + off - ch, cwR, ch);
+    ctx.restore();
+
+    ctx.fillStyle = hot ? COLORS.mustard : 'rgba(200,196,188,0.8)';
+    ctx.font = '12px Galindo, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = standing ? 1 : carrying ? 0.85 : 0.6;
+    ctx.fillText('SET DOWN', 0, 4);
+    ctx.globalAlpha = 1;
+  }
+
   // The pads themselves are painted into the board. All the code adds is the
   // highlight for the one you are standing on, plus the CLEAR prompt when a
   // table is waiting to be bussed — a dirty table is public knowledge, so that
@@ -3412,11 +3478,18 @@
   function drawDropZones(){
     const carrying = carried.length > 0;
     const phase = performance.now();
+    const cornersReady = ready(dropCornerHotL) && ready(dropCornerHotR) &&
+                          ready(dropCornerCoolL) && ready(dropCornerCoolR);
     for (const t of tables){
       const standing = inDropZone(t);
       const dirty = t.state === 'dirty';
       ctx.save();
       ctx.translate(t.padX, t.padY);
+      if (USE_3D && !dirty && cornersReady){
+        drawSetDownCorners(standing, carrying, phase);
+        ctx.restore();
+        continue;
+      }
       if (ready(padImg)){
         drawPadArt(padImg, DROP.w, DROP.h,
                    dirty ? 'dirty' : standing ? 'active' : carrying ? 'carrying' : 'idle',
