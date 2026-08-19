@@ -159,8 +159,8 @@ const LAYOUT = [
   // number changes -- but the wall explanation in this comment's earlier
   // version was fabricated after the fact and did not point at anything
   // that exists in the scene.
-  { prop: 'dish-return', x: 120, y: 950, upright: 'none', yaw: 90 },
-  { prop: 'dish-return', x: 1416, y: 950, upright: 'none', mirror: true, yaw: -90 },
+  { prop: 'dish-return', x: 80, y: 950, upright: 'none', yaw: 90 },
+  { prop: 'dish-return', x: 1456, y: 950, upright: 'none', mirror: true, yaw: -90 },
 
   // Hung above the counter at each end, over the two pickup positions.
   { prop: 'pass-sign', x: 370,  y: 300, upright: 'none', hang: 300 },

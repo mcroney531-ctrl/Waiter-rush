@@ -645,10 +645,18 @@
         // the prop sitting behind a side wall, and there is no side wall in
         // the scene, so that explanation didn't hold up under a re-check) ->
         // 95/1441 (fixed it, but read as tight at a glance) -> 120/1416, 58
-        // art px clear. Both boards carry busXL/busXR rather than
-        // BUS_STATIONS hardcoding them, since this board's dish-return moved
-        // and the painted one's has not -- one shared constant would have
-        // forced them to match.
+        // art px clear -> 80/1456 once the prop turned to face the room
+        // (yaw:90/-90, render_room.mjs) and got narrower on screen (200 art
+        // px wide face-on, 142 side-on): re-ran the same corner-tucking test
+        // against the new footprint rather than assuming the old numbers
+        // still applied, using the isolate render's alpha channel to find
+        // the real clip point pixel-exact instead of eyeballing a crop (a
+        // crop at x:60 looked clean by eye and was actually clipped 230
+        // rows solid -- the floor's dark tone hid it). x:70 clips, x:80
+        // doesn't, 9-10px clear on each side. Both boards carry busXL/busXR
+        // rather than BUS_STATIONS hardcoding them, since this board's
+        // dish-return moved and the painted one's has not -- one shared
+        // constant would have forced them to match.
         // ticketAnchorL/R: the queue's outermost slot, i=0. 291/1238 (the
         // painted board's values, below) put an i=0 plate's left/right edge
         // past the modelled counter's own timber edge (art x 373-1163, see
@@ -659,7 +667,7 @@
         // 4 deep doesn't collide with its mirror at the counter's centre --
         // that headroom shrinks if the full-width plate art ever comes back
         // here, and would need re-checking then.
-        passY: 480, busY: 950, busXL: 120, busXR: 1416, padAtX: true, ticketBase: 315,
+        passY: 480, busY: 950, busXL: 80, busXR: 1456, padAtX: true, ticketBase: 315,
         ticketAnchorL: 350, ticketAnchorR: 1186 }
     // Measured off the painting, and out of spec on every band by 45-115px --
     // see DINING-ROOM-3D-RUNBOOK.md section 1. Kept until the swap.
