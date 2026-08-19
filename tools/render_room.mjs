@@ -1035,15 +1035,23 @@ if (LAVA_FLOOR && !ISOLATE) {
 }
 
 
-// Floor fossil impressions: the same DALL-E claw/ammonite art already used on
-// the rug, stamped faint and desaturated-by-alpha onto open floor plates --
-// away from the pickup floor (art y 430-580, which board_audit.py requires
-// clear) and away from every table/counter/dish-return footprint. Reuses the
-// existing art rather than asking DALL-E for new floor-specific fossils,
-// since the same "carved into the stone" motif already reads as this room's.
+// Floor fossil impressions: the same DALL-E claw art already used on the rug,
+// stamped faint and desaturated-by-alpha onto open floor plates -- away from
+// the pickup floor (art y 430-580, which board_audit.py requires clear) and
+// away from every table/counter/dish-return footprint. Reuses the existing
+// art rather than asking DALL-E for new floor-specific fossils, since the
+// same "carved into the stone" motif already reads as this room's.
+//
+// The ammonite stamp that used to sit at (768, 735) -- "centre aisle,
+// between the two table columns, open at every queue depth" -- was true when
+// it was written, but the SET DOWN corner accents added afterward (see
+// drawSetDownCorners in index.html) reach further out from each table than
+// anything on the floor did at the time, and that spot turned out to be
+// close enough to table 2's zone to collide. Removed rather than nudged
+// around a second time -- Rone's call once the corner-vs-fossil fight showed
+// up on screen -- so table 2 no longer needs a CORNER_NUDGE entry either.
 if (!ISOLATE) {
   const floorClaw = await loadImg('rug-fossil-claw.png');
-  const floorAmmo = await loadImg('rug-fossil-ammonite.png');
   const stampFossil = (img, cx, cy, h, rot, alpha) => {
     const s = h / img.height, dw = img.width * s, dh = h;
     g.save();
@@ -1053,8 +1061,6 @@ if (!ISOLATE) {
     g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
     g.restore();
   };
-  // Centre aisle, between the two table columns -- open at every queue depth.
-  stampFossil(floorAmmo, 768, 735, 70, 0.35, 0.4);
   // Open floor between table 5 and the left dish return.
   stampFossil(floorClaw, 500, 955, 60, -0.5, 0.38);
 }

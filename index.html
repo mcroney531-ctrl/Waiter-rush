@@ -3438,14 +3438,16 @@
   // fossil stamps are their own hand-placed pass in render_room.mjs, so they
   // land differently table to table by coincidence, not because any table is
   // out of alignment. Found by comparing all 8 against the actual baked
-  // board, not guessed: table 2's right corner sits on the ammonite fossil
-  // (nudged right and down, clear of its shell). Table 6's left corner was
-  // first read as grazing the crack along the row's top edge and nudged
-  // down, but a closer crop showed the real collision is its vertical stem
-  // running straight down the wall-side crack -- a down-only nudge doesn't
-  // touch a vertical line, so this needs ldx (away from the wall) too.
+  // board, not guessed. Table 2 used to need one too (its right corner sat on
+  // an ammonite fossil), but the nudge needed to clear it read as too far off
+  // from its siblings -- Rone's call to remove the fossil itself instead
+  // (render_room.mjs) rather than keep chasing it around the corner.
+  // Table 6's left corner was first read as grazing the crack along the
+  // row's top edge and nudged down, but a closer crop showed the real
+  // collision is its vertical stem running straight down the wall-side crack
+  // -- a down-only nudge doesn't touch a vertical line, so this needs ldx
+  // (away from the wall) too.
   const CORNER_NUDGE = {
-    2: { rdx: 44, rdy: 24 },
     6: { ldx: 9, ldy: 6 },
   };
 
