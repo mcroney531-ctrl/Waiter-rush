@@ -795,8 +795,25 @@
   }
 
   // The table number is drawn as its own badge rather than baked into the art,
-  // so one set of plates serves every table.
+  // so one set of plates serves every table. Rone's pinned-parchment art
+  // (assets/ui/tag-t1..8.webp) replaces the flat vector pill below once each
+  // one loads; the vector version is the same fallback convention as the
+  // board and the sprite sheets use before their own art arrives.
+  const tagImg = {};
+  for (let n = 1; n <= 8; n++){
+    const im = new Image();
+    im.src = 'assets/ui/tag-t' + n + '.webp';
+    tagImg[n] = im;
+  }
+
   function drawTableTag(cx, cy, id, big){
+    const im = tagImg[id];
+    if (im && im.complete && im.naturalWidth){
+      const hgt = big ? 26 : 22;
+      const wid = hgt * (im.naturalWidth / im.naturalHeight);
+      ctx.drawImage(im, cx - wid/2, cy - hgt/2, wid, hgt);
+      return;
+    }
     const w = big ? 34 : 30, h = big ? 19 : 17;
     ctx.fillStyle = 'rgba(28,23,18,0.92)';
     roundRect(ctx, cx - w/2, cy - h/2, w, h, h/2);
