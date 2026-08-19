@@ -959,30 +959,49 @@ if (LAVA_FLOOR && !ISOLATE) {
 }
 
 // Lava-crack seam patch, right rug. The tiled lava-floor photo has a real
-// discontinuity in its crack pattern around art (1295-1310, 696-703) -- not a
-// clean gap, a sideways jog, the glowing line ending at x~1305 and resuming
-// at x~1295 a few px lower, which reads as a break because a real crack
-// wouldn't step sideways like that. It was always there; it was invisible
-// because the rug used to reach x 1286, covering this exact patch of floor.
-// Shortening the rug (RUG_SHORTEN above) exposed it rather than caused it --
-// confirmed by checking the pre-shorten board-3d.jpg, where this spot is rug
-// fabric, not floor. Colours and the endpoints below are measured off the
-// shipped render, not eyeballed: y<=696 the line's bright core sits at
-// x~1302-1309 (peak rgb 255,255,73); y>=703 it sits at x~1292-1298 (peak rgb
-// 255,190,60, slightly cooler). A short stroke between those two points,
-// styled the same as the rest of the glow (soft wide underglow, tight bright
-// core), smooths the step into a continuous-looking crack instead of a kink.
-// Only patches this one occurrence -- it is not known whether the same tile
-// boundary produces the identical break on the left rug's now-exposed floor,
-// since the two rugs' xFar values differ (LAYOUT is genuinely mirrored, but
-// the lava-floor photo tiling is not), and nothing in the left corner's
-// crop taken while checking this looked broken the same way.
+// flaw here: the glow line runs dead straight at x~1305.5 from y~600 all the
+// way down to y~693 (checked every 5px, holds within half a pixel), then
+// steps to x~1298 to enter the three-way junction at y~750, which is also
+// clean. It is one crack bending, not two unrelated cracks -- but the bend
+// itself renders across only about 9px of y for a 10.5px jog, roughly a
+// 45-degree elbow, which is too sharp for what the rest of this crack
+// network does and is exactly what read as "broken" rather than "bent".
+//
+// First attempt here bridged the two endpoints with a stroke and left the
+// existing sharp-elbow pixels in place underneath it; that patch still
+// looked kinked at normal viewing scale, because the underlying geometry
+// was still a 45-degree corner, just no longer an outright gap. Rone
+// circled it again. This version erases the flawed span outright (floor
+// base colour measured off this exact tile at rgb ~67,63,60, several
+// samples averaged, not guessed) and redraws the bend as a single shallow
+// line from the still-good straight run above to the still-good junction
+// below -- an 8-degree lean over 90px of y reads as a real crack, not an
+// elbow. It was always there; the rug used to reach x 1286, covering this
+// whole patch of floor, and shortening it (RUG_SHORTEN above) exposed the
+// flaw rather than caused it -- confirmed against the pre-shorten
+// board-3d.jpg, where this is rug fabric, not floor.
+//
+// Only patches this one occurrence. Checked the mirrored spot the left
+// rug's own shortening exposed and no crack line runs through that patch
+// of floor at all, so there is nothing to fix there.
 if (!ISOLATE) {
   g.save();
+  // erase: a flat fill here first, and it was visibly worse than the kink --
+  // the floor has real grain from the tiled photo, and a flat rectangle
+  // reads as an obvious patch against it, a bigger defect than the one being
+  // fixed. This clones real floor pixels instead: (1000, 663) is measured
+  // clean at this same y-band (max channel 81 across the whole 47x82 block,
+  // well below any glow, lowest variance of eight candidates tried), so the
+  // grain comes along with the erase and nothing looks pasted-on.
+  g.drawImage(flat, 1000, 663, 47, 82, 1278, 663, 47, 82);
+
+  // redraw: one shallow line, (1305.5, 663) matching the straight run above
+  // to (1298, 748) matching the junction's own measured centre, with the
+  // same two-pass glow style used everywhere else in this file
   g.lineCap = 'round';
-  g.beginPath(); g.moveTo(1305.5, 695); g.lineTo(1295, 704);
+  g.beginPath(); g.moveTo(1305.5, 663); g.lineTo(1298, 748);
   g.strokeStyle = 'rgba(255,150,40,0.55)'; g.lineWidth = 9; g.stroke();
-  g.beginPath(); g.moveTo(1305.5, 695); g.lineTo(1295, 704);
+  g.beginPath(); g.moveTo(1305.5, 663); g.lineTo(1298, 748);
   g.strokeStyle = 'rgba(255,235,120,0.9)'; g.lineWidth = 4; g.stroke();
   g.restore();
 }
