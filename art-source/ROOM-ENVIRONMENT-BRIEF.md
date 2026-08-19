@@ -57,10 +57,31 @@ counter clutter): before writing a vine prompt, re-read
 **it says "no vines" explicitly**, as a deliberate choice to keep the room
 reading as "upscale civilised" rather than "prehistoric jungle." A vine
 prompt would contradict the room's own house style, not just add detail to
-it. Flag this to Rone before generating anything vine-shaped. The
-chalkboard sign and counter clutter (books/bottles/mugs) don't have this
-problem -- they're safe to prompt for using the same style block, following
-the two-step brief -> per-object prompt pattern that block documents.
+it. Flag this to Rone before generating anything vine-shaped.
+
+Rone greenlit chalkboard + counter clutter (`aa1cae5`, 2026-08-19). The
+chalkboard is **done**, and it went a different route than "prompt it and
+run it through Meshy" -- Rone specifically asked for the lightweight path
+while a new dish-return back model happens externally, so it's painted on
+the flat overlay canvas instead: same technique as the wall cracks and
+floor fossils above it in this file, no new GLB. Placement was found by
+scanning the baked render for open wall columns rather than guessed --
+the crack gaps are too narrow at ~60-70px, but the gap between each
+shelf-unit and its neighbouring pass-sign has real room (~135px). One
+board, not a mirrored pair. No literal text -- it draws too small to read
+a word, so it's a doodled plate plus scribble lines instead, the same
+"silhouette before detail" rule the character tiers use. Full harness
+suite + `board_audit.py --3d` passed before it shipped. See `aa1cae5`'s
+commit message for the exact numbers.
+
+**Counter clutter (books/bottles/mugs) is still open**, and deliberately
+not attempted the same way. A chalkboard is close enough to flat that
+painting it as wall detail reads fine; a bottle or a mug has real volume,
+and this codebase has no established technique yet for drawing a small
+volumetric object as a 2D overlay that doesn't look pasted onto the 3D
+render rather than sitting in it. That's either a genuine Meshy pass (the
+original plan) or a deliberate 2D-icon treatment matching the game's own
+UI language -- worth settling with Rone before guessing at either.
 
 **Per Rone's steer partway through this session: stop verifying new room
 work against the plain wood floor.** The molten paved floor
