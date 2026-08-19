@@ -237,15 +237,24 @@ const LAYOUT = [
   // rather than a hue shift, reading as a different pot/plant age rather
   // than a colour mismatch.
   //
-  // The right planter sits lower than the left on Rone's call: down against
-  // the top edge of the right rug rather than floating 113px above it. Both
-  // were at y 520, which read as unmoored once RUG_SHORTEN pulled the rugs
-  // back and left a gap between plant and rug. Measured rather than nudged --
-  // the rug's own top edge renders at art y 633 and the planter's pot bottom
-  // sits about 10px under its placement y, so 630 stands it on that edge.
-  // x stays 1466, which is centred over the rug's 1354-1535 span.
+  // The right planter stands *on* the right rug, not beside it, and sits much
+  // lower than the left one. Both were at y 520, placed when the rugs were
+  // 35% longer and reached up near them; RUG_SHORTEN pulled the floor out
+  // from under this one and left it floating 113px clear of the rug. It went
+  // to 630 first (pot exactly on the rug's top edge) and then onto the rug
+  // proper on Rone's call.
+  //
+  // Measured, not nudged: the rug renders y 633-815, and the planter's pot
+  // bottom sits about 10px under its placement y, so 700 puts the pot roughly
+  // a third of the way onto the fabric -- clearly standing on the rug rather
+  // than balanced on its edge, without marching so far down that it reads as
+  // centred on it. x stays 1466, already centred over the rug's 1354-1535 span.
+  //
+  // The left/right height difference this creates is deliberate, per Rone --
+  // the room is mirror-symmetric in prop placement everywhere else, so do not
+  // "fix" the left planter to match without asking.
   { prop: 'planter', x: 70,   y: 520, upright: 'none' },
-  { prop: 'planter', x: 1466, y: 630, upright: 'none', yaw: 140, tint: 0.9 },
+  { prop: 'planter', x: 1466, y: 700, upright: 'none', yaw: 140, tint: 0.9 },
   // floor-inlay (a round fossil medallion) lived here through several passes --
   // upside-down, flipped, moved, swapped with dish-return -- and Rone was never
   // quite sold on it even fixed. Removed rather than tuned again; a procedural
