@@ -958,50 +958,58 @@ if (LAVA_FLOOR && !ISOLATE) {
   }
 }
 
-// Lava-crack seam patch, right rug. The tiled lava-floor photo has a real
-// flaw here: the glow line runs dead straight at x~1305.5 from y~600 all the
-// way down to y~693 (checked every 5px, holds within half a pixel), then
-// steps to x~1298 to enter the three-way junction at y~750, which is also
-// clean. It is one crack bending, not two unrelated cracks -- but the bend
-// itself renders across only about 9px of y for a 10.5px jog, roughly a
-// 45-degree elbow, which is too sharp for what the rest of this crack
-// network does and is exactly what read as "broken" rather than "bent".
+// Lava-crack seam patch, right rug, third attempt -- read the full history
+// before touching this again, it took three tries to get right.
 //
-// First attempt here bridged the two endpoints with a stroke and left the
-// existing sharp-elbow pixels in place underneath it; that patch still
-// looked kinked at normal viewing scale, because the underlying geometry
-// was still a 45-degree corner, just no longer an outright gap. Rone
-// circled it again. This version erases the flawed span outright (floor
-// base colour measured off this exact tile at rgb ~67,63,60, several
-// samples averaged, not guessed) and redraws the bend as a single shallow
-// line from the still-good straight run above to the still-good junction
-// below -- an 8-degree lean over 90px of y reads as a real crack, not an
-// elbow. It was always there; the rug used to reach x 1286, covering this
-// whole patch of floor, and shortening it (RUG_SHORTEN above) exposed the
-// flaw rather than caused it -- confirmed against the pre-shorten
-// board-3d.jpg, where this is rug fabric, not floor.
+// Attempt 1 bridged two endpoints with a stroke and left the existing sharp
+// corner underneath it -- still read as kinked, because the geometry was
+// still a ~45-degree elbow (10.5px of x over 9px of y), just no longer an
+// outright gap.
 //
-// Only patches this one occurrence. Checked the mirrored spot the left
-// rug's own shortening exposed and no crack line runs through that patch
-// of floor at all, so there is nothing to fix there.
+// Attempt 2 erased the elbow with a flat fill before redrawing a gentler
+// diagonal. The flat fill was worse than the elbow: the floor has real
+// photographic grain, and a flat rectangle sits on top of it as an obvious
+// patch. Fixed by cloning real floor pixels instead of filling -- but the
+// redrawn line still ran on a deliberate diagonal, (1305.5, 663) to
+// (1298, 748), an 8-degree lean chosen to connect what attempt 1 measured
+// as "the straight run above" to the junction below. Rone circled it a
+// third time: still visibly slanted next to two junctions with vertical
+// arms either side of it.
+//
+// The actual mistake, found by measuring the junction NODES rather than the
+// stem: the upper node's own brightest core (R>200, right at y~594-598,
+// where its three arms actually cross) sits at x~1299-1301 -- almost
+// exactly where the lower node sits (~1298). It is the stem a few px below
+// the node, at y~604-614, that drifts out to 1305.5 as it exits the node's
+// blob -- and that drift is what attempt 2 anchored its "good" endpoint to,
+// carrying the error forward instead of fixing it. The two junctions were
+// never actually misaligned; only the stem between them was.
+//
+// This version draws one truly vertical line at x=1299 -- matching both
+// node centres, not splitting a difference that did not need splitting --
+// from y=650 to y=745, deliberately not reaching all the way up to the
+// node's own blob (y~615): every clean floor sample tried between y=605 and
+// y=650 in this x range carries a soft shadow (min channel 35-45 against a
+// floor baseline of ~65, some prop's cast shadow, not this seam), and cloning
+// it in would import a shadow shape that does not belong at this position.
+// Leaving that 35px band as original pixels means a few px of the old
+// stem's drift survives immediately next to the node -- accepted
+// deliberately, on the reasoning attempt 2 already used correctly: a small
+// offset disappears into a junction's own irregular blob far more easily
+// than the same offset reads along an open straight run, which is exactly
+// where the eye caught it twice.
 if (!ISOLATE) {
   g.save();
-  // erase: a flat fill here first, and it was visibly worse than the kink --
-  // the floor has real grain from the tiled photo, and a flat rectangle
-  // reads as an obvious patch against it, a bigger defect than the one being
-  // fixed. This clones real floor pixels instead: (1000, 663) is measured
-  // clean at this same y-band (max channel 81 across the whole 47x82 block,
-  // well below any glow, lowest variance of eight candidates tried), so the
-  // grain comes along with the erase and nothing looks pasted-on.
-  g.drawImage(flat, 1000, 663, 47, 82, 1278, 663, 47, 82);
+  // clean source: (1000, 650), verified shadow-free at this exact band
+  // (min channel 60 vs ~40 one row up) after four other x candidates
+  // (450-1450, spanning the whole width) all carried either this same
+  // shadow or a real glow line from elsewhere in the pattern.
+  g.drawImage(flat, 1000, 650, 42, 95, 1278, 650, 42, 95);
 
-  // redraw: one shallow line, (1305.5, 663) matching the straight run above
-  // to (1298, 748) matching the junction's own measured centre, with the
-  // same two-pass glow style used everywhere else in this file
   g.lineCap = 'round';
-  g.beginPath(); g.moveTo(1305.5, 663); g.lineTo(1298, 748);
+  g.beginPath(); g.moveTo(1299, 650); g.lineTo(1299, 745);
   g.strokeStyle = 'rgba(255,150,40,0.55)'; g.lineWidth = 9; g.stroke();
-  g.beginPath(); g.moveTo(1305.5, 663); g.lineTo(1298, 748);
+  g.beginPath(); g.moveTo(1299, 650); g.lineTo(1299, 745);
   g.strokeStyle = 'rgba(255,235,120,0.9)'; g.lineWidth = 4; g.stroke();
   g.restore();
 }
