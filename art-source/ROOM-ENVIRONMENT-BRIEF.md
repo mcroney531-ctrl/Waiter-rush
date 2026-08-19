@@ -8,6 +8,78 @@ the same goal against the pipeline that actually exists.
 
 ---
 
+## Handoff — 2026-08-19, mid-session-limit
+
+Picking this up cold: everything through "static detail + animation layer"
+below is **shipped and live** (check `git log --oneline` for the exact
+commits, most recent first — each one's message has the reasoning). What's
+left is the "new clutter objects" tier, which needs Rone to run DALL-E and
+Meshy externally the same way the food items and the floor art did — nothing
+in that tier is buildable by a session alone.
+
+**Also open, blocking, needs Rone's eyes before touching again:** Rone asked
+for the dish-return's ornate face (the knobs, the ammonite medallion) to
+point "outward, toward the tables/restaurant floor" instead of its current
+orientation. I tested this properly before reporting back rather than
+guessing once and moving on:
+
+- Current (`yaw` unset): the ornate face points toward the camera. Confirmed
+  by isolating the prop (`node tools/render_room.mjs --isolate dish-return`)
+  and looking at it alone.
+- `yaw: 180` (turns the face away from camera, toward the tables): the
+  camera then sees the model's **back** — a plain slab, no knobs, no
+  medallion. Tested and screenshotted; the knobs are not merely dim, they
+  are not there.
+- `yaw: ±90` (side-on): shows the basin's side profile instead, and it also
+  broke the object's on-screen scale (200×140 art px became 200×198 --
+  `PROP_ART_WIDTH` locks scale to bounding-box width, and rotating 90°
+  swaps which axis that measures) without reading as "facing the tables"
+  either.
+
+The room's camera sits on the same side of the origin as the dish-return
+itself (`cam.position.set(0, sin(el)*30, cos(el)*30)`, both positive Z; the
+dish-return's art-y 950 is also positive-Z once run through
+`artYToWorldZ`) -- so whichever way you rotate this specific prop, "face
+the tables" and "stay visible to the camera" pull in opposite directions.
+That's a real geometric fact about this model and this camera, not a
+one-more-yaw-value-away problem, so I stopped testing rotations rather
+than keep guessing and burning renders. **Reverted to the shipped
+default (unset yaw) — nothing changed on this point.** Options, for
+whoever picks this up: ask Rone which matters more (visible knobs, or
+literal "facing" correctness that the camera will never show); or treat it
+as a new-GLB job with a differently-modelled back face; or Rone looks at
+the isolated renders (still in the scratchpad the session that wrote this
+used, or easy to regenerate) and decides it's not actually worth chasing.
+
+**On new clutter objects** (vines, bottles, a "Today's Special" chalkboard,
+counter clutter): before writing a vine prompt, re-read
+`art-source/refs/room/PROMPTS.md`'s own style block --
+**it says "no vines" explicitly**, as a deliberate choice to keep the room
+reading as "upscale civilised" rather than "prehistoric jungle." A vine
+prompt would contradict the room's own house style, not just add detail to
+it. Flag this to Rone before generating anything vine-shaped. The
+chalkboard sign and counter clutter (books/bottles/mugs) don't have this
+problem -- they're safe to prompt for using the same style block, following
+the two-step brief -> per-object prompt pattern that block documents.
+
+**Per Rone's steer partway through this session: stop verifying new room
+work against the plain wood floor.** The molten paved floor
+(`--lavafloor`) is what's shipped as the 3D board's actual default now: the
+wood floor is legacy/unused, not a second thing every change has to pass.
+
+**Standard verification for anything touching `render_room.mjs`,** so it
+doesn't have to be rediscovered: `node tools/hands.js`,
+`BOARD=3d node tools/hands.js`, `node tools/hud.js`, `node tools/dpad.js`,
+`node tools/contrast.js`, `python3 tools/board_audit.py --3d` -- all five
+plus the audit have to pass before a board-3d.jpg regeneration ships.
+Regenerate the shipped asset with
+`node tools/render_room.mjs --lavafloor --out art-source/shots/room.png`
+then re-encode with PIL at quality 88 (see any recent commit touching
+`assets/board-3d.jpg` for the exact one-liner) -- never commit the raw
+render output directly, it's PNG bytes and needs the real JPEG pass.
+
+---
+
 ## The one fact that decides everything below
 
 There is no runtime 3D scene. `tools/render_room.mjs` runs **offline** — Node,
