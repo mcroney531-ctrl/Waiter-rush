@@ -3433,14 +3433,31 @@
   // Sized off DROP.h/DROP.w rather than pixel constants copied from the
   // mockup screenshot, since that mockup's browser viewport doesn't
   // necessarily share the canvas's internal-resolution scale.
-  function drawSetDownCorners(standing, carrying, phase){
+  // Small per-table corrections where a corner would otherwise land on floor
+  // decor that isn't derived from table position at all -- the crack grid and
+  // fossil stamps are their own hand-placed pass in render_room.mjs, so they
+  // land differently table to table by coincidence, not because any table is
+  // out of alignment. Found by comparing all 8 against the actual baked
+  // board, not guessed: table 2's right corner sits on the ammonite fossil
+  // (nudged right and down, clear of its shell). Table 6's left corner was
+  // first read as grazing the crack along the row's top edge and nudged
+  // down, but a closer crop showed the real collision is its vertical stem
+  // running straight down the wall-side crack -- a down-only nudge doesn't
+  // touch a vertical line, so this needs ldx (away from the wall) too.
+  const CORNER_NUDGE = {
+    2: { rdx: 44, rdy: 24 },
+    6: { ldx: 9, ldy: 6 },
+  };
+
+  function drawSetDownCorners(id, standing, carrying, phase){
     const hot = standing || carrying;
     const cl = hot ? dropCornerHotL : dropCornerCoolL;
     const cr = hot ? dropCornerHotR : dropCornerCoolR;
-    const ch = DROP.h * 0.9, off = DROP.h * 0.12;
+    const ch = DROP.h * 0.65, off = DROP.h * 0.05;
     const cwL = ch * (cl.naturalWidth / cl.naturalHeight);
     const cwR = ch * (cr.naturalWidth / cr.naturalHeight);
     const halfW = DROP.w / 2, halfH = DROP.h / 2;
+    const nudge = CORNER_NUDGE[id] || {};
 
     if (standing){
       const g = ctx.createRadialGradient(0, 0, 0, 0, 0, DROP.w * 0.55);
@@ -3459,8 +3476,10 @@
     } else if (hot){
       ctx.globalAlpha = 0.8;
     }
-    ctx.drawImage(cl, -halfW - off, halfH + off - ch, cwL, ch);
-    ctx.drawImage(cr, halfW + off - cwR, halfH + off - ch, cwR, ch);
+    ctx.drawImage(cl, -halfW - off + (nudge.ldx || 0),
+                  halfH + off - ch + (nudge.ldy || 0), cwL, ch);
+    ctx.drawImage(cr, halfW + off - cwR + (nudge.rdx || 0),
+                  halfH + off - ch + (nudge.rdy || 0), cwR, ch);
     ctx.restore();
 
     ctx.fillStyle = hot ? COLORS.mustard : 'rgba(200,196,188,0.8)';
@@ -3486,7 +3505,7 @@
       ctx.save();
       ctx.translate(t.padX, t.padY);
       if (USE_3D && !dirty && cornersReady){
-        drawSetDownCorners(standing, carrying, phase);
+        drawSetDownCorners(t.id, standing, carrying, phase);
         ctx.restore();
         continue;
       }
