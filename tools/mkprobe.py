@@ -22,6 +22,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get steps(){return TUTORIAL_STEPS.length;},
     PASSES:PASSES, BUS:BUS_STATIONS, set elapsed(v){elapsed=v;},
     set score(v){score=v; updateHUD();},
+    get tips(){return tipsEarned;}, set tips(v){tipsEarned=v;},
+    endGame(){return endGame();},
     get lives(){return lives;}, set lives(v){lives=v; updateHUD();},
     get tier(){return tierIndex;}, get tierArt(){return tierArt.map(t=>!!t.img);},
     get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},

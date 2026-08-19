@@ -205,6 +205,21 @@
     letter-spacing: 1px;
   }
   #overlay p { max-width: 440px; line-height: 1.5; font-size: 15px; opacity: 0.9; margin: 6px 0 20px; }
+  /* The personal-best line sits tighter to the summary above it than a normal
+     paragraph gap. Placeholder styling: this becomes the mock's stone panel
+     once the end-card art lands.
+     Set in amber (#E0A72E) first, to read as a score rather than more prose,
+     and contrast.js rejected it at 3.66:1 against 4.5 needed at 14px — the
+     same mistake the big-stat comment above records against its old teal.
+     A palette accent is an accent, not a text colour, over the fossil wall.
+     So it separates from the body prose by typeface instead: Galindo against
+     the paragraphs' DM Sans, cream over the same dark outline the shift total
+     and the in-shift tips sign already use. */
+  #overlay p.best {
+    font-family: 'Galindo', sans-serif; font-size: 14px;
+    color: #F7F1E0; opacity: 1; margin: -12px 0 20px;
+    text-shadow: 0 2px 0 rgba(24,19,14,0.9), 0 0 14px rgba(24,19,14,0.7);
+  }
   /* Was #2F6F6B, a teal left over from the pre-art palette. Against the fossil
      wall that is 1.13:1 at the wall's brightest — the shift total, the one
      number the screen exists to report, effectively invisible. Cream over a
@@ -854,6 +869,10 @@
   let deliveries = 0;
   let cleared = 0;      // tables bussed; not shown in the HUD, used by the tutorial
   let score = 0;
+  // The tip half of score, on its own. score is base + tip + bussing pay rolled
+  // together, which is the right number for the HUD but cannot be taken apart
+  // afterwards -- the end card wants to show what speed alone earned.
+  let tipsEarned = 0;
   let lives = 3;
   let lastTime = 0;
   // ---------- Difficulty ----------
@@ -1185,6 +1204,7 @@
     cleared = 0;
     floaters = [];
     score = 0;
+    tipsEarned = 0;
     // Back to the starting outfit — the shift is the progression, so it resets
     // with the shift rather than persisting.
     tierNotice = 0;
@@ -2320,6 +2340,38 @@
   // instead of to a broken render.
   const CHAR_STORE = 'dineo.char';
 
+  // ---------- Personal best ----------
+  // Held in cents, like score, so the stored value never picks up float drift
+  // across sessions the way a running dollar figure would.
+  //
+  // Global rather than per-character, deliberately. Per-character was available
+  // for free (the picker already persists a choice) but it fragments the one
+  // number the end card is built around: switching dinosaur would appear to
+  // wipe a best that is still there, and a player who rotates the roster never
+  // accumulates a figure worth beating. If the roster ever wants its own
+  // leaderboard that is a second key, not a change to this one.
+  const BEST_STORE = 'dineo.best';
+
+  function loadBest(){
+    try {
+      const raw = parseInt(localStorage.getItem(BEST_STORE), 10);
+      // Anything non-numeric, negative or absent reads as no best yet. A
+      // corrupt key should cost the player their record, not the end screen.
+      return Number.isFinite(raw) && raw > 0 ? raw : 0;
+    } catch (e) { return 0; }
+  }
+
+  // Returns what the best was *before* this shift, so the end card can say
+  // whether the run beat it without needing a second read.
+  function commitBest(finalScore){
+    const previous = loadBest();
+    if (finalScore > previous) {
+      try { localStorage.setItem(BEST_STORE, String(finalScore)); }
+      catch (e) { /* private mode: the figure still shows, it just will not keep */ }
+    }
+    return previous;
+  }
+
   let pickedChar = charId;
 
   // A thumbnail is the sprite sheet itself, scaled down and offset to one cell.
@@ -2793,6 +2845,7 @@
       }
       const tip = Math.round(frac * TIP_MAX_C * (flowLit ? FLOW_MULT : 1) * (rushActive ? RUSH_TIP_MULT : 1));
       score += DELIVERY_BASE_C + tip;
+      tipsEarned += tip;
       // Everything the delivery paid, not just the tip's rush share: what the
       // closing banner is answering is "was pushing through that worth it",
       // and the base pay was earned in the rush too.
@@ -3132,11 +3185,24 @@
     rushOver = 0;
     document.documentElement.classList.remove('rush');
     running = false;
+    // Commit before rendering: the card wants both the new best and what it
+    // beat, and commitBest hands back the previous figure so the record is
+    // written and reported from one read.
+    const prevBest = commitBest(score);
+    const best = Math.max(prevBest, score);
+    const beatIt = score > prevBest && prevBest > 0;
+    const toBeat = best - score;
+
     const overlay = document.getElementById('overlay');
     overlay.innerHTML = `
       <h1>Shift Over</h1>
       <div class="big-stat">${money(score)}</div>
-      <p>${deliveries} orders delivered and ${cleared} tables cleared before the floor got the better of you. The rush only gets faster from here — want another go?</p>
+      <p>${deliveries} orders delivered and ${cleared} tables cleared before the floor got the better of you. ${money(tipsEarned)} of that was tips.</p>
+      <p class="best">${
+        beatIt ? `New personal best — you beat ${money(prevBest)}.`
+        : prevBest === 0 ? `That is your first shift on the board.`
+        : `Personal best ${money(best)} — ${money(toBeat)} to beat.`
+      }</p>
       <button class="cta" id="startBtn">Run It Back</button>
       <button class="cta ghost" id="avatarBtn2">Change your waiter</button>
     `;
