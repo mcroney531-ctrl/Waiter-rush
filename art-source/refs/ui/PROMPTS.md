@@ -198,3 +198,141 @@ station in the rendered room → *then* decide. If it does turn out to need one,
 the recipe is already here: same style block, `--mode flat --shadow`, sized to
 whatever `BUS` is by then. Nothing about that gets easier by doing it now, and
 the geometry it would be sized against is the thing most likely to move.
+
+---
+
+## 4. The shift-over end card — four images, not one
+
+Rone mocked this as a single finished picture: a clipboard on a desk in a
+closed kitchen, holding a shift report with a total, three stat columns, a
+personal-best panel and two buttons. The mock is the design and the icons and
+layout in it are deliberate — this section is about splitting it into pieces
+the game can actually drive, not about redesigning it.
+
+It comes apart into four generations for two independent reasons.
+
+**The numbers have to come off the art.** Six values change every shift —
+today's total, orders delivered, tables cleared, tips earned, personal best,
+and the amount left to beat. In the mock all six are painted into the pixels.
+Same rule as the table plaque in the room kit: the art carries the frame and
+the labels, the game draws the figures.
+
+**The mock is portrait and the canvas is not.** It is roughly 4:5; the board is
+960x640. A 4:5 panel on a 16:9 desktop either letterboxes with dead sides or
+scales up and crops the composition. Splitting the desk scene from the
+clipboard fixes it: the scene is a full-bleed background that is *allowed* to
+crop at the edges, the clipboard is a centred panel that never distorts. That
+is how the picker and landing already work against `backdrop.webp`, which is
+1600x1200 and cropped by `cover` on every screen it appears on.
+
+Buttons come out for a third reason: `assets/ui/start.webp` and its siblings are
+separate keyed images on `button.plaque`, which is what gives them a real hit
+target and a press state. **Those bake their own lettering** — the DOM label is
+pushed off-screen with `text-indent` — so unlike the pads, these prompts *do*
+ask for words.
+
+### 4a. `endcard-backdrop.png` — the scene, no clipboard
+
+Not keyed and not on magenta: this one is a full-bleed CSS background like
+`backdrop.webp`, so it needs no cutout. **Landscape, 4:3 or wider.**
+
+> A wide view of a closed restaurant kitchen at night. A heavy timber desk runs
+> across the foreground, and behind it the kitchen recedes into warm shadow —
+> stone walls, hanging brass lanterns, shelves of stacked crockery, a few
+> candles. Scattered across the desk are end-of-shift things: a fat drawstring
+> coin pouch spilling coins, a tin mug, a folded checked cloth, loose notes.
+> Deep warm shadow at the edges, light pooling toward the middle.
+>
+> Style: a restaurant designed by dinosaur civilisation — carved basalt, fossil
+> framed trim, amber and gold accents, chunky prehistoric joinery. Warm,
+> hand-painted storybook look, soft cel shading, muted palette. Upscale, cosy
+> and whimsical. Not a cave, not Jurassic Park, no vines.
+>
+> No clipboard, no paper, no text, no lettering anywhere. **Keep the middle
+> third dark and uncluttered** — a panel sits there and anything detailed behind
+> it is noise. Landscape.
+
+The middle-third instruction is the one that matters. Everything interesting
+belongs in the outer thirds, because the clipboard covers the centre at every
+viewport and the parts of this that a player actually sees are the edges.
+
+### 4b. `endcard-board.png` — the clipboard, every number blank
+
+> A single game UI element on a plain flat magenta background, drawn in a warm
+> hand-painted storybook style with soft cel shading and a muted palette.
+>
+> Style: a restaurant designed by dinosaur civilisation — carved basalt, fossil
+> framed trim, amber and gold accents, chunky prehistoric joinery. Upscale,
+> cosy and whimsical. Not a cave, not Jurassic Park, no vines.
+>
+> The object: a portrait clipboard, metal bound with a heavy hinged clip at the
+> top, holding a sheet of aged parchment. On the parchment, top to bottom: a
+> display title reading SHIFT OVER in bold western slab lettering with small
+> paw-print flourishes; a thin rule under it; a wide panel headed TODAY'S TOTAL
+> with a large **empty** area beneath the heading; then three equal columns
+> divided by thin vertical rules, each holding an illustrated icon above a
+> two-line label — a domed serving cloche over ORDERS DELIVERED, a small carved
+> bone chair over TABLES CLEARED, a drawstring coin pouch over TIPS EARNED —
+> each with an **empty** area beneath its label; and at the bottom a dark inset
+> stone panel with a gold trophy at the left and the heading PERSONAL BEST, the
+> rest of that panel **empty**. A circular red rubber stamp reading SHIFT
+> COMPLETE sits at a slight angle in the top right corner of the parchment.
+>
+> **Every number area must come out completely blank.** No digits, no currency
+> symbols, no placeholder figures, nothing in any of the empty areas described
+> above. The headings, the labels and the stamp are the only lettering on the
+> sheet. Portrait, about 4:5.
+
+```
+python3 tools/cut_plaque.py art-source/refs/ui/endcard-board.png endcard-board \
+        --mode flat --bg <sampled> --shadow --width 1024
+```
+
+**It is worth re-rolling until the number areas are actually empty**, exactly
+as the room kit says about the table plaque. Generators fill space; asked for a
+box headed TODAY'S TOTAL they will put a total in it. If one otherwise-perfect
+roll comes back with digits in one slot, say so rather than re-rolling the whole
+sheet — the parchment is a near-uniform texture and clone-filling one slot is
+the same job as the lava-crack repair, about ten minutes.
+
+Do **not** ask for a magenta block where the numbers go. That was considered and
+it is wrong: `--mode flat` keys magenta globally, so those blocks would punch
+holes clean through the parchment and show the desk behind them. Blank parchment
+is what is wanted.
+
+### 4c and 4d. The two buttons
+
+Same style block as 4b, then:
+
+> The object: a wide rectangular button plaque, carved stone with a metal border
+> and gold corner studs, deep red enamelled face, with the words RUN ANOTHER
+> SHIFT across it in bold cream lettering. About five times wider than tall.
+
+> The same plaque in the same materials and lettering style, but with a dark
+> charcoal-green face instead of red, and a little narrower — about six times
+> wider than tall — reading CHANGE WAITER.
+
+Generate these two **in the same session, one immediately after the other**, for
+the same reason `pick-up` follows `set-down`: two objects meant to be the same
+thing at two sizes are exactly what drifts across a session boundary.
+
+### What is still missing after the art lands
+
+Two of the six figures do not exist in the game yet, so the mock is ahead of the
+code:
+
+- **Tips as their own number.** `score` accumulates `DELIVERY_BASE_C + tip` plus
+  `BUS_PAY_C` as one running total; nothing tracks the tip part separately. A
+  counter alongside `deliveries` and `cleared`.
+- **Personal best.** Nothing persists a high score — the only `localStorage`
+  keys are `dineo.muted` and the character choice. Needs a decision too:
+  per-character or global. Per-character is available for free since the picker
+  already stores a chosen character, and it would give the roster more reason to
+  exist.
+
+And one open question: **the numerals in the mock are a slab face, not Galindo**,
+which is the only display font the game ships. Either send the font file and it
+gets added as a second `@font-face`, or the figures get drawn in Galindo and
+will not match the mock exactly. Whichever way, the money sign's harness check
+(`$9999.99 fits between the frame rails`) wants copying for each of these slots
+— `$1,284.92` is already nine glyphs and a five-figure best is wider.
