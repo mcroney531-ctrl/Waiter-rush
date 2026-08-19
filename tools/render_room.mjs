@@ -607,13 +607,31 @@ async function paintRug(w, h){
 // table's own 190px width) so the rug's inward end doesn't reach the table.
 // yCenter: 735 was the old run's own midpoint, unchanged through the 90
 // rotation above -- moved up 40 (toward the counter) on Rone's call.
-const RUG_ART = { xNear: [-60, 1596], xFar: [250, 1286], yCenter: 695, depth: 120 };
+// xFar values below are the full-length numbers from the paragraph above --
+// kept as-is rather than rewritten, so the reasoning behind each ("short of
+// the front row's own left edge" etc.) still points at a real number. Rone's
+// eye read the pair as uneven even after they measured out symmetric (every
+// row of the baked render checked, inner edge within 1px of a true mirror);
+// the read was the rugs reaching too far into the room regardless, so
+// RUG_SHORTEN pulls the inward end back toward the wall-anchored end by 35%
+// rather than the numbers above being wrong. xNear (the off-frame, wall
+// side) is untouched -- that end deliberately runs off the canvas edge with
+// no gap at the corner, and shortening from there would reopen that gap.
+const RUG_SHORTEN = 0.65;
+const RUG_ART_FULL = { xNear: [-60, 1596], xFar: [250, 1286], yCenter: 695, depth: 120 };
+const RUG_ART = {
+  ...RUG_ART_FULL,
+  xFar: RUG_ART_FULL.xNear.map((n, i) => n + (RUG_ART_FULL.xFar[i] - n) * RUG_SHORTEN),
+};
 const rugWorldLen   = Math.abs(RUG_ART.xFar[0] - RUG_ART.xNear[0]) / PPU;
 const rugWorldDepth = RUG_ART.depth / (SIN_E * PPU);
-// Canvas swaps to landscape with the geometry -- paintRug draws its border as
-// a fraction of whichever w/h it is given, so a portrait canvas on a
-// landscape plane would carry the old proportions over sideways.
-const rugTex = await paintRug(300, 190);
+// Canvas swaps to landscape with the geometry -- paintRug draws its border and
+// every motif position as a fraction of whichever w/h it is given (checked
+// before relying on this: no absolute-pixel placements in there), so scaling
+// its width by the same RUG_SHORTEN factor as the plane keeps the border
+// thickness and motif spacing proportioned to the now-shorter rug instead of
+// stretching a texture drawn for the old length over a shorter plane.
+const rugTex = await paintRug(300 * RUG_SHORTEN, 190);
 for (let i = 0; i < RUG_ART.xNear.length; i++){
   const xCenter = (RUG_ART.xNear[i] + RUG_ART.xFar[i]) / 2;
   const rug = new THREE.Mesh(
