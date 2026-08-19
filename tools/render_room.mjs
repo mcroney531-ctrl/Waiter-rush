@@ -958,6 +958,35 @@ if (LAVA_FLOOR && !ISOLATE) {
   }
 }
 
+// Lava-crack seam patch, right rug. The tiled lava-floor photo has a real
+// discontinuity in its crack pattern around art (1295-1310, 696-703) -- not a
+// clean gap, a sideways jog, the glowing line ending at x~1305 and resuming
+// at x~1295 a few px lower, which reads as a break because a real crack
+// wouldn't step sideways like that. It was always there; it was invisible
+// because the rug used to reach x 1286, covering this exact patch of floor.
+// Shortening the rug (RUG_SHORTEN above) exposed it rather than caused it --
+// confirmed by checking the pre-shorten board-3d.jpg, where this spot is rug
+// fabric, not floor. Colours and the endpoints below are measured off the
+// shipped render, not eyeballed: y<=696 the line's bright core sits at
+// x~1302-1309 (peak rgb 255,255,73); y>=703 it sits at x~1292-1298 (peak rgb
+// 255,190,60, slightly cooler). A short stroke between those two points,
+// styled the same as the rest of the glow (soft wide underglow, tight bright
+// core), smooths the step into a continuous-looking crack instead of a kink.
+// Only patches this one occurrence -- it is not known whether the same tile
+// boundary produces the identical break on the left rug's now-exposed floor,
+// since the two rugs' xFar values differ (LAYOUT is genuinely mirrored, but
+// the lava-floor photo tiling is not), and nothing in the left corner's
+// crop taken while checking this looked broken the same way.
+if (!ISOLATE) {
+  g.save();
+  g.lineCap = 'round';
+  g.beginPath(); g.moveTo(1305.5, 695); g.lineTo(1295, 704);
+  g.strokeStyle = 'rgba(255,150,40,0.55)'; g.lineWidth = 9; g.stroke();
+  g.beginPath(); g.moveTo(1305.5, 695); g.lineTo(1295, 704);
+  g.strokeStyle = 'rgba(255,235,120,0.9)'; g.lineWidth = 4; g.stroke();
+  g.restore();
+}
+
 // Floor fossil impressions: the same DALL-E claw/ammonite art already used on
 // the rug, stamped faint and desaturated-by-alpha onto open floor plates --
 // away from the pickup floor (art y 430-580, which board_audit.py requires
