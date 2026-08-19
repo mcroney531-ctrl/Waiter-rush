@@ -481,6 +481,38 @@ const lavaFloorEmissiveImg = LAVA_FLOOR ? await loadImg('lava-floor-emissive.png
 const lavaFloorTex = LAVA_FLOOR ? paintFromImage(lavaFloorImg, 8, 8) : null;
 const lavaFloorEmissive = LAVA_FLOOR ? paintFromImage(lavaFloorEmissiveImg, 8, 8) : null;
 
+// LAVA_V_OFFSET: slides the floor texture in v so no tile wrap line crosses
+// the visible floor.
+//
+// The photo tiles cleanly in the sense that matters for flat rock -- no
+// brightness step across the join, which is what was checked when it landed
+// -- but its *crack network* does not connect across the join: a glowing
+// crack running off the bottom edge does not meet the one entering at the
+// top. Wherever the wrap falls, every crack crossing it is cut and offset.
+//
+// That line was landing at art y=700, straight across the board through the
+// open aisle between the table rows, which is why the junction by table 4/8
+// read as broken. Three separate hand-patches went into repairing that one
+// junction's pixels before this got diagnosed properly; all of them were
+// retouching one instance of a systematic seam, which is why each fix
+// exposed a new symptom (a gap, then a pasted-looking fill, then a lean,
+// then a step). See git history for the full sequence.
+//
+// The visible floor spans only 0.452 of a tile in v (art y 430 at the
+// counter's foot down to 1024), so an offset anywhere in 0.21..0.75 keeps
+// the whole floor inside one tile with no wrap at all. 0.48 is the middle
+// of that window, so there is ~0.27 of margin either side -- the camera
+// elevation or the floor's top edge can move a fair way before a seam
+// re-enters frame.
+//
+// Must be identical on both maps: the emissive is derived from the same
+// photo and only lines up with the diffuse cracks if it slides with it.
+const LAVA_V_OFFSET = 0.48;
+if (LAVA_FLOOR) {
+  lavaFloorTex.offset.y = LAVA_V_OFFSET;
+  lavaFloorEmissive.offset.y = LAVA_V_OFFSET;
+}
+
 // Lightened base_color replacements for table.glb/dish-return.glb, only under
 // --lavafloor (see the staging note above). A 1:1 UV-space swap, not a tiled
 // pattern -- flipY has to match what GLTFLoader already set on the original
@@ -958,61 +990,6 @@ if (LAVA_FLOOR && !ISOLATE) {
   }
 }
 
-// Lava-crack seam patch, right rug, third attempt -- read the full history
-// before touching this again, it took three tries to get right.
-//
-// Attempt 1 bridged two endpoints with a stroke and left the existing sharp
-// corner underneath it -- still read as kinked, because the geometry was
-// still a ~45-degree elbow (10.5px of x over 9px of y), just no longer an
-// outright gap.
-//
-// Attempt 2 erased the elbow with a flat fill before redrawing a gentler
-// diagonal. The flat fill was worse than the elbow: the floor has real
-// photographic grain, and a flat rectangle sits on top of it as an obvious
-// patch. Fixed by cloning real floor pixels instead of filling -- but the
-// redrawn line still ran on a deliberate diagonal, (1305.5, 663) to
-// (1298, 748), an 8-degree lean chosen to connect what attempt 1 measured
-// as "the straight run above" to the junction below. Rone circled it a
-// third time: still visibly slanted next to two junctions with vertical
-// arms either side of it.
-//
-// The actual mistake, found by measuring the junction NODES rather than the
-// stem: the upper node's own brightest core (R>200, right at y~594-598,
-// where its three arms actually cross) sits at x~1299-1301 -- almost
-// exactly where the lower node sits (~1298). It is the stem a few px below
-// the node, at y~604-614, that drifts out to 1305.5 as it exits the node's
-// blob -- and that drift is what attempt 2 anchored its "good" endpoint to,
-// carrying the error forward instead of fixing it. The two junctions were
-// never actually misaligned; only the stem between them was.
-//
-// This version draws one truly vertical line at x=1299 -- matching both
-// node centres, not splitting a difference that did not need splitting --
-// from y=650 to y=745, deliberately not reaching all the way up to the
-// node's own blob (y~615): every clean floor sample tried between y=605 and
-// y=650 in this x range carries a soft shadow (min channel 35-45 against a
-// floor baseline of ~65, some prop's cast shadow, not this seam), and cloning
-// it in would import a shadow shape that does not belong at this position.
-// Leaving that 35px band as original pixels means a few px of the old
-// stem's drift survives immediately next to the node -- accepted
-// deliberately, on the reasoning attempt 2 already used correctly: a small
-// offset disappears into a junction's own irregular blob far more easily
-// than the same offset reads along an open straight run, which is exactly
-// where the eye caught it twice.
-if (!ISOLATE) {
-  g.save();
-  // clean source: (1000, 650), verified shadow-free at this exact band
-  // (min channel 60 vs ~40 one row up) after four other x candidates
-  // (450-1450, spanning the whole width) all carried either this same
-  // shadow or a real glow line from elsewhere in the pattern.
-  g.drawImage(flat, 1000, 650, 42, 95, 1278, 650, 42, 95);
-
-  g.lineCap = 'round';
-  g.beginPath(); g.moveTo(1299, 650); g.lineTo(1299, 745);
-  g.strokeStyle = 'rgba(255,150,40,0.55)'; g.lineWidth = 9; g.stroke();
-  g.beginPath(); g.moveTo(1299, 650); g.lineTo(1299, 745);
-  g.strokeStyle = 'rgba(255,235,120,0.9)'; g.lineWidth = 4; g.stroke();
-  g.restore();
-}
 
 // Floor fossil impressions: the same DALL-E claw/ammonite art already used on
 // the rug, stamped faint and desaturated-by-alpha onto open floor plates --
