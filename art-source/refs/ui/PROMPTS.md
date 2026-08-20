@@ -397,3 +397,69 @@ image, three states." One baked image per label, tinted/dimmed at runtime the
 same way `drawPadArt` already handles idle/active/carrying for the pad
 frames: full brightness standing on the pad, a warm flat tint carrying-but-
 not-there, dimmed alpha idle. No need for three separate bakes per label.
+
+---
+
+## 6. The Manager — a training-mascot character, exploratory, not built yet
+
+Rone's idea: the tutorial is currently a text banner with no speaker. What
+if a character -- "The Manager" -- delivers it instead, in a parchment
+speech bubble, positioned in the pocket of open floor above table 4 (the
+same spot `PICK UP`'s frame used to occupy before section 5 removed it).
+The conceit is he's training the player.
+
+Two source sheets exist, both saved here: `manager-sheet-brown.png` (a
+velociraptor-ish dinosaur, brown vest, glasses, a name tag literally reading
+THE MANAGER, five poses -- presenting-with-clipboard, pointing-with-pencil,
+arms-crossed, reading-a-book, thumbs-up) and `manager-sheet-olive.png` (a
+similar character, olive jacket and purple scarf, no name tag, holding a
+book with an ammonite emblem on the cover -- closer to "field researcher"
+than "manager," and it's not clear yet whether this is a rejected direction
+or a second character for a different role). Neither sheet has been
+generated through this project's own prompt pipeline -- both came from
+Rone directly, so there is no prompt to record for them, only the sheets
+themselves.
+
+`parchment-bubble-sheet.png` -- a single torn-edge parchment card with a paw
+print in the corner, blank -- is the speech-bubble backing. Real alpha
+already baked as a checker pattern on RGB rather than true transparency
+(same issue tag-t1/t3 hit early on), not magenta-keyed, so cutting it needs
+`cut_plaque.py --mode flat --bg <sampled near-white>` rather than the
+default background.
+
+**A mock exists and was approved as a good placement**, but nothing here
+is final:
+
+- The pose used (presenting-with-clipboard, from `manager-sheet-brown.png`)
+  was picked for the mock only, not confirmed as the one to ship. The other
+  four poses on that sheet exist for a reason -- different tutorial moments
+  probably want different expressions -- and the olive-jacket character's
+  role is still an open question.
+- The cutout used for the mock (`assets/ui/manager-mock.webp`, keyed at
+  `--bg 216,219,223`) has a visible fringe: a faint blue-gray cast on the
+  white sleeve and collar, where that fabric's tone sat too close to the
+  sheet's light-gray background for a clean key. Fine for judging
+  placement, not fine to ship. A tighter re-key (tuned `--lo`/`--hi`) or a
+  cleaner-background source render would fix it.
+- The tutorial copy used in the mock ("Use the pad in the corner to get
+  moving.") is a placeholder rewrite of step 1's real text, picked to prove
+  the bubble can hold a short line legibly -- not wordsmithed, and the other
+  five tutorial steps have not been attempted at all. Some current steps run
+  close to 200 characters (see the PICK UP step in index.html's
+  TUTORIAL_STEPS, still present even though the pad itself is gone) --
+  those will not fit this bubble at any reasonable size without a real
+  rewrite pass.
+
+The mock itself lives as temporary code in `index.html` -- search for
+"TEMP mockup -- not for commit" (a `drawManagerMock()` function and its two
+image loads) -- deliberately never committed, so `git status`/`git diff`
+show it directly rather than this file describing it out of date.
+`assets/ui/manager-mock.webp` and `assets/ui/parchment-mock.webp` are
+untracked for the same reason. See `HANDOFF.md`'s top section for the full
+current-state writeup and exact screenshots taken.
+
+Next real steps, in order: (1) Rone picks a pose (and settles what the
+second character is, if anything), (2) a clean isolated render or a
+tighter re-key removes the fringe, (3) tutorial copy gets shortened for
+all six steps, not just step 1, (4) wire for real and run the harness
+suite, same as every other asset in this file.
