@@ -755,6 +755,11 @@
   // permanently if it never does, same convention as every other asset here.
   const dishReturnLabelImg = new Image();
   dishReturnLabelImg.src = 'assets/ui/dish-return-3d.webp';
+  // SET DOWN, same baked-3D convention. Its letterforms passed the
+  // reference check clean on the first DALL-E round -- no S-flourish
+  // redo needed the way DISH RETURN's did.
+  const setDownLabelImg = new Image();
+  setDownLabelImg.src = 'assets/ui/set-down-3d.webp';
   // The dish return's silhouette, isolated from the room render with the same
   // camera and light as the real board, so the hover glow can hug the
   // basin's actual shape instead of a generic box. One full-canvas image;
@@ -3531,9 +3536,22 @@
                   halfH + off - ch + (nudge.rdy || 0), cwR, ch);
     ctx.restore();
 
-    ctx.font = '700 12px DM Sans, sans-serif';
     ctx.globalAlpha = standing ? 1 : carrying ? 0.85 : 0.6;
-    drawStyledLabel('SET DOWN', 0, 4, hot ? COLORS.mustard : 'rgba(200,196,188,0.8)');
+    if (ready(setDownLabelImg)){
+      // The baked label is a fixed gold, so idle/hot can't be told apart by
+      // colour the way the procedural version (grey vs mustard) or the
+      // corners (cool vs molten pair) manage it. A grayscale+dim filter on
+      // the idle draw gets the same cool/hot read from one asset.
+      ctx.save();
+      if (!hot) ctx.filter = 'grayscale(75%) brightness(0.75)';
+      const w = DROP.w * 0.62;
+      const h = w * (setDownLabelImg.naturalHeight / setDownLabelImg.naturalWidth);
+      ctx.drawImage(setDownLabelImg, -w / 2, 4 - h / 2, w, h);
+      ctx.restore();
+    } else {
+      ctx.font = '700 12px DM Sans, sans-serif';
+      drawStyledLabel('SET DOWN', 0, 4, hot ? COLORS.mustard : 'rgba(200,196,188,0.8)');
+    }
     ctx.globalAlpha = 1;
   }
 
