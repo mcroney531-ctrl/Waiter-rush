@@ -2,6 +2,99 @@
 
 Read this first. It is the working brief for continuing development, written at the point where the previous session's environment had to be replaced. The README covers what the game *is* for anyone arriving cold; this covers what has been decided, what has been measured, what is unresolved, and what to be careful about.
 
+---
+
+## Handoff — 2026-08-20, session moving to "the alt"
+
+**Read this section, not the rest of the file, for current state.** Everything below this section is from an earlier phase of the project (character-roster and sprite-pipeline era, last touched 2026-08-09) — the mechanics it documents (sprite rendering, the tier ladder, sound) are still accurate and unchanged, but "Current state" and "Immediate next steps" further down are stale by a large margin. Don't act on those two sections without checking git log first.
+
+### The one-paragraph version
+
+The 3D board (`assets/board-3d.jpg`, baked offline through `render_room.mjs` + Three.js + headless Chromium — there is no runtime 3D, see `art-source/ROOM-ENVIRONMENT-BRIEF.md`) is now the sole focus. Rone's explicit call, still standing: stop spending further passes on the painted 2D board. This session did a long run of small, verified UI/art passes on the 3D board — dish-return orientation, table tags, the SET DOWN pad's look, baked 3D lettering for two of the three counter labels, removing the third label's UI entirely, planter placement — and is now mid-mockup on a tutorial mascot character when it handed off. Nothing is broken; the working tree has one deliberate uncommitted mockup in it (see below), not loose ends.
+
+### Exact repo state at handoff
+
+```
+git log --oneline -25   # newest first
+af0a923 Save The Manager mascot reference sheets before the session hands off
+9aa2a02 Move both planters: left closer to its rug, right as far to the edge as it can go
+3d4a8b2 Remove the pickup pad's standing confirmation glow entirely
+b651953 Drop the PICK UP frame and label, both boards
+a5c9d35 Wire SET DOWN to the baked 3D label
+a8e70da Save the accepted SET DOWN 3D label render before cutting it
+481afc4 Wire DISH RETURN to the baked 3D label, generalize the fallback for the other two
+349349b Save the accepted DISH RETURN 3D label render before cutting it
+d9a06a0 Add DALL-E reference renders and prompt for baked 3D SET DOWN/PICK UP/DISH RETURN
+edff0f8 Remove the ammonite floor fossil instead of nudging table 2's corner around it
+3871d0b Tighten SET DOWN corner brackets and nudge two off pre-existing floor decor
+5dd8cb5 Replace the 3D board's SET DOWN frame with lava corner accents
+fd7e55c Replace the vector table-number pill with Rone's pinned-parchment tags
+978517a Push both dish-returns as close to the room's edge as they can safely go
+540e4e1 Turn both dish-returns to face the room, and fix the yaw scale bug that blocked it
+ce6eb69 Persist a personal best, and track tips on their own
+```
+
+`main` is pushed and clean through `af0a923`. The one thing sitting in the working tree, uncommitted **on purpose**:
+
+```
+git status --short
+ M index.html                        <- ~30 lines, marked "TEMP mockup -- not for commit"
+?? assets/ui/manager-mock.webp       <- placeholder cutout, known fringe artifact
+?? assets/ui/parchment-mock.webp     <- clean cutout, fine as-is
+```
+
+Both webp files are placeholder-quality (see below) — don't polish them, they're for judging placement only. The `index.html` diff adds `managerMockImg`/`parchmentMockImg` image loads and a `drawManagerMock()` function, called once from `render()`. Search the file for `TEMP mockup` to find every line; nothing else in the working tree is touched. This is intentionally left uncommitted (not a mistake, not lost work) so a `git diff` shows it directly rather than this doc going stale about exactly what it contains.
+
+### In progress: The Manager, a tutorial mascot
+
+Rone's idea: the tutorial is currently a text-only bottom banner (`drawTutorialBanner()`) with no speaker. What if a character — "The Manager" — delivers it instead, in a parchment speech bubble positioned in the pocket of open floor above table 4 (the same spot `PICK UP`'s frame used to occupy, before it got removed entirely — see below). Conceit: he's training the player.
+
+**Full writeup, including both source character sheets and the open questions, is in `art-source/refs/ui/PROMPTS.md` section 6.** Short version:
+
+- A mock was built and screenshotted against the real board. Rone's read: the *placement* works — no collision with the shelf-unit prop, the wall panels, or the "Tables lost" HUD widget, and a short line of real tutorial copy fits legibly on the parchment.
+- Nothing about the *art* is final. Open: which of the five poses on `manager-sheet-brown.png` to use (or whether different tutorial steps want different poses); what the second character (`manager-sheet-olive.png`, no name tag, holds a book with an ammonite emblem) is for, if anything; the mock's cutout has a real fringe artifact (faint blue-gray cast on the white sleeve/collar — the fabric's tone sat too close to the sheet's background for `cut_plaque.py`'s flat key) that needs a tighter re-key or a cleaner source render before shipping.
+- The tutorial copy is the other open half. Only step 1 has been rewritten short enough to fit ("Use the pad in the corner to get moving." — a placeholder rewrite, not final wording). The other five `TUTORIAL_STEPS` entries in `index.html` are untouched, and at least one (the old PICK UP step) runs close to 200 characters — it will not fit this bubble at any reasonable size without a real rewrite pass.
+- Three source images are saved to `art-source/refs/ui/` and pushed (`manager-sheet-brown.png`, `manager-sheet-olive.png`, `parchment-bubble-sheet.png`) — safe even though the mock code itself isn't committed.
+
+Next steps in order, once picked back up: (1) Rone picks a pose and settles the second character's role, (2) fix the cutout fringe, (3) shorten the other five tutorial steps, (4) wire for real (replacing the temp code, not adding to it) and run the full harness suite before committing.
+
+### What shipped this session, chronologically (commit hash → one line)
+
+- `540e4e1`/`978517a` — Dish-return rotation: found and fixed a real scale bug (`render_room.mjs` was measuring a prop's bounding box *after* rotating it, not before), turned both dish-returns to face the room, then pushed both as close to the board edge as the alpha channel says is actually safe (not eyeballed).
+- `fd7e55c` — Replaced the vector "T#" table-number pill under counter orders/carried plates with Rone's pinned-parchment tag art (`assets/ui/tag-t1..8.webp`).
+- `5dd8cb5`→`edff0f8` — SET DOWN's rope-and-bone pad frame replaced with two lava corner accents (idle cooled-obsidian pair, molten pair standing/carrying), mocked twice against the real board first (a framed-box version read as a floating panel, rejected). Then two rounds of fixing real collisions with pre-existing floor decor: tightened corner size globally, added per-table pixel nudges for two tables, then — when one table's nudge still read as visibly offset from its 7 siblings — removed the offending floor fossil at its source in `render_room.mjs` instead of keeping nudging around it.
+- `d9a06a0`→`a5c9d35` — Real baked 3D lettering (genuine extrusion, real lighting) for `SET DOWN` and `DISH RETURN`, generated via DALL·E against reference renders of the actual DM Sans Bold typeface (not a text-only prompt — diffusion models drift on exact letterforms otherwise), each checked letter-by-letter against the reference before accepting. This is a **documented, deliberate exception** to this project's own "no baked text, it can't be translated" rule (see `art-source/refs/ui/PROMPTS.md` sections 1/2 for the rule, section 5 for the exception and why). `PICK UP` was mid-queue for the same treatment when the plan changed (see next item) — it never got baked lettering, and per the item below, now never will.
+- `b651953`/`3d4a8b2` — Rone's call: cut `PICK UP`'s frame, label, *and* even the minimal standing-confirmation glow entirely, both boards. Reasoning: tickets now render sitting on the counter itself (the tag work above), so a floor marker calling out "pick up here" repeats information the visible ticket already gives. `drawPickupZone()` is fully removed, not emptied — the underlying interaction (`PASSES`, `passUnderPlayer()`) is untouched.
+- `9aa2a02` — Both planters repositioned: left one 30px closer to its rug, right one pushed to its real edge limit (found via the isolated render's alpha channel, same method as the dish-return edge push — turned out to be only 2px of real room, it was already centred on its rug's own edge).
+
+### Standing rules a new session needs, condensed
+
+- **3D board only.** Painted board (`assets/board.jpg`) gets no further passes. Shared code (e.g. `drawPickupZone`, before it was removed) still had to be edited carefully when it affected both boards, but new visual work targets 3D specifically.
+- **No baked text, with two now-documented exceptions.** The rule ("baked text in a 3D model is text you cannot change or translate") lives in `art-source/refs/ui/PROMPTS.md` sections 1/2, written originally about `SET DOWN`/`PICK UP`'s pad frames. `DISH RETURN` and `SET DOWN`'s *lettering* (not their frames) are now real exceptions, reasoned through explicitly in section 5 — there's no language switcher anywhere in this codebase today, and the cost of redoing three short labels later is accepted as real but small. Don't extend the exception to new text without the same reasoning.
+- **`cut_plaque.py` has two real gotchas worth knowing before the first re-roll:** (1) some DALL·E output comes back as flattened RGB with a checkerboard baked into the pixels instead of real alpha — needs `--mode flat --bg <sampled near-white>`, not the magenta default. (2) A faint vignette in a "flat" background can expand the auto-cropped bbox to nearly the full canvas, padding the art with invisible margin — check the crop's actual pixel dimensions, not just that the tool ran without error.
+- **Verification before any commit touching `render_room.mjs` or the 3D board's rendering:**
+  ```
+  python3 tools/mkprobe.py && python3 -m http.server 8222 &   # once per session
+  node tools/hands.js
+  BOARD=3d node tools/hands.js
+  node tools/hud.js
+  node tools/dpad.js
+  node tools/contrast.js
+  python3 tools/board_audit.py --3d
+  ```
+  All five harnesses plus the audit have to pass. If `assets/board-3d.jpg` changed, re-encode with `python3 -c "from PIL import Image; Image.open('art-source/shots/room.png').convert('RGB').save('assets/board-3d.jpg', quality=88, optimize=True)"` and sanity-check the mean channel delta against the raw render (should land close to 1.9-2.0/255, consistent with every prior re-encode).
+  `contrast.js` in particular is slow (headless Chromium) and will sometimes hit the 120s foreground timeout — that's normal, not a hang; let it run in the background and wait for the real completion notification rather than assuming it's stuck.
+- **One commit per logical change, reasoning in the message, push straight to `main`, no PRs unless asked.** Established throughout, not new.
+- **Empirical over eyeballed, every time there's a tool to check with.** Several findings this session only held up because something was measured rather than assumed: a corner bracket that "looked clean" in a screenshot was actually clipped 230 rows solid at the canvas edge (only the isolated render's alpha channel caught it); two DALL·E variants that looked identical at a glance differed across nearly the whole frame when diffed pixel-by-pixel. Don't skip the check because a screenshot looks fine.
+
+### Open threads not touched this session
+
+- **Counter clutter** (books/bottles/mugs) — flagged as open in `art-source/ROOM-ENVIRONMENT-BRIEF.md` well before this session started, still open. Needs a decision between a real Meshy pass and a flat 2D-icon treatment before any art gets generated.
+- **End-card art** — four DALL·E prompts are written in `art-source/refs/ui/PROMPTS.md` section 4 (backdrop, clipboard board, two buttons), from a session before this one. No art has come back for them as of this handoff.
+- **Personal-best/tips persistence** — built and verified in an earlier session (`ce6eb69` and before), not touched this session, no known issues.
+
+---
+
 ## What this project is
 
 A build for Articulate E-Learning Challenge #561 ("Online Training for Restaurant Servers & Waiters"). Instead of the usual branching scenario, it is a short Overcooked-style arcade game that trains the "in the weeds" skill of a server's job: holding multiple orders in your head while physically running the floor, under escalating pressure.
