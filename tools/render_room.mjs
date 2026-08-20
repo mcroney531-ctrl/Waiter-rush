@@ -253,8 +253,23 @@ const LAYOUT = [
   // The left/right height difference this creates is deliberate, per Rone --
   // the room is mirror-symmetric in prop placement everywhere else, so do not
   // "fix" the left planter to match without asking.
-  { prop: 'planter', x: 70,   y: 520, upright: 'none' },
-  { prop: 'planter', x: 1466, y: 700, upright: 'none', yaw: 140, tint: 0.9 },
+  //
+  // y 520 -> 550 on a later, explicit ask: move the left planter 30px closer
+  // to its own rug, which sits at higher y (further toward camera) than the
+  // plant did, same "toward larger y is toward the rug" relationship the
+  // right planter's own placement above already establishes.
+  //
+  // Right planter: x 1466 -> 1472 -> 1468, y 700 -> 702, another explicit
+  // ask ("small plant on the right, as far to the edge as we can, down a
+  // pixel or two"). x was already "centred over the rug's 1354-1535 span" --
+  // i.e. already almost at the canvas edge -- so there wasn't much room left
+  // to give. Found the real limit with the isolate render's alpha channel
+  // rather than guessing (same method the dish-return corner push used):
+  // x 1470 clips a pixel into the canvas edge, x 1468 is clear by 2px. Landed
+  // on 1468, not 1470, to keep a hair of margin rather than shipping exactly
+  // at the clip line.
+  { prop: 'planter', x: 70,   y: 550, upright: 'none' },
+  { prop: 'planter', x: 1468, y: 702, upright: 'none', yaw: 140, tint: 0.9 },
   // floor-inlay (a round fossil medallion) lived here through several passes --
   // upside-down, flipped, moved, swapped with dish-return -- and Rone was never
   // quite sold on it even fixed. Removed rather than tuned again; a procedural
