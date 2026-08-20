@@ -759,6 +759,15 @@
   // redo needed the way DISH RETURN's did.
   const setDownLabelImg = new Image();
   setDownLabelImg.src = 'assets/ui/set-down-3d.webp';
+  // TEMP mockup -- not for commit. The Manager, training-mascot idea: a
+  // portrait + a parchment speech bubble in the pocket of open floor above
+  // table 4, right where PICK UP's frame used to sit. Placeholder crop/key,
+  // not final art -- picking this pose only to test whether the placement
+  // and a short line of real tutorial copy actually fit and read.
+  const managerMockImg = new Image();
+  managerMockImg.src = 'assets/ui/manager-mock.webp';
+  const parchmentMockImg = new Image();
+  parchmentMockImg.src = 'assets/ui/parchment-mock.webp';
   // The dish return's silhouette, isolated from the room render with the same
   // camera and light as the real board, so the hover glow can hug the
   // basin's actual shape instead of a generic box. One full-canvas image;
@@ -4463,6 +4472,26 @@
     ctx.restore();
   }
 
+  // TEMP mockup -- not for commit. See managerMockImg above.
+  function drawManagerMock(){
+    if (!ready(managerMockImg) || !ready(parchmentMockImg)) return;
+    ctx.save();
+    const cx = A(1180), cy = A(430) + 30;
+    const ch = 92;
+    const cw = ch * (managerMockImg.naturalWidth / managerMockImg.naturalHeight);
+    ctx.drawImage(managerMockImg, cx - cw * 0.32, cy - ch, cw, ch);
+
+    const bw = 190, bh = 130;
+    const bx = cx - cw * 0.1, by = cy - ch - bh + 20;
+    ctx.drawImage(parchmentMockImg, bx, by, bw, bh);
+    ctx.fillStyle = '#3a2c18';
+    ctx.font = '700 13px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    const lines = wrapText('Use the pad in the corner to get moving.', bw - 50);
+    lines.forEach((ln, i) => ctx.fillText(ln, bx + bw / 2, by + bh / 2 - (lines.length - 1) * 9 + i * 18));
+    ctx.restore();
+  }
+
   function render(){
     ctx.clearRect(0,0,W,H);
     drawFloor();
@@ -4475,6 +4504,7 @@
     drawFloaters();
     drawCounter();
     drawTutorialBanner();
+    drawManagerMock();
     drawMoments();
     drawPlayer();   // above the panel, so you can always see yourself
   }
