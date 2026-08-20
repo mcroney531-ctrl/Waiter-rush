@@ -733,7 +733,6 @@
   // middle -- the middle is a hole on purpose so the floor shows through it,
   // which is what lets these survive the room being rebuilt in 3D.
   const padImg = new Image();  padImg.src  = 'assets/ui/set-down.webp';
-  const passImg = new Image(); passImg.src = 'assets/ui/pick-up.webp';
   const ready = im => im.complete && im.naturalWidth > 0;
   // The 3D board's SET DOWN pad, mocked against the real board and approved
   // by Rone: two lava corner accents flanking the label instead of a full
@@ -3651,48 +3650,27 @@
     }
   }
 
-  // The PICK UP signs are painted on the wall; these pads are the floor
-  // positions beneath them. Only the live state is drawn: amber when that
-  // section has an order waiting, teal when you are standing on it.
+  // Used to draw a rope-bordered frame and a PICK UP label at each pass,
+  // always visible -- Rone's call to drop both: with tickets now drawn
+  // sitting on the counter itself (the tag system), the food being visibly
+  // there is the cue, and a floor marker under it repeats the same
+  // information. What's left is purely functional: a confirmation glow only
+  // while actually standing in the pass's hit zone, nothing advertising it
+  // beforehand. assets/ui/pick-up.webp is unreferenced now -- left in place
+  // rather than deleted, in case this gets revisited.
   function drawPickupZone(){
     const at = passUnderPlayer();
-    const phase = performance.now();
     for (const p of PASSES){
-      const standing = at === p;
-      const waiting = queueFor(p.side).length > 0;
-      if (ready(passImg)){
-        // Unlike a set-down pad this one is drawn even when idle: it is where
-        // the shift starts, and an empty pass is still the place to go back to.
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        drawPadArt(passImg, p.w, p.h,
-                   standing ? 'active' : waiting ? 'carrying' : 'idle', phase);
-        // The painted board has PICK UP lettered onto the wall signs. The 3D
-        // pass-sign prop deliberately has none -- PROMPTS.md 4, "the game draws
-        // PICK UP itself, and baked text in a 3D model is text you cannot
-        // change or translate" -- so on that board the game has to keep its
-        // half of the bargain, or the two pads are unlabelled.
-        if (USE_3D) {
-          ctx.globalAlpha = standing ? 0.95 : waiting ? 0.8 : 0.5;
-          ctx.font = '700 12px DM Sans, sans-serif';
-          drawStyledLabel('PICK UP', 0, 4, COLORS.mustard);
-          ctx.globalAlpha = 1;
-        }
-        ctx.restore();
-        continue;
-      }
-      if (!standing && !waiting) continue;
+      if (at !== p) continue;
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.fillStyle = standing ? 'rgba(47,111,107,0.32)' : 'rgba(224,167,46,0.16)';
-      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);   // fallback path
+      ctx.fillStyle = 'rgba(47,111,107,0.32)';
+      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
       ctx.fill();
-      ctx.strokeStyle = standing ? COLORS.counter : COLORS.mustard;
+      ctx.strokeStyle = COLORS.counter;
       ctx.lineWidth = 3;
-      ctx.setLineDash(standing ? [] : [8, 6]);
       roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.restore();
     }
   }
