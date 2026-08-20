@@ -613,17 +613,21 @@
   // The counter is painted across the top; the floor the player can walk on
   // starts below it.
   // ---- the two boards, during the changeover ----------------------------
-  // ?board=3d loads the rendered room and the spec's geometry; anything else
-  // keeps the painted board and the geometry measured off it. Both have to
-  // switch together and that is the whole reason this exists as one flag: the
-  // painted board's back row sits at art y 465 and the rendered one's at 620,
-  // so a rendered board with painted constants puts every SET DOWN pad 155px
-  // off its table and makes the room look broken for reasons that have nothing
-  // to do with the room.
+  // 3D is the default now -- the rendered room is what live players get with
+  // no query string at all. ?board=2d is the escape hatch back to the painted
+  // board, kept only so the legacy path can still be looked at for
+  // comparison; nothing about it is being developed further (see HANDOFF.md's
+  // standing rule: painted board, no further passes).
   //
-  // Temporary. When the rendered board is accepted this collapses to the 3D
-  // branch and the flag goes.
-  const USE_3D = new URLSearchParams(location.search).get('board') === '3d';
+  // Both boards have to switch together and that is the whole reason this
+  // exists as one flag: the painted board's back row sits at art y 465 and
+  // the rendered one's at 620, so a rendered board with painted constants
+  // puts every SET DOWN pad 155px off its table and makes the room look
+  // broken for reasons that have nothing to do with the room.
+  //
+  // Temporary either way. Once the painted board is dropped for good this
+  // collapses to the 3D branch alone and the flag goes.
+  const USE_3D = new URLSearchParams(location.search).get('board') !== '2d';
   const BOARD_SRC = USE_3D ? 'assets/board-3d.jpg' : 'assets/board.jpg';
   const GEO = USE_3D
     // Derived from the rendered tables' measured extent rather than read off
