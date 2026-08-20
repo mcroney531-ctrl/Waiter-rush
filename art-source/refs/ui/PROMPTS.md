@@ -336,3 +336,64 @@ gets added as a second `@font-face`, or the figures get drawn in Galindo and
 will not match the mock exactly. Whichever way, the money sign's harness check
 (`$9999.99 fits between the frame rails`) wants copying for each of these slots
 — `$1,284.92` is already nine glyphs and a five-figure best is wider.
+
+---
+
+## 5. `SET DOWN` / `PICK UP` / `DISH RETURN` — bold 3D lettering, baked
+
+**This overrides the "no lettering" rule in sections 1 and 2, deliberately.**
+Both `set-down.png` and `pick-up.png` say the game draws these words itself
+specifically so they stay editable and translatable. Rone chose to cross that
+line here anyway, after weighing it against what it actually costs today:
+there is no language switcher or string table anywhere in this codebase, every
+line of dialogue is already hardcoded English, and the end-card buttons
+(section 4c/4d) already bake their own lettering for the same kind of reason
+(a real hit target with a press state). Re-doing three short labels later if
+translation ever becomes real is a cost worth accepting now, not a structural
+problem being created.
+
+The reason to bake these at all: true bevel/emboss/extrusion has no canvas
+primitive. `index.html` can fake it — stacked diagonal copies for an extruded
+side, checked and approved against the real board at the labels' actual
+11-12px render size — but a real render with real lighting reads better than
+any canvas trick will, and Rone wants that if it's achievable without
+breaking the things that actually matter (see above).
+
+**Reference images, not a text prompt.** Diffusion models are unreliable at
+reproducing exact letterforms/kerning when a heavy stylistic pass is layered
+on, so the prompt below attaches a reference render rather than describing
+the words. `art-source/refs/ui/label-set-down.png`,
+`label-pick-up.png`, `label-dish-return.png` — each is DM Sans Bold (weight
+700, the same face and weight `index.html` already loads and uses for this
+exact functional-label role elsewhere: the tips sign, the HUD stats), on a
+transparent background, rendered through actual headless Chromium against
+the real Google Fonts file rather than a locally-guessed substitute, and
+checked against `document.fonts.check('700 32px "DM Sans"')` before
+capturing to confirm the real webfont loaded rather than a silent fallback.
+
+> Attached is a reference image of the exact word(s), typeface and spacing to
+> use. Keep the letterforms, proportions and kerning identical to the
+> reference -- do not restyle or substitute the typeface. Render the same
+> text as bold 3D lettering, raised off the surface: a carved amber-and-gold
+> metal face, a visible extruded side in a darker bronze catching a warm
+> highlight, and a crisp dark outer edge. Warm directional light from the
+> upper left, matching a restaurant designed by dinosaur civilisation --
+> carved basalt, fossil framed trim, chunky prehistoric joinery, upscale and
+> whimsical, not a cave, not Jurassic Park.
+>
+> Plain flat magenta background, no drop shadow, nothing else in frame.
+
+```
+python3 tools/cut_plaque.py art-source/refs/ui/<result>.png label-<name> \
+        --mode flat --bg <sampled> --shadow --width 512
+```
+
+**Re-roll if the letters drift from the reference**, the same standing rule
+as the table plaque and the end-card board: check it against the reference
+letter by letter before accepting, not just for overall vibe.
+
+**State handling stays code, not art** — same reasoning as section 1's "one
+image, three states." One baked image per label, tinted/dimmed at runtime the
+same way `drawPadArt` already handles idle/active/carrying for the pad
+frames: full brightness standing on the pad, a warm flat tint carrying-but-
+not-there, dimmed alpha idle. No need for three separate bakes per label.
