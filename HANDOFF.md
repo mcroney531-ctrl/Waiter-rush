@@ -34,16 +34,14 @@ fd7e55c Replace the vector table-number pill with Rone's pinned-parchment tags
 ce6eb69 Persist a personal best, and track tips on their own
 ```
 
-`main` is pushed and clean through `af0a923`. The one thing sitting in the working tree, uncommitted **on purpose**:
+`main` is pushed and clean through `af0a923`. **Correction to this section's first version:** it originally described the Manager mockup as deliberately uncommitted in the working tree, reasoning that this was safe because it was "not lost work." That framing was wrong in a way that matters — uncommitted changes live only in one session's own container, and do not transfer to another session attached to the same repo. The alt session that picked this handoff up caught that gap before anything was actually lost, and the mockup is now pushed to a real branch instead:
 
 ```
-git status --short
- M index.html                        <- ~30 lines, marked "TEMP mockup -- not for commit"
-?? assets/ui/manager-mock.webp       <- placeholder cutout, known fringe artifact
-?? assets/ui/parchment-mock.webp     <- clean cutout, fine as-is
+git branch -a | grep manager
+  remotes/origin/wip/manager-mascot-mockup
 ```
 
-Both webp files are placeholder-quality (see below) — don't polish them, they're for judging placement only. The `index.html` diff adds `managerMockImg`/`parchmentMockImg` image loads and a `drawManagerMock()` function, called once from `render()`. Search the file for `TEMP mockup` to find every line; nothing else in the working tree is touched. This is intentionally left uncommitted (not a mistake, not lost work) so a `git diff` shows it directly rather than this doc going stale about exactly what it contains.
+`wip/manager-mascot-mockup` (commit `078f0c3`) holds the ~30-line `index.html` diff (search for `TEMP mockup` to find every line: `managerMockImg`/`parchmentMockImg` image loads and a `drawManagerMock()` function called once from `render()`) plus the two placeholder webp assets. `main` itself has none of this — check out that branch to see or continue the mockup. It is genuinely not ready to merge (placeholder cutout, one tutorial step rewritten, pose not picked — see below), which is why it's a separate branch and not a `main` commit; "not ready for main" and "not saved anywhere" are different things, and only the first is still true.
 
 ### In progress: The Manager, a tutorial mascot
 
@@ -54,9 +52,9 @@ Rone's idea: the tutorial is currently a text-only bottom banner (`drawTutorialB
 - A mock was built and screenshotted against the real board. Rone's read: the *placement* works — no collision with the shelf-unit prop, the wall panels, or the "Tables lost" HUD widget, and a short line of real tutorial copy fits legibly on the parchment.
 - Nothing about the *art* is final. Open: which of the five poses on `manager-sheet-brown.png` to use (or whether different tutorial steps want different poses); what the second character (`manager-sheet-olive.png`, no name tag, holds a book with an ammonite emblem) is for, if anything; the mock's cutout has a real fringe artifact (faint blue-gray cast on the white sleeve/collar — the fabric's tone sat too close to the sheet's background for `cut_plaque.py`'s flat key) that needs a tighter re-key or a cleaner source render before shipping.
 - The tutorial copy is the other open half. Only step 1 has been rewritten short enough to fit ("Use the pad in the corner to get moving." — a placeholder rewrite, not final wording). The other five `TUTORIAL_STEPS` entries in `index.html` are untouched, and at least one (the old PICK UP step) runs close to 200 characters — it will not fit this bubble at any reasonable size without a real rewrite pass.
-- Three source images are saved to `art-source/refs/ui/` and pushed (`manager-sheet-brown.png`, `manager-sheet-olive.png`, `parchment-bubble-sheet.png`) — safe even though the mock code itself isn't committed.
+- Three source images are saved to `art-source/refs/ui/` and pushed on `main` (`manager-sheet-brown.png`, `manager-sheet-olive.png`, `parchment-bubble-sheet.png`); the mock code itself is pushed too, on `wip/manager-mascot-mockup` rather than `main` (see above).
 
-Next steps in order, once picked back up: (1) Rone picks a pose and settles the second character's role, (2) fix the cutout fringe, (3) shorten the other five tutorial steps, (4) wire for real (replacing the temp code, not adding to it) and run the full harness suite before committing.
+Next steps in order, once picked back up: (1) Rone picks a pose and settles the second character's role, (2) fix the cutout fringe, (3) shorten the other five tutorial steps, (4) wire for real on `main` (replacing the temp code, not adding to it) and run the full harness suite before committing.
 
 ### What shipped this session, chronologically (commit hash → one line)
 
