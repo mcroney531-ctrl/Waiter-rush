@@ -748,6 +748,13 @@
   const dropCornerHotR  = new Image(); dropCornerHotR.src  = 'assets/ui/pad-corner-hot-r.webp';
   const dropCornerCoolL = new Image(); dropCornerCoolL.src = 'assets/ui/pad-corner-cool-l.webp';
   const dropCornerCoolR = new Image(); dropCornerCoolR.src = 'assets/ui/pad-corner-cool-r.webp';
+  // DISH RETURN as real baked 3D lettering (art-source/refs/ui/PROMPTS.md
+  // section 5) -- carved amber-gold metal with a genuine extruded side and
+  // real lighting, which no canvas trick matches. drawStyledLabel's
+  // stacked-diagonal fake stays as the fallback below until it loads and
+  // permanently if it never does, same convention as every other asset here.
+  const dishReturnLabelImg = new Image();
+  dishReturnLabelImg.src = 'assets/ui/dish-return-3d.webp';
   // The dish return's silhouette, isolated from the room render with the same
   // camera and light as the real board, so the hover glow can hug the
   // basin's actual shape instead of a generic box. One full-canvas image;
@@ -3418,6 +3425,46 @@
     ctx.restore();
   }
 
+  // Bold + outer stroke + a stacked-diagonal fake extrusion, all procedural.
+  // This is the fallback for SET DOWN and PICK UP until their own baked 3D
+  // labels exist -- both keep canvas-drawn text on purpose, per
+  // art-source/refs/ui/PROMPTS.md sections 1/2: "baked text in a 3D model is
+  // text you cannot change or translate." DISH RETURN's baked art (below) is
+  // a deliberate, documented exception to that rule (PROMPTS.md section 5),
+  // not a change to it for these two -- they upgrade the same way DISH
+  // RETURN just did, once their own art lands.
+  function lerpRGB(a, b, t){
+    return `rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;
+  }
+  function drawStyledLabel(text, x, y, fillColor){
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.lineJoin = 'round';
+    // The "side" of the extrusion: a short diagonal stack, darkest at the
+    // far end and lightening toward the face, same idea as an extruded 3D
+    // logo. Steps and step size both tuned down from a first pass at 8
+    // steps / 0.55px, which read as a blurred smudge at this size rather
+    // than a crisp edge -- fewer, larger steps read cleaner small, checked
+    // at the labels' real 11-12px render size, not just at zoom.
+    const steps = 5, dx = 0.9, dy = 0.9;
+    const far = [40, 24, 10], near = [120, 78, 24];
+    for (let i = steps; i >= 1; i--){
+      ctx.fillStyle = lerpRGB(far, near, 1 - i / steps);
+      ctx.fillText(text, x + dx * i, y + dy * i);
+    }
+    // One stroke pass, not two -- a second, narrower same-colour pass drawn
+    // first would just get overdrawn by this wider dark one. The stroke's own
+    // width is what supplies the "bold" (strokeText expands the glyph's
+    // silhouette by half the lineWidth in every direction) as well as the
+    // outer outline, so one pass does both jobs.
+    ctx.strokeStyle = 'rgba(20,14,8,0.92)';
+    ctx.lineWidth = 3.2;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fillColor;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
   // The 3D board's SET DOWN pad: two lava corner accents flanking the label,
   // no frame. A framed-box version (patching the old rope frame out with a
   // rectangle to draw on) read as a floating panel that didn't sit on the
@@ -3484,11 +3531,9 @@
                   halfH + off - ch + (nudge.rdy || 0), cwR, ch);
     ctx.restore();
 
-    ctx.fillStyle = hot ? COLORS.mustard : 'rgba(200,196,188,0.8)';
-    ctx.font = '12px Galindo, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.font = '700 12px DM Sans, sans-serif';
     ctx.globalAlpha = standing ? 1 : carrying ? 0.85 : 0.6;
-    ctx.fillText('SET DOWN', 0, 4);
+    drawStyledLabel('SET DOWN', 0, 4, hot ? COLORS.mustard : 'rgba(200,196,188,0.8)');
     ctx.globalAlpha = 1;
   }
 
@@ -3611,10 +3656,8 @@
         // half of the bargain, or the two pads are unlabelled.
         if (USE_3D) {
           ctx.globalAlpha = standing ? 0.95 : waiting ? 0.8 : 0.5;
-          ctx.fillStyle = COLORS.mustard;
-          ctx.font = '12px Galindo, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('PICK UP', 0, 4);
+          ctx.font = '700 12px DM Sans, sans-serif';
+          drawStyledLabel('PICK UP', 0, 4, COLORS.mustard);
           ctx.globalAlpha = 1;
         }
         ctx.restore();
@@ -3697,13 +3740,17 @@
       for (const b of BUS_STATIONS) {
         ctx.save();
         ctx.globalAlpha = at === b ? 0.95 : holding ? 0.8 : 0.45;
-        ctx.fillStyle = COLORS.mustard;
-        ctx.font = '11px Galindo, sans-serif';
-        ctx.textAlign = 'center';
         // Above the basin, where the painted board's sign was. Below it the
         // two lines landed on the floor inlays in the margins.
-        ctx.fillText('DISH', b.x, b.y - A(112));
-        ctx.fillText('RETURN', b.x, b.y - A(90));
+        if (ready(dishReturnLabelImg)){
+          const w = A(112);
+          const h = w * (dishReturnLabelImg.naturalHeight / dishReturnLabelImg.naturalWidth);
+          ctx.drawImage(dishReturnLabelImg, b.x - w / 2, b.y - A(101) - h / 2, w, h);
+        } else {
+          ctx.font = '700 11px DM Sans, sans-serif';
+          drawStyledLabel('DISH', b.x, b.y - A(112), COLORS.mustard);
+          drawStyledLabel('RETURN', b.x, b.y - A(90), COLORS.mustard);
+        }
         ctx.restore();
       }
     }
