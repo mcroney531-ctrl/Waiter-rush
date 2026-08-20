@@ -3650,30 +3650,17 @@
     }
   }
 
-  // Used to draw a rope-bordered frame and a PICK UP label at each pass,
-  // always visible -- Rone's call to drop both: with tickets now drawn
-  // sitting on the counter itself (the tag system), the food being visibly
-  // there is the cue, and a floor marker under it repeats the same
-  // information. What's left is purely functional: a confirmation glow only
-  // while actually standing in the pass's hit zone, nothing advertising it
-  // beforehand. assets/ui/pick-up.webp is unreferenced now -- left in place
+  // drawPickupZone() used to draw a rope-bordered frame and a PICK UP label
+  // at each pass, always visible, then a plain confirmation glow while
+  // standing in one. Rone's call to drop both, in two passes: with tickets
+  // now drawn sitting on the counter itself (the tag system), the food being
+  // visibly there is the cue, so the frame+label went first; then even the
+  // standing-only glow turned out to repeat the same information the ticket
+  // already gives, so that went too. Removed rather than emptied -- nothing
+  // called it after that. The interaction itself (PASSES/passUnderPlayer(),
+  // pickup logic) is untouched; this only ever removed floor-level
+  // advertising. assets/ui/pick-up.webp is unreferenced -- left on disk
   // rather than deleted, in case this gets revisited.
-  function drawPickupZone(){
-    const at = passUnderPlayer();
-    for (const p of PASSES){
-      if (at !== p) continue;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.fillStyle = 'rgba(47,111,107,0.32)';
-      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
-      ctx.fill();
-      ctx.strokeStyle = COLORS.counter;
-      ctx.lineWidth = 3;
-      roundRect(ctx, -p.w/2, -p.h/2, p.w, p.h, 10);
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
 
   // The 3D board's rim-glow highlight: a soft halo that hugs each basin's
   // own silhouette (via dish-return-mask.png) rather than a bounding box.
@@ -4483,7 +4470,6 @@
     drawRushLight();
     drawTipsSign();   // scenery: everything below draws over it, the player included
     drawDropZones();
-    drawPickupZone();
     drawBusStation();
     tables.forEach(drawTable);
     drawFloaters();
