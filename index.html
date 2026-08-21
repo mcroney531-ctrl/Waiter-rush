@@ -3765,11 +3765,14 @@
         if (ready(dishReturnLabelImg)){
           const w = A(112);
           const h = w * (dishReturnLabelImg.naturalHeight / dishReturnLabelImg.naturalWidth);
-          ctx.drawImage(dishReturnLabelImg, b.x - w / 2, b.y - A(101) - h / 2, w, h);
+          // Lower on the basin's side, not up near its rim -- Rone's call
+          // after the top placement read as floating above the prop rather
+          // than sitting on it.
+          ctx.drawImage(dishReturnLabelImg, b.x - w / 2, b.y - A(30) - h / 2, w, h);
         } else {
           ctx.font = '700 11px DM Sans, sans-serif';
-          drawStyledLabel('DISH', b.x, b.y - A(112), COLORS.mustard);
-          drawStyledLabel('RETURN', b.x, b.y - A(90), COLORS.mustard);
+          drawStyledLabel('DISH', b.x, b.y - A(41), COLORS.mustard);
+          drawStyledLabel('RETURN', b.x, b.y - A(19), COLORS.mustard);
         }
         ctx.restore();
       }
@@ -4471,35 +4474,45 @@
   // or null if nobody generated art for it (step 3 has no success/miss art
   // at all -- see MANAGER_ART above). Step 1's opening moment is the one
   // irregular key: 'welcome', not 'instruction'.
-  function managerArtKey(){
+  function managerMoment(){
     if (!tut) return null;
     const showNote = tut.noteTimer > 0;
     const showSuccess = !showNote && tut.successTimer > 0;
     const stepNum = tut.index + 1;
     const moment = showNote ? 'miss' : showSuccess ? 'success'
                  : stepNum === 1 ? 'welcome' : 'instruction';
-    const key = 'step' + stepNum + '-' + moment;
-    return MANAGER_ART[key] ? key : null;
+    return 'step' + stepNum + '-' + moment;
   }
 
   // Anchored in the pocket of open floor above table 4, the same spot
   // PICK UP's frame used to occupy -- the placement Rone approved against
-  // the mockup. That mock stacked a small portrait under a separate
-  // parchment bubble; these renders bake character-and-bubble into one
-  // landscape image instead, so the footprint here is sized fresh rather
-  // than copied, then checked against real screenshots (see the harness
-  // suite) rather than assumed to line up.
-  const MANAGER_H = 150, MANAGER_RIGHT = A(1370), MANAGER_TOP = A(120);
+  // the mockup, then pushed further down on top of that after a real-device
+  // check: the first pass sat close enough to the counter's fossil-panel
+  // trim to read as crowded. That mock stacked a small portrait under a
+  // separate parchment bubble; these renders bake character-and-bubble into
+  // one landscape image instead, so the footprint here is sized fresh
+  // rather than copied, then checked against real screenshots (see the
+  // harness suite) rather than assumed to line up.
+  const MANAGER_H = 150, MANAGER_RIGHT = A(1370), MANAGER_TOP = A(280);
 
   function drawManagerBanner(){
     if (mode !== 'tutorial' || !tut) return;
     const step = TUTORIAL_STEPS[tut.index];
     if (!step) return;
 
-    const key = managerArtKey();
-    const img = key && MANAGER_ART[key];
-    if (!img || !ready(img)){
-      drawTutorialBanner();   // no art for this moment yet -- the old panel
+    const key = managerMoment();
+    const img = MANAGER_ART[key];
+    if (!img){
+      // No art was ever generated for this moment -- step 3's success is
+      // the one gap (it has no baked art at all, not a loading race). The
+      // old steno-pad panel used to fill in here, but next to the Manager
+      // everywhere else it read as a stale leftover UI rather than a
+      // deliberate fallback, so this beat is silent instead: the delivery
+      // still gets its own feedback from the tip floater.
+      return;
+    }
+    if (!ready(img)){
+      drawTutorialBanner();   // still loading -- brief, worth a fallback
       return;
     }
 
