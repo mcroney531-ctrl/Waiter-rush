@@ -19,11 +19,13 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     set flowLit(v){flowLit=v;},
     get cap(){return carryCapacity;}, get wrong(){return wrongTurns;},
     get tut(){return tut ? {index:tut.index, practice:!!tut.practice,
-      successTimer:tut.successTimer, noteTimer:tut.noteTimer} : null;},
+      successTimer:tut.successTimer, noteTimer:tut.noteTimer,
+      managerShown:tut.managerShown, managerDelay:tut.managerDelay} : null;},
     get steps(){return TUTORIAL_STEPS.length;},
     forceTutMoment(index, moment){
       if (!tut) return;
       tut.index = index;
+      tut.managerShown = true; tut.managerPopT = 999999;   // skip the entrance delay for tests
       tut.successTimer = 0; tut.noteTimer = 0;
       if (moment === 'success'){ tut.successMsg = TUTORIAL_STEPS[index].success(); tut.successTimer = 5000; }
       else if (moment === 'miss'){ tut.note = 'forced miss for testing'; tut.noteTimer = 5000; }
