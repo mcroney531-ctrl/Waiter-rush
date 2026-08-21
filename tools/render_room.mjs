@@ -704,7 +704,12 @@ async function paintRug(w, h){
 // side) is untouched -- that end deliberately runs off the canvas edge with
 // no gap at the corner, and shortening from there would reopen that gap.
 const RUG_SHORTEN = 0.65;
-const RUG_ART_FULL = { xNear: [-60, 1596], xFar: [250, 1286], yCenter: 695, depth: 120 };
+// Right rug removed on Rone's call -- it sat under the small right planter,
+// which stays put (see its own placement note below); the planter now
+// stands on bare floor rather than rug fabric. Only the left entry remains
+// in xNear/xFar, which is why the loop below still reads "rugs" plural in
+// spirit but draws one.
+const RUG_ART_FULL = { xNear: [-60], xFar: [250], yCenter: 695, depth: 120 };
 const RUG_ART = {
   ...RUG_ART_FULL,
   xFar: RUG_ART_FULL.xNear.map((n, i) => n + (RUG_ART_FULL.xFar[i] - n) * RUG_SHORTEN),
