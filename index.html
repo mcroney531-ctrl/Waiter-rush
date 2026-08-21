@@ -763,6 +763,14 @@
   // redo needed the way DISH RETURN's did.
   const setDownLabelImg = new Image();
   setDownLabelImg.src = 'assets/ui/set-down-3d.webp';
+  // CLEAR, restyled to match SET DOWN's white-fill/orange-stroke pass rather
+  // than DISH RETURN's older carved-gold -- the two share a pad, so they read
+  // as one prop's two states instead of two different treatments swapped in
+  // and out. No idle/hot colour split needed the way SET DOWN's grayscale
+  // filter provides: white-on-orange already reads at both intensities the
+  // corners' cool/molten pair alone carries the state.
+  const clearLabelImg = new Image();
+  clearLabelImg.src = 'assets/ui/clear-3d.webp';
   // The Manager: a training-mascot character in a torn-parchment speech
   // bubble, narrating the tutorial. Replaces the old plain steno-pad banner
   // (drawTutorialBanner, kept below as the fallback for the handful of
@@ -3588,14 +3596,23 @@
     ctx.restore();
 
     if (dirty){
-      // No baked CLEAR label yet (see art-source/refs/ui/PROMPTS.md section
-      // 5's SET DOWN/PICK UP/DISH RETURN precedent -- CLEAR is queued for the
-      // same treatment). Procedural fallback in the meantime, same corner
-      // brackets a dirty table already earns rather than the old painted-
-      // board bone frame this used to fall back to.
       ctx.globalAlpha = standing ? 1 : 0.75;
-      ctx.font = '700 12px DM Sans, sans-serif';
-      drawStyledLabel('CLEAR', 0, 4, hot ? COLORS.mustard : 'rgba(200,196,188,0.8)');
+      if (ready(clearLabelImg)){
+        // Sized by height, not SET DOWN's width-fraction trick -- CLEAR's
+        // aspect (3.0) is shorter than SET DOWN's (4.0, a longer word spread
+        // wider), so matching width would leave CLEAR a third taller than
+        // SET DOWN ever runs on this pad. Matching height instead keeps the
+        // two labels reading as the same size regardless of word length.
+        // No idle/hot filter needed here the way SET DOWN's grayscale trick
+        // is -- white-on-orange already carries both states, the corners'
+        // own cool/molten pair does the rest.
+        const h = DROP.h * 0.524;
+        const w = h * (clearLabelImg.naturalWidth / clearLabelImg.naturalHeight);
+        ctx.drawImage(clearLabelImg, -w / 2, 4 - h / 2, w, h);
+      } else {
+        ctx.font = '700 12px DM Sans, sans-serif';
+        drawStyledLabel('CLEAR', 0, 4, hot ? COLORS.mustard : 'rgba(200,196,188,0.8)');
+      }
       ctx.globalAlpha = 1;
       return;
     }

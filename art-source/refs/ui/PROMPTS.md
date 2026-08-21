@@ -428,6 +428,42 @@ Composited over both a stone-plank table (`assets/board-3d.jpg` back row) and
 the dark aisle floor (front row) before shipping — white-on-dark reads with
 more contrast than the gold version did against either.
 
+### 5b. `CLEAR` — new label, same white/orange treatment as 5a
+
+Shipped in `assets/ui/clear-3d.webp`. Not a restyle of an existing bake —
+CLEAR never had a baked label before this, only `drawStyledLabel`'s
+procedural extrusion fallback (still there as the loading-race fallback in
+`drawSetDownCorners`). Matched to SET DOWN's white/orange pass rather than
+the older gold treatment because the two share one physical pad, swapped in
+and out as a table goes from settable to dirty — gold CLEAR next to white
+SET DOWN would read as two different props instead of one pad's two states.
+
+Same reference method as every label here: `label-clear.png` is DM Sans
+Bold, rendered through headless Chromium and checked against
+`document.fonts.check('700 32px "DM Sans"')` before capturing. Same prompt
+as 5a, reference swapped:
+
+> Attached is a reference image of the exact word(s), typeface and spacing to
+> use. Keep the letterforms, proportions and kerning identical to the
+> reference — do not restyle or substitute the typeface. Render the same text
+> as bold flat lettering: a solid white fill, with a thick, crisp orange outer
+> stroke/outline running the full perimeter of every letter. No bevel, no
+> extrusion, no gradient, no drop shadow — flat and graphic, like a bold
+> sticker outline.
+>
+> Plain flat magenta background, nothing else in frame.
+
+```
+python3 tools/cut_plaque.py art-source/refs/ui/clear-3d.png clear-3d \
+        --mode flat --bg 219,4,135 --width 512
+```
+
+No `--shadow` needed — corners sampled clean and uniform, same as 5a. Sized
+in code by height rather than width (`DROP.h * 0.524`, matching what SET
+DOWN's own width-fraction sizing actually renders at): CLEAR's aspect (3.0)
+is shorter than SET DOWN's (4.0, a longer word spread wider), so matching
+width would have left CLEAR a third taller than SET DOWN ever runs.
+
 ---
 
 ## 6. The Manager — a training-mascot character, exploratory, not built yet
