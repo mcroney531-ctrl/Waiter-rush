@@ -398,6 +398,36 @@ same way `drawPadArt` already handles idle/active/carrying for the pad
 frames: full brightness standing on the pad, a warm flat tint carrying-but-
 not-there, dimmed alpha idle. No need for three separate bakes per label.
 
+### 5a. `SET DOWN` restyle — flat white fill, orange outer stroke
+
+Shipped in `assets/ui/set-down-3d.webp`, replacing the carved-gold treatment
+above for this one label only. `PICK UP` and `DISH RETURN` are unchanged and
+still use the amber-and-gold 3D lettering prompt as written. Same reference
+image (`label-set-down.png`), same "keep the letterforms identical" framing,
+different surface description:
+
+> Attached is a reference image of the exact word(s), typeface and spacing to
+> use. Keep the letterforms, proportions and kerning identical to the
+> reference — do not restyle or substitute the typeface. Render the same text
+> as bold flat lettering: a solid white fill, with a thick, crisp orange outer
+> stroke/outline running the full perimeter of every letter. No bevel, no
+> extrusion, no gradient, no drop shadow — flat and graphic, like a bold
+> sticker outline.
+>
+> Plain flat magenta background, nothing else in frame.
+
+```
+python3 tools/cut_plaque.py art-source/refs/ui/set-down-3d.png set-down-3d \
+        --mode flat --bg 233,4,141 --width 512
+```
+
+No `--shadow` needed — this render's magenta corners sampled clean and
+uniform (~233,4,141 at all four corners and edge midpoints, 99th-percentile
+background noise only 16), unlike the fight `DISH RETURN`'s S needed.
+Composited over both a stone-plank table (`assets/board-3d.jpg` back row) and
+the dark aisle floor (front row) before shipping — white-on-dark reads with
+more contrast than the gold version did against either.
+
 ---
 
 ## 6. The Manager — a training-mascot character, exploratory, not built yet
