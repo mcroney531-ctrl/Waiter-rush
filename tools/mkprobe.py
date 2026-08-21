@@ -18,8 +18,16 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get streak(){return streak;}, set streak(v){streak=v; updateHUD();},
     set flowLit(v){flowLit=v;},
     get cap(){return carryCapacity;}, get wrong(){return wrongTurns;},
-    get tut(){return tut ? {index:tut.index, practice:!!tut.practice} : null;},
+    get tut(){return tut ? {index:tut.index, practice:!!tut.practice,
+      successTimer:tut.successTimer, noteTimer:tut.noteTimer} : null;},
     get steps(){return TUTORIAL_STEPS.length;},
+    forceTutMoment(index, moment){
+      if (!tut) return;
+      tut.index = index;
+      tut.successTimer = 0; tut.noteTimer = 0;
+      if (moment === 'success'){ tut.successMsg = TUTORIAL_STEPS[index].success(); tut.successTimer = 5000; }
+      if (moment === 'miss'){ tut.note = 'forced miss for testing'; tut.noteTimer = 5000; }
+    },
     PASSES:PASSES, BUS:BUS_STATIONS, set elapsed(v){elapsed=v;},
     set score(v){score=v; updateHUD();},
     get tips(){return tipsEarned;}, set tips(v){tipsEarned=v;},

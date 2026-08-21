@@ -763,6 +763,31 @@
   // redo needed the way DISH RETURN's did.
   const setDownLabelImg = new Image();
   setDownLabelImg.src = 'assets/ui/set-down-3d.webp';
+  // The Manager: a training-mascot character in a torn-parchment speech
+  // bubble, narrating the tutorial. Replaces the old plain steno-pad banner
+  // (drawTutorialBanner, kept below as the fallback for the handful of
+  // moments with no baked art yet -- see MANAGER_ART). Each image bakes its
+  // own character pose, bubble and text together -- see
+  // art-source/refs/ui/PROMPTS.md section 6 for why that is fine here even
+  // though baked text is avoided everywhere else in this file: the tutorial
+  // copy this bakes in is fixed, not state-parameterised, the same
+  // reasoning that justified SET DOWN/PICK UP/DISH RETURN's baked labels.
+  // Keyed by 'step<N>-<moment>' to match TUTORIAL_STEPS' own shape; step 1's
+  // opening moment is 'welcome' rather than 'instruction' because that is
+  // literally the file Rone generated for it, not a naming inconsistency to
+  // paper over.
+  const MANAGER_ART = {};
+  ['step1-welcome', 'step1-success',
+   'step2-instruction', 'step2-success',
+   'step3-instruction',
+   'step4-instruction', 'step4-success', 'step4-miss',
+   'step5-instruction', 'step5-success',
+   'step6-instruction', 'step6-success', 'step6-miss'
+  ].forEach(key => {
+    const im = new Image();
+    im.src = 'assets/ui/manager-' + key + '.webp';
+    MANAGER_ART[key] = im;
+  });
   // The dish return's silhouette, isolated from the room render with the same
   // camera and light as the real board, so the hover glow can hug the
   // basin's actual shape instead of a generic box. One full-canvas image;
@@ -2933,52 +2958,60 @@
   // the player actually performing the action, so nothing advances on a timer.
   const PRACTICE_TARGET = 3;
 
+  // Copy here is the Manager's own voice: a welcoming trainer walking a new
+  // hire through their first shift, affirming when a step lands. It has to
+  // stay in sync with MANAGER_ART's baked bubble text by hand -- these
+  // strings are also the fallback shown by drawTutorialBanner() whenever the
+  // matching baked art isn't ready (or, for the handful of success/miss
+  // moments nobody generated art for, always), so state-dependent detail
+  // that the baked art can't carry (which table, which sub-state) stays
+  // here even where it runs longer than the bubble's fixed line.
   const TUTORIAL_STEPS = [
     {
       hint: 'Find your feet',
       text: () => TOUCH
-        ? 'Use the pad in the bottom corner to walk around the floor.'
-        : 'Use the arrow keys — or WASD — to walk around the floor.',
+        ? 'Welcome in! Use the pad in the corner to get moving.'
+        : 'Welcome in! Use the arrow keys — or WASD — to get moving.',
       enter(){ drainEnabled = false; bussingEnabled = false; },
       done(){ return tut.moved > 300; },
-      success: () => 'That is the job, physically speaking. Now the hard part.'
+      success: () => 'Perfect — you’ve got your legs under you.'
     },
     {
       hint: 'Pick up an order',
-      text: () => 'An order is up. There is a PICK UP pad at each end of the counter, one per section — step onto the one under the ticket to take it, no button needed. You always get the ticket marked NEXT UP, so read it before you walk.',
+      text: () => 'Great, an order’s up! Step up to the counter to grab it — you’ll always get the one marked NEXT UP.',
       enter(){ drainEnabled = false; bussingEnabled = false; spawnTicket(6); },
       done(){ return carried.length > 0; },
-      success: () => 'You are carrying table ' + (carried[0] ? carried[0].tableId : '') + '.'
+      success: () => 'Great! Order’s in hand. Let’s get it out.'
     },
     {
       hint: 'Deliver it',
       text: () => carried[0]
-        ? 'Take it to table ' + carried[0].tableId + ' and step onto the dashed pad in front of it — no need to walk through the table. Watch the ticket fade as you go; you have to hold the number in your head. Drift back toward the counter any time to peek.'
-        : 'Step onto the dashed pad in front of the table to hand the order over.',
+        ? 'Set it down at table ' + carried[0].tableId + ' — the table matching your ticket.'
+        : 'Set it down at the table matching the ticket.',
       enter(){ drainEnabled = false; bussingEnabled = false; },
       done(){ return carried.length === 0; },
-      success: () => 'Delivered. That is a full loop — and the quicker it lands, the bigger the tip.'
+      success: () => 'Delivered — that’s a full loop. The quicker it lands, the bigger the tip.'
     },
     {
       hint: 'Watch their patience',
-      text: () => 'This one is on the clock. The bar above the table drains while they wait — empty it and they walk out, costing you one of three lives. Get this order out.',
+      text: () => 'Watch the bar above the table — that’s their patience running out. Get this order out before it empties.',
       enter(){ drainEnabled = true; bussingEnabled = false; spawnTicket(3); },
       done(){ return carried.length === 0 && !tables.some(t => t.state === 'waiting'); },
       onMiss(){
-        tut.note = 'They walked. On a real shift that costs a life — here we just run it again.';
+        tut.note = 'They left. That means we lost the table. No harm done today — try again.';
         tut.noteTimer = 2600;
         sfxTutorialBell();
         spawnTicket(3);
       },
-      success: () => 'Out before the bar emptied. That is the whole game.'
+      success: () => 'Out in time — that’s the job!'
     },
     {
       hint: 'Clear the table',
       text: () => cleared > tut.baseCleared
-        ? 'That table is back in service.'
+        ? 'Table’s back in service.'
         : (tables.some(t => t.state === 'dirty')
-            ? 'They have finished. Step onto that table\'s pad to stack the plates, then carry them to the DISH RETURN on the right wall.'
-            : 'They are eating now — the teal bar is their meal, not a warning. When it empties the table needs clearing before anyone new can sit there.'),
+            ? 'Once they’re done, clear the plates to DISH RETURN.'
+            : 'They’re eating now — that teal bar is their meal, not a warning. Clear the table once it empties.'),
       enter(){
         // The one lesson that needs the eat/clear cycle. Served straight away
         // and the meal shortened, because the point is the clearing, not the
@@ -2990,11 +3023,11 @@
         t.eatTimer = 3200;
       },
       done(){ return cleared > tut.baseCleared; },
-      success: () => 'Cleared. A dirty table cannot take a new order, so that is one of your eight back.'
+      success: () => 'Table’s back in service — nicely cleared.'
     },
     {
       hint: 'Practice round',
-      text: () => 'Three orders, back to back, nothing at stake. Delivered ' +
+      text: () => 'Three orders, back-to-back — nothing’s at stake. Show me what you’ve got. Delivered ' +
                   (deliveries - tut.baseDeliveries) + ' of ' + PRACTICE_TARGET + '.',
       enter(){
         drainEnabled = true;
@@ -3006,11 +3039,11 @@
       },
       done(){ return deliveries - tut.baseDeliveries >= PRACTICE_TARGET; },
       onMiss(){
-        tut.note = 'Lost one. It costs you nothing here — keep going.';
+        tut.note = 'No harm done — shake it off and keep going.';
         tut.noteTimer = 2200;
         sfxTutorialBell();
       },
-      success: () => 'Service. You are ready for the floor.'
+      success: () => 'Excellent service! You’re ready for the floor.'
     }
   ];
 
@@ -4434,6 +4467,64 @@
     ctx.restore();
   }
 
+  // The baked pose+bubble for whatever moment the player is in right now,
+  // or null if nobody generated art for it (step 3 has no success/miss art
+  // at all -- see MANAGER_ART above). Step 1's opening moment is the one
+  // irregular key: 'welcome', not 'instruction'.
+  function managerArtKey(){
+    if (!tut) return null;
+    const showNote = tut.noteTimer > 0;
+    const showSuccess = !showNote && tut.successTimer > 0;
+    const stepNum = tut.index + 1;
+    const moment = showNote ? 'miss' : showSuccess ? 'success'
+                 : stepNum === 1 ? 'welcome' : 'instruction';
+    const key = 'step' + stepNum + '-' + moment;
+    return MANAGER_ART[key] ? key : null;
+  }
+
+  // Anchored in the pocket of open floor above table 4, the same spot
+  // PICK UP's frame used to occupy -- the placement Rone approved against
+  // the mockup. That mock stacked a small portrait under a separate
+  // parchment bubble; these renders bake character-and-bubble into one
+  // landscape image instead, so the footprint here is sized fresh rather
+  // than copied, then checked against real screenshots (see the harness
+  // suite) rather than assumed to line up.
+  const MANAGER_H = 150, MANAGER_RIGHT = A(1370), MANAGER_TOP = A(120);
+
+  function drawManagerBanner(){
+    if (mode !== 'tutorial' || !tut) return;
+    const step = TUTORIAL_STEPS[tut.index];
+    if (!step) return;
+
+    const key = managerArtKey();
+    const img = key && MANAGER_ART[key];
+    if (!img || !ready(img)){
+      drawTutorialBanner();   // no art for this moment yet -- the old panel
+      return;
+    }
+
+    ctx.save();
+    const h = MANAGER_H, w = h * (img.naturalWidth / img.naturalHeight);
+    const x = MANAGER_RIGHT - w, y = MANAGER_TOP;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.28, y + h * 0.98, w * 0.22, h * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.drawImage(img, x, y, w, h);
+
+    // The old panel's one bit of functional chrome worth keeping: how far
+    // through the tutorial the player is. Small and out of the way rather
+    // than repeating the panel's full steno-pad treatment.
+    ctx.textAlign = 'right';
+    ctx.font = '700 11px DM Sans, sans-serif';
+    ctx.fillStyle = 'rgba(24,19,14,0.85)';
+    ctx.fillText('STEP ' + (tut.index + 1) + ' OF ' + TUTORIAL_STEPS.length, x + w - 14, y + h + 4);
+    ctx.fillStyle = '#F7F1E0';
+    ctx.fillText('STEP ' + (tut.index + 1) + ' OF ' + TUTORIAL_STEPS.length, x + w - 15, y + h + 3);
+    ctx.restore();
+    tut.bannerTop = y;
+  }
+
   // Warm light over the board and nothing else. Composited here rather than at
   // the end of render() on purpose: the character, the pads, the tickets, the
   // floaters and the HUD are all drawn after this and keep their full contrast,
@@ -4478,7 +4569,7 @@
     tables.forEach(drawTable);
     drawFloaters();
     drawCounter();
-    drawTutorialBanner();
+    drawManagerBanner();
     drawMoments();
     drawPlayer();   // above the panel, so you can always see yourself
   }
