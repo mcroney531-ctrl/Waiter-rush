@@ -26,7 +26,8 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
       tut.index = index;
       tut.successTimer = 0; tut.noteTimer = 0;
       if (moment === 'success'){ tut.successMsg = TUTORIAL_STEPS[index].success(); tut.successTimer = 5000; }
-      if (moment === 'miss'){ tut.note = 'forced miss for testing'; tut.noteTimer = 5000; }
+      else if (moment === 'miss'){ tut.note = 'forced miss for testing'; tut.noteTimer = 5000; }
+      else { const s = TUTORIAL_STEPS[index]; if (s && s.enter) s.enter(); }
     },
     PASSES:PASSES, BUS:BUS_STATIONS, set elapsed(v){elapsed=v;},
     set score(v){score=v; updateHUD();},
