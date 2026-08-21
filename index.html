@@ -4519,15 +4519,20 @@
     if (!tut.managerShown) return;
 
     const key = managerMoment();
-    const img = MANAGER_ART[key];
-    if (!img){
-      // No art was ever generated for this moment -- step 3's success is
-      // the one gap (it has no baked art at all, not a loading race). The
-      // old steno-pad panel used to fill in here, but next to the Manager
-      // everywhere else it read as a stale leftover UI rather than a
-      // deliberate fallback, so this beat is silent instead: the delivery
-      // still gets its own feedback from the tip floater.
-      return;
+    let img = MANAGER_ART[key];
+    if (img){
+      tut.lastManagerKey = key;
+    } else {
+      // No art was ever generated for this exact moment -- step 3's success
+      // is the one gap (it has no baked art at all, not a loading race).
+      // First cut just hid him here, which read as him vanishing after a
+      // delivery and popping back a beat later -- worse than the stale
+      // panel it replaced. Freezing on whatever he was last showing keeps
+      // him standing there instead; the delivery still gets its own
+      // feedback from the tip floater, his line just goes briefly stale
+      // for the ~1.7s a success message holds.
+      img = MANAGER_ART[tut.lastManagerKey];
+      if (!img) return;
     }
     if (!ready(img)){
       drawTutorialBanner();   // still loading -- brief, worth a fallback
