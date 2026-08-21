@@ -26,6 +26,24 @@ Two backdrops turn up, and they need different tools:
 ground has no edge to cut along down there; a ramp turns a hard slice into the
 plaque standing on something that fades out.
 
+--declutter (vignette only) handles a third backdrop the two modes above
+don't: a DALL-E "transparency" checker pattern baked as real RGB pixels
+(alternating near-white tiles, not true alpha), the same issue
+`parchment-bubble-sheet.png` hit and the Manager character sheets hit worse.
+The checker is often close enough in colour to a white shirt/collar in the
+art that a global `flat` key mottles the fabric, but plain `vignette` alone
+can leave isolated checker tiles behind: they sit *inside* the border-flood
+region colour-wise but get welded onto the real silhouette through a thin
+soft-edge bridge, so the border flood never reaches them and a same-colour
+flat key can't tell them apart from real fabric either. Fix: erode the
+vignette foreground a couple pixels (breaks thin bridges without shrinking
+real limbs/objects), label what's left, drop any piece whose average colour
+is still near the backdrop key, then grow the surviving pieces back out to
+their full original extent (morphological reconstruction) so real edges
+stay crisp. Needs scipy (`ndimage`) on top of PIL/numpy -- not vendored,
+install it if it's missing. `--declutter-thresh 0` disables the check on a
+per-run basis without needing a separate code path.
+
 WebP rather than PNG: these are smooth painted gradients, and quantising the
 wood to 96 colours bands it visibly (mean error 8.6/255) while still costing
 89 KB. Lossy WebP at the same size is smaller and closer to the original.
@@ -96,6 +114,35 @@ def key_vignette(a, step):
     return np.where(bg, 0.0, 1.0)
 
 
+def declutter_vignette(a, bg, key, erode_iters, color_thresh):
+    """Clean up checker-pattern remnants `key_vignette` alone leaves behind.
+
+    `bg` is key_vignette's boolean background mask (True = already cut).
+    Erode the foreground to break thin bridges to leftover checker tiles,
+    drop any eroded piece whose average colour is still near the backdrop
+    key, then reconstruct (dilate the survivors back out, clipped to the
+    original foreground) so real silhouette edges are not shrunk.
+    """
+    from scipy import ndimage
+
+    fg = ~bg
+    struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
+    eroded = ndimage.binary_erosion(fg, structure=struct, iterations=erode_iters)
+    labels, n = ndimage.label(eroded, structure=struct)
+    kc = np.array(key, dtype=np.float64)
+
+    valid_seed = np.zeros_like(eroded)
+    for i in range(1, n + 1):
+        mask = labels == i
+        mean_color = a[mask].mean(axis=0)
+        if np.abs(mean_color - kc).sum() < color_thresh:
+            continue
+        valid_seed |= mask
+
+    fg_clean = ndimage.binary_propagation(valid_seed, mask=fg)
+    return ~fg_clean
+
+
 def unmultiply(rgb, key, alpha):
     """Take the backdrop back out of the edge pixels.
 
@@ -136,6 +183,13 @@ def main():
     ap.add_argument('--shadow', action='store_true',
                     help='flat: also key out the backdrop\'s own drop shadow')
     ap.add_argument('--step', type=int, default=22, help='vignette: max per-pixel colour step')
+    ap.add_argument('--declutter', default=None,
+                    help='vignette: R,G,B of the checker/backdrop colour to also '
+                         'sweep for welded-on leftover tiles (see module docstring)')
+    ap.add_argument('--declutter-erode', type=int, default=2,
+                    help='declutter: erosion iterations used to break thin bridges')
+    ap.add_argument('--declutter-thresh', type=int, default=45,
+                    help='declutter: colour distance under which an isolated piece is dropped')
     ap.add_argument('--ground', type=int, default=0, help='fade the last N source rows out')
     ap.add_argument('--width', type=int, default=640)
     ap.add_argument('--quality', type=int, default=82)
@@ -149,6 +203,11 @@ def main():
                          args.shadow)
     else:
         alpha = key_vignette(a, args.step)
+        if args.declutter and args.declutter_thresh > 0:
+            bg = declutter_vignette(a, alpha < 0.5,
+                                     [int(v) for v in args.declutter.split(',')],
+                                     args.declutter_erode, args.declutter_thresh)
+            alpha = np.where(bg, 0.0, 1.0)
 
     if args.ground:
         h = alpha.shape[0]

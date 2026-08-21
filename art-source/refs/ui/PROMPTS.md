@@ -493,3 +493,53 @@ second character is, if anything), (2) a clean isolated render or a
 tighter re-key removes the fringe, (3) tutorial copy gets shortened for
 all six steps, not just step 1, (4) wire for real and run the harness
 suite, same as every other asset in this file.
+
+### Update: the full set, poses and copy both, delivered
+
+(1) and (3) above are done. Rone generated thirteen renders -- one per
+tutorial-step text bubble that has copy today (all six `text()` lines plus
+the step 4/6 `onMiss` and step 1/2/4/5/6 `success` lines; step 3 has no
+success/miss variant), all `manager-sheet-brown.png`'s presenting pose with
+a thumbs-up swap for the affirming lines, holding a clipboard rather than
+the book partway through -- and the tutorial copy audit that produced the
+warm "Manager as trainer" wording this set illustrates. Saved as
+`art-source/refs/ui/manager/manager-step<N>-<welcome|instruction|success|miss>.png`,
+cut to `assets/ui/manager-step<N>-*.webp` (thirteen files, `step1-welcome`
+covering step 1's opening line and `step1-success` through `step6-success`/
+`-miss`/`-instruction` covering the rest -- names match `TUTORIAL_STEPS`'
+own `enter()`/`done()`/`success()`/`onMiss()` shape so wiring can map
+1:1). The olive-jacket second character is still unused and still an open
+question -- nothing here answers it.
+
+(2)'s fringe turned out to be a bigger problem than the mock let on: these
+renders' "transparent" backdrop is the same checker-pattern-baked-as-RGB
+issue `parchment-bubble-sheet.png` already had, but coarser and, in most of
+the thirteen, close enough to the white shirt/collar that a plain flat key
+mottles the fabric while a plain vignette key leaves scattered checker
+tiles welded onto the silhouette through a soft-edge bridge the border
+flood never reaches. `cut_plaque.py` grew a `--declutter` option for
+exactly this (see its module docstring) -- erode, drop isolated pieces
+still near the backdrop colour, reconstruct -- and it cleared twelve of
+the thirteen outright:
+
+```
+python3 tools/cut_plaque.py art-source/refs/ui/manager/manager-step1-welcome.png \
+        manager-step1-welcome --mode vignette --step 14 --declutter 250,250,250 --width 900
+```
+
+`manager-step1-success` (the thumbs-up) needed one more pass by hand on top
+of `--declutter`: its checker tiles don't just touch the sleeve, they blend
+into it with no hard edge at all in the source render, which no colour- or
+connectivity-based key can resolve on principle. Fixed by hand-zeroing the
+alpha of the specific near-key-colour pixels left over, restricted to the
+image's left margin (`x < 100`, clear of any real character content) --
+same "measure the actual leftover pixels, don't guess a box" approach as
+the lava-crack repair, and about the same ten minutes.
+
+(4) is still not done. These are real, checked assets now, not a mockup,
+but nothing in `index.html` reads them yet -- `drawManagerMock()` is still
+the TEMP single-pose/single-line placeholder described above. Wiring means:
+swap in the thirteen-image set keyed by tutorial step and moment
+(welcome/instruction/success/miss), decide what step 3 shows given it has
+no success/miss art, and run the full harness suite the way every other
+shipped asset in this file did.
