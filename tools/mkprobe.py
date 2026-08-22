@@ -13,8 +13,10 @@ DST = os.path.join(ROOT, 'probe.html')   # gitignored; regenerate, never commit
 
 DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get tables(){return tables;}, get carried(){return carried;}, get tickets(){return tickets;},
-    get player(){return player;}, get score(){return score;}, get cleared(){return cleared;},
-    get deliveries(){return deliveries;}, get mode(){return mode;}, get flow(){return flowLit;},
+    get player(){return player;}, get score(){return score;},
+    get cleared(){return cleared;}, set cleared(v){cleared=v;},
+    get deliveries(){return deliveries;}, set deliveries(v){deliveries=v;},
+    get mode(){return mode;}, get flow(){return flowLit;},
     get streak(){return streak;}, set streak(v){streak=v; updateHUD();},
     set flowLit(v){flowLit=v;},
     get cap(){return carryCapacity;}, get wrong(){return wrongTurns;},

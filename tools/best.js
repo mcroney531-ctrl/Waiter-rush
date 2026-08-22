@@ -21,6 +21,10 @@ const check = (n, ok, d) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await p.evaluate(() => localStorage.removeItem('dineo.best'));
 
   // Drive endGame directly with a chosen score, and read what the card says.
+  // .so-best-num/.so-best-cap replaced .big-stat/p.best when the end card
+  // moved onto the baked clipboard art (see index.html's endGame()) -- the
+  // prose paragraph and the amber pill are gone, the six figures now sit in
+  // fixed slots on assets/ui/endcard-board.webp instead.
   const runShift = (cents) => p.evaluate(async (c) => {
     const d = window.__dbg;
     d.score = c;
@@ -28,25 +32,27 @@ const check = (n, ok, d) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
     const o = document.getElementById('overlay');
     return {
       stored: localStorage.getItem('dineo.best'),
-      big: o.querySelector('.big-stat')?.textContent,
-      best: o.querySelector('p.best')?.textContent.trim(),
+      bestNum: o.querySelector('.so-best-num')?.textContent,
+      bestCap: o.querySelector('.so-best-cap')?.textContent.trim(),
     };
   }, cents);
 
   const first = await runShift(50000);                    // $500, no prior best
   check('first shift stores a best', first.stored === '50000', first.stored);
   check('first shift says so rather than quoting a target',
-        /first shift/i.test(first.best || ''), JSON.stringify(first.best));
+        /first shift/i.test(first.bestCap || ''), JSON.stringify(first.bestCap));
 
   const worse = await runShift(20000);                    // $200, under the best
   check('a worse shift does not overwrite', worse.stored === '50000', worse.stored);
-  check('a worse shift reports the gap', /300\.00 to beat/i.test(worse.best || ''),
-        JSON.stringify(worse.best));
+  check('a worse shift reports the gap', /300\.00 to beat/i.test(worse.bestCap || ''),
+        JSON.stringify(worse.bestCap));
 
   const better = await runShift(80000);                   // $800, a new record
   check('a better shift overwrites', better.stored === '80000', better.stored);
-  check('a better shift announces the record', /new personal best/i.test(better.best || ''),
-        JSON.stringify(better.best));
+  check('a better shift announces the record', /new best/i.test(better.bestCap || ''),
+        JSON.stringify(better.bestCap));
+  check('a better shift shows the new score as the headline figure',
+        /800\.00/.test(better.bestNum || ''), JSON.stringify(better.bestNum));
 
   // Survives a reload -- the whole point.
   await p.reload({ waitUntil: 'load' });

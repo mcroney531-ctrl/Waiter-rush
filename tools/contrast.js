@@ -134,6 +134,98 @@ const survey = screen => p.evaluate(screen => {
 
 const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 
+// The shift-over card's six dynamic figures sit on endcard-board.webp, not
+// the wall -- survey()'s "onWall" walk deliberately excludes anything with a
+// background-image ancestor, which is exactly #shiftOverCard's own rule, so
+// those six numbers get skipped by the checks above rather than flagged.
+// Same worst-pixel idea as the wall, but background-size: contain (the card
+// is never cropped, just letterboxed) instead of cover -- different mapping
+// from element rect to source-image pixel.
+const installCard = () => p.evaluate(async () => {
+  const img = new Image();
+  img.src = 'assets/ui/endcard-board.webp';
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const L = new Float32Array(c.width * c.height);
+  let max = 0;
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    L[j] = 0.2126 * lin(d[i]) + 0.7152 * lin(d[i+1]) + 0.0722 * lin(d[i+2]);
+    if (L[j] > max) max = L[j];
+  }
+  window.__card = { L, w: c.width, h: c.height, max };
+
+  window.__cardWorst = (rect) => {
+    const card = window.__card;
+    const box = document.getElementById('shiftOverCard').getBoundingClientRect();
+    const s = Math.min(box.width / card.w, box.height / card.h);
+    const dw = card.w * s, dh = card.h * s;
+    const ox = box.left + (box.width - dw) / 2, oy = box.top + (box.height - dh) / 2;
+    const x0 = Math.max(0, Math.floor((rect.left - ox) / s));
+    const x1 = Math.min(card.w - 1, Math.ceil((rect.right - ox) / s));
+    const y0 = Math.max(0, Math.floor((rect.top - oy) / s));
+    const y1 = Math.min(card.h - 1, Math.ceil((rect.bottom - oy) / s));
+    let m = 0;
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) { const v = card.L[y * card.w + x]; if (v > m) m = v; }
+    return m;
+  };
+});
+
+const surveyCard = () => p.evaluate(() => {
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const relL = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const parse = s => (s.match(/[\d.]+/g) || []).slice(0, 4).map(Number);
+  const root = document.getElementById('shiftOverCard');
+  if (!root) return [];
+  const out = [];
+  for (const e of root.querySelectorAll('*')) {
+    const own = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+    if (!own) continue;
+    const r = e.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    const cs = getComputedStyle(e);
+    const col = parse(cs.color);
+    const px = parseFloat(cs.fontSize);
+    const bold = +cs.fontWeight >= 700 || cs.fontWeight === 'bold';
+    // An element (or an ancestor, up to the card root) with its own opaque
+    // background controls what is actually behind the text -- measure
+    // against that flat colour instead of the card's texture, the same way
+    // a deliberate backing is meant to be read. Below full opacity it still
+    // blends toward the card, same "effective colour" idea audit() already
+    // uses for a faded foreground colour, just applied to the background.
+    let backing = null;
+    for (let n = e; n && n !== root.parentElement; n = n.parentElement) {
+      const bc = parse(getComputedStyle(n).backgroundColor);
+      if (bc.length && (bc[3] === undefined || bc[3] > 0)) { backing = bc; break; }
+    }
+    const cardPx = window.__cardWorst(r);
+    const bg = backing
+      ? relL(backing) * (backing[3] === undefined ? 1 : backing[3]) + cardPx * (1 - (backing[3] === undefined ? 1 : backing[3]))
+      : cardPx;
+    out.push({
+      tag: e.className, text: e.textContent.trim().slice(0, 24),
+      L: relL(col), px, bold, large: px >= 24 || (bold && px >= 19),
+      bg,
+    });
+  }
+  return out;
+});
+
+async function auditCard(name) {
+  const items = await surveyCard();
+  console.log(`${name}: ${items.length} figure(s) on the card`);
+  for (const it of items) {
+    const c = ratio(it.L, it.bg);
+    const need = it.large ? AA_LARGE : AA_NORMAL;
+    check(`${name}: "${it.text}" is readable on the card`, c >= need,
+          `${c.toFixed(2)}:1 needs ${need} (${it.px}px${it.large ? ' large' : ''})`);
+  }
+}
+
 async function audit(name, screen) {
   const items = await survey(screen);
   // The landing is a picture and a plaque -- its only text is the plaque's
@@ -184,6 +276,8 @@ for (const [tag, vp] of [['desk', { width: 1280, height: 860 }],
                           null, { timeout: 15000 });
   await p.waitForTimeout(300);
   await audit(`${tag} shift over`, '#overlay');
+  await installCard();
+  await auditCard(`${tag} shift over`);
 }
 
 console.log(errs.length ? '\nPAGE ERRORS: ' + errs.join(' | ') : '\nno page errors');

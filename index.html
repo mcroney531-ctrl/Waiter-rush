@@ -273,6 +273,95 @@
   .plaque.start { aspect-ratio: 1.763; background-image: url('assets/ui/start.webp'); }
   .plaque.random { aspect-ratio: 1.803; background-image: url('assets/ui/random.webp'); }
   .plaque.skip { aspect-ratio: 2.222; background-image: url('assets/ui/skip-training.webp'); }
+  .plaque.run-shift { aspect-ratio: 3.286; background-image: url('assets/ui/run-shift.webp'); }
+  .plaque.change-waiter { aspect-ratio: 2.846; background-image: url('assets/ui/change-waiter.webp'); }
+
+  /* The shift-over screen gets its own backdrop rather than sharing
+     #landing/#avatarPicker's -- the desk scene was built for this screen
+     specifically (art-source/refs/ui/PROMPTS.md section 4), not the
+     dinosaur-party art the other two use. More specific than the shared
+     `#overlay` rule by selector weight alone, so no !important needed;
+     order here is for readability, not precedence. */
+  #overlay.shift-over {
+    background: #1c1712 url('assets/ui/endcard-backdrop.webp') no-repeat center / cover;
+  }
+
+  /* The clipboard art carries its own frame, title, icons and labels --
+     everything static that endcard-board.png bakes in. This positions only
+     the six figures that change every shift over it, each box measured as a
+     fraction of the card's own 1024x1359 art (see the grid overlay used to
+     find them) so it holds up at any rendered size rather than being tied to
+     one pixel measurement. */
+  #shiftOverCard {
+    position: relative;
+    height: min(56vh, 440px);
+    aspect-ratio: 1024 / 1359;
+    background: url('assets/ui/endcard-board.webp') no-repeat center / contain;
+    margin: 0 auto 12px;
+  }
+  /* Direct children only -- .so-best has its own nested num/cap divs that
+     need to stay in its flex-column flow, not break out to absolute
+     positioning too (which stacked them on top of each other). */
+  #shiftOverCard > div {
+    position: absolute; text-align: center; font-family: 'Galindo', sans-serif;
+  }
+  #shiftOverCard .so-total {
+    left: 18.6%; width: 70.3%; top: 31.6%; height: 15.1%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(20px, 4.2vh, 34px); color: #3A2C18;
+  }
+  #shiftOverCard .so-stat {
+    top: 66.6%; height: 5.6%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(13px, 2.2vh, 18px); color: #3A2C18;
+  }
+  #shiftOverCard .so-stat-1 { left: 13.7%; width: 26.4%; }
+  #shiftOverCard .so-stat-2 { left: 40.0%; width: 25.9%; }
+  #shiftOverCard .so-stat-3 { left: 65.9%; width: 23.0%; }
+  /* Right two-thirds of the personal-best panel -- the trophy and the
+     PERSONAL BEST label live in the art on the left third, this is the dark
+     inset stone left blank for the figure. Cream, not the parchment areas'
+     dark brown: this box sits on near-black stone (sampled ~54,46,34),
+     measured at 11.85:1 for cream against 6.2:1 for the accent gold, both
+     well clear of the 4.5:1 floor but cream by a wide enough margin to skip
+     re-measuring if the stone's tone ever shifts a little between re-rolls. */
+  /* Solid-ish backing rather than trusting the stone under it: the "cracked
+     stone" texture has scattered natural bright flecks/veins (a real one
+     measured 140,130,119 against cream's 247,241,224 -- 3.34:1, caught by
+     contrast.js's own per-pixel worst-case check), and the panel doesn't
+     have a uniformly-dark strip big enough to dodge every one of them at
+     every possible text width. A deliberate backing controls what's
+     actually behind the text regardless of which fleck a given shift's
+     figure happens to land on. */
+  #shiftOverCard .so-best {
+    left: 63.7%; width: 24.2%; top: 78.0%; height: 11.8%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #F7F1E0; text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+    background: rgba(20,16,10,0.6); border-radius: 4px;
+    overflow: hidden;
+  }
+  /* Minimums low enough to actually shrink in a short landscape window --
+     2.1vh floors out at 12px well before the box (26.4% of a card that is
+     itself capped by 56vh) is wide enough for it, and a single unbreakable
+     token like a dollar figure just overflows past the box edge into
+     PERSONAL BEST's own baked lettering rather than wrapping. .so-best's own
+     overflow:hidden is the backstop if it's ever still too wide even at the
+     lower floor -- clips instead of bleeding into the label. Checked at
+     844x390 specifically, the shortest realistic viewport this hits. */
+  #shiftOverCard .so-best-num {
+    font-size: clamp(8px, 2.1vh, 17px); font-weight: 700;
+    max-width: 100%; white-space: nowrap;
+  }
+  #shiftOverCard .so-best-cap {
+    font-size: clamp(6px, 1.3vh, 10px); opacity: 0.85; margin-top: 2px;
+    letter-spacing: 0.3px; text-transform: uppercase;
+  }
+
+  #shiftOverActions {
+    display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; align-items: center;
+    margin: 4px 0 2px;
+  }
+  #shiftOverActions .plaque { height: clamp(46px, 8vh, 64px); }
 
   #skipBtn {
     position: absolute; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -3113,6 +3202,12 @@
     mode = 'game';
     document.getElementById('skipBtn').classList.add('hidden');
     const overlay = document.getElementById('overlay');
+    // Defensive: a shift-over screen earlier in the same session leaves this
+    // class on the (reused) #overlay element. Harmless either way since a
+    // fresh shift always goes through endGame() again before it would show,
+    // but this screen has no clipboard card of its own, so it should not be
+    // sitting on the endcard backdrop in the meantime.
+    overlay.classList.remove('shift-over');
     overlay.innerHTML = `
       <h1>Training Done</h1>
       <p>You know the floor now. The real shift ramps up — orders arrive faster the longer you last, tables lose patience quicker, and every table that walks costs one of three lives. Tips scale with how long the guest waited, so speed is worth real money.</p>
@@ -3300,17 +3395,33 @@
     const toBeat = best - score;
 
     const overlay = document.getElementById('overlay');
+    overlay.classList.add('shift-over');
+    // The card's own art already carries SHIFT OVER, the SHIFT COMPLETE stamp,
+    // TODAY'S TOTAL, the three column icons/labels and PERSONAL BEST -- this
+    // only fills the six blank figures the art was drawn to leave empty (see
+    // art-source/refs/ui/PROMPTS.md section 4b). No prose paragraph any more;
+    // the old text summary ("X orders delivered and Y tables cleared...")
+    // doesn't have a slot on the card, and the numbers now speak for
+    // themselves the way the mock always intended.
     overlay.innerHTML = `
-      <h1>Shift Over</h1>
-      <div class="big-stat">${money(score)}</div>
-      <p>${deliveries} orders delivered and ${cleared} tables cleared before the floor got the better of you. ${money(tipsEarned)} of that was tips.</p>
-      <p class="best">${
-        beatIt ? `New personal best — you beat ${money(prevBest)}.`
-        : prevBest === 0 ? `That is your first shift on the board.`
-        : `Personal best ${money(best)} — ${money(toBeat)} to beat.`
-      }</p>
-      <button class="cta" id="startBtn">Run It Back</button>
-      <button class="cta ghost" id="avatarBtn2">Change your waiter</button>
+      <div id="shiftOverCard">
+        <div class="so-total">${money(score)}</div>
+        <div class="so-stat so-stat-1">${deliveries}</div>
+        <div class="so-stat so-stat-2">${cleared}</div>
+        <div class="so-stat so-stat-3">${money(tipsEarned)}</div>
+        <div class="so-best">
+          <div class="so-best-num">${beatIt ? money(score) : money(best)}</div>
+          <div class="so-best-cap">${
+            beatIt ? 'New best'
+            : prevBest === 0 ? 'First shift'
+            : money(toBeat) + ' to beat'
+          }</div>
+        </div>
+      </div>
+      <div id="shiftOverActions">
+        <button class="plaque run-shift" id="startBtn" type="button">Run It Back</button>
+        <button class="plaque change-waiter" id="avatarBtn2" type="button">Change your waiter</button>
+      </div>
     `;
     overlay.classList.remove('hidden');
     playMusic('menu');
