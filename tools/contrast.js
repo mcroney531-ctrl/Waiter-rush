@@ -52,9 +52,9 @@ p.on('pageerror', e => errs.push(String(e).slice(0, 160)));
 // layout instead of assuming it. Measuring everything against the lamp glow at
 // the top would force every faded label on the page to be as loud as the one
 // element that sits under it.
-const installBackdrop = () => p.evaluate(async () => {
+const installBackdrop = (src = 'assets/ui/backdrop.webp') => p.evaluate(async (src) => {
   const img = new Image();
-  img.src = 'assets/ui/backdrop.webp';
+  img.src = src;
   await img.decode();
   const c = document.createElement('canvas');
   c.width = img.naturalWidth; c.height = img.naturalHeight;
@@ -85,7 +85,7 @@ const installBackdrop = () => p.evaluate(async () => {
       for (let x = x0; x <= x1; x++) { const v = b.L[y * b.w + x]; if (v > m) m = v; }
     return m;
   };
-});
+}, src);
 
 // Every text node drawn straight onto it, per screen.
 const survey = screen => p.evaluate(screen => {
@@ -268,8 +268,15 @@ for (const [tag, vp] of [['desk', { width: 1280, height: 860 }],
   await audit(`${tag} picker`, '#avatarPicker');
 
   await p.click('#avatarDone'); await p.waitForTimeout(500);
-  await p.evaluate(() => document.getElementById('skipBtn').click());
-  await p.waitForTimeout(600);
+  // finishTutorial() directly, the same way endGame() is driven below, rather
+  // than clicking through the tutorial's six steps or the skip button (which
+  // calls startGame() straight through and never touches this screen at all).
+  await p.evaluate(() => window.__dbg.finishTutorial());
+  await p.waitForTimeout(300);
+  await installBackdrop('assets/ui/training-done-backdrop.webp');
+  await audit(`${tag} training done`, '#overlay');
+
+  await p.click('#startBtn'); await p.waitForTimeout(300);
   await p.evaluate(() => { window.__dbg.lives = 0;
                            window.__dbg.tables.forEach(t => { t.state = 'waiting'; t.patience = 0.001; }); });
   await p.waitForFunction(() => !document.getElementById('overlay').classList.contains('hidden'),

@@ -36,7 +36,7 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     PASSES:PASSES, BUS:BUS_STATIONS, set elapsed(v){elapsed=v;},
     set score(v){score=v; updateHUD();},
     get tips(){return tipsEarned;}, set tips(v){tipsEarned=v;},
-    endGame(){return endGame();},
+    endGame(){return endGame();}, finishTutorial(){return finishTutorial();},
     get lives(){return lives;}, set lives(v){lives=v; updateHUD();},
     get tier(){return tierIndex;}, get tierArt(){return tierArt.map(t=>!!t.img);},
     get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},
@@ -98,6 +98,7 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
               'SIGN', 'moneyMetrics', 'drainRate', 'spawnInterval', 'eatMs', 'queueCap', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
               'muted', 'rushMusic', 'rushMusicPlaying', 'forceTierNotice',
+              'finishTutorial',
               'handsFreeArt', 'rushOver', 'rushOverTips', 'rushTips', 'rushActive', 'rushArmedAt', 'rushLandAt', 'rushEndsAt', 'rushFastCount',
               'rushReadyAt', 'rushFastTarget', 'promoPending', 'capacityNotice', 'rushSpawnMult', 'rushDrainMult', 'rushDurationMs', 'forceRush'):
     assert field in DBG, field

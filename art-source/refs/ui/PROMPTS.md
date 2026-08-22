@@ -579,3 +579,52 @@ swap in the thirteen-image set keyed by tutorial step and moment
 (welcome/instruction/success/miss), decide what step 3 shows given it has
 no success/miss art, and run the full harness suite the way every other
 shipped asset in this file did.
+
+---
+
+## 7. `training-done-backdrop.png` -- the Training Done screen's own wall
+
+Shipped as `assets/ui/training-done-backdrop.webp`, behind `#overlay.training-done`.
+Like the Manager sheets in section 6, this came from Rone directly -- both the
+blank backdrop and a mock with the real DOM text overlaid, to show the intended
+placement -- so there is no prompt to record, only the two source images
+(`training-done-backdrop.png`, `training-done-mock.png`).
+
+A stone archway framing a closed kitchen counter, a fossil skull and paw prints
+carved into the lintel, lanterns and candles lighting a dark doorway interior --
+same "restaurant designed by dinosaur civilisation" style as everywhere else in
+this file, but its own scene, not `backdrop.webp`'s. The landing and picker keep
+that one; this screen gets its own for the same reason the shift-over screen
+got `endcard-backdrop.png` in section 4a -- built for this screen specifically,
+not shared.
+
+Portrait source (1024x1536), unlike `backdrop.webp`'s landscape 1600x1200 --
+checked at both a wide desk viewport and a narrow phone one with `cover`
+before shipping, since a portrait image cropped wide is exactly the kind of
+thing that reads fine in one shape and crops badly in the other. Both held up:
+the dark archway interior where the heading/paragraph/button sit stays framed
+at both aspect ratios.
+
+One small retouch: `contrast.js`'s wall audit (extended this same session to
+actually reach this screen -- see below) failed the paragraph at 2.28:1 on
+phone, driven by a handful of specular highlights on the counter's metalware
+(pot rims, coin glints) within the paragraph's bounding box, peaking at
+relative luminance 0.316. Fixed the same way the lava-crack and manager-glasses
+retouches were -- measure the actual offending pixels, not a guessed box -- by
+capping only the ~27 pixels above the safe threshold (relative luminance 0.135
+for this text/alpha combination) down to 0.11, entirely within the exact rect
+the DOM measurement sampled. That rect stops well short of x=920, which
+mattered: an earlier, wider attempt at this fix used a padded box that reached
+the candle flame at (920, 724) -- relative luminance 0.99, the single brightest
+pixel in the whole image -- and nearly flattened it. Redone scoped to the real
+measurement rect only; the candle is untouched, the twenty-odd fixed pixels are
+invisible at normal viewing size in both viewports.
+
+`contrast.js` did not check this screen at all before this session --
+`skipBtn` calls `startGame()` directly and never touches `finishTutorial()`, so
+the harness's landing/picker/shift-over loop walked straight past it. Fixed by
+exposing `finishTutorial()` on the `__dbg` probe handle (`tools/mkprobe.py`,
+same pattern as `endGame()`) and driving it directly in the audit loop, the way
+`endGame()` already was -- rather than trying to click through six tutorial
+steps or relying on the skip button, which was never going to reach this
+screen either.
