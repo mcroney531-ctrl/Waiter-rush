@@ -19,8 +19,22 @@ That matters for two reasons:
    reference so the *shape* is reconstructable — and shoot all ten identically,
    for the reason in Camera below.
 2. **Food skips rig and animate.** Unlike the characters, a dish has no
-   skeleton and no walk cycle. The Meshy path is Image to 3D → Remesh → export
-   GLB, and that is all. Do not run Rig on a burger.
+   skeleton and no walk cycle. The Meshy path is Image to 3D → export GLB,
+   and that is all. Do not run Rig on a burger.
+
+   **Skip Meshy's own Remesh step too.** This line originally said to run it;
+   don't. Nothing forces a poly budget on food (no rig), and Meshy's raw
+   output varies wildly for objects of the same on-screen size — the steak
+   came back at 3.1M triangles. Decimate locally instead with
+   `node tools/simplify_glb.mjs <file>.glb --target 10000` (10,000 is food's
+   own established budget — much lower than the room kit's 60,000, since a
+   dish renders at 68px against props seen at a couple hundred), then
+   `python3 tools/shrink_glb.py <file>.glb --inplace` for textures. The
+   simplifier will sometimes stop well short of the target when the error
+   bound would be exceeded first — the steak settled at 34,882 rather than
+   10,000 — which means the geometry it's protecting is load-bearing; check
+   the render before forcing it further with `--error`, the same rule the
+   room kit's decimation already follows.
 
 **Food has no tiers.** One reference per dish, ten in total.
 
@@ -102,7 +116,7 @@ The test: black the dish out entirely. If it is still identifiable, it works.
 | `salad` | deep bowl, piled above the rim |
 | `club` | stacked triangles standing on their points |
 | `soup` | wide bowl with a strong rim line |
-| `ribs` | arced rack |
+| `steak` | forked bone jutting from a tilted wedge |
 | `tart` | raised cylinder on a stand |
 
 Note the burger is a stack **plus a fan** rather than a clean cylinder, because
@@ -312,9 +326,17 @@ itself is ordinary diner food; the *world* is prehistoric, the menu is not.
 ## The menu
 
 Names are the game's internal keys — keep the filenames exactly these:
-`pizza, sub, tacos, pasta, salad, club, soup, ribs, tart, burger, shake`.
+`pizza, sub, tacos, pasta, salad, club, soup, steak, tart, burger, shake`.
 
-Done: `burger`, `pizza`, `tacos`, `ribs`, `tart`, `salad`, `shake`. The
+`ribs` is dropped from the menu: three re-roll rounds never cleanly cleared
+both the physical-plausibility and aspect bars at once, and it's replaced by
+`steak` (a porterhouse), which nailed a natural pose on the first pass. Its
+identifying feature is the T-shaped bone itself — visible as a genuine notch
+in the outline at a low, near-front camera angle (`--elev 42 --yaw 10` reads
+best; higher elevations and wider yaws show the bone as a flat marking on the
+top face instead of an outline break, and lose it entirely).
+
+Done: `burger`, `pizza`, `tacos`, `steak`, `tart`, `salad`, `shake`. The
 remaining four:
 
 Each row says where the **height** comes from; the dominant shape each one has

@@ -220,7 +220,7 @@ One testing note worth keeping: reconciling score against `sum(base + tip) + cle
 
 ## Food art
 
-Orders are plated dishes in `assets/food/` — ten of them: pizza, sub, tacos, pasta, salad, club, soup, ribs, tart, burger. They replaced the emoji in `FOOD_ITEMS`. Each is a speech-bubble plate with a pointer at the bottom, so a whole ticket, not an icon that sits inside a card. The old white card is gone.
+Orders are plated dishes in `assets/food/` — ten of them: pizza, sub, tacos, pasta, salad, club, soup, steak, tart, burger. They replaced the emoji in `FOOD_ITEMS`. Each is a speech-bubble plate with a pointer at the bottom, so a whole ticket, not an icon that sits inside a card. The old white card is gone. (`ribs` was dropped and replaced by `steak` — see `art-source/FOOD-SPEC.md`'s menu section for why.)
 
 Three things about how they are prepared, because the source files were not uniform:
 

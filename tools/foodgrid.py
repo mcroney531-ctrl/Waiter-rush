@@ -36,7 +36,7 @@ SLOT_W, SLOT_H = 68, 62
 FLOOR = (87, 63, 43)
 CARRY_TWO = 0.6          # icons shrink to this when carrying two orders
 
-ITEMS = ['pizza', 'sub', 'tacos', 'pasta', 'salad', 'club', 'soup', 'ribs',
+ITEMS = ['pizza', 'sub', 'tacos', 'pasta', 'salad', 'club', 'soup', 'steak',
          'tart', 'burger', 'shake']
 
 # Measured off the illustrated set, which is the art this replaces: their outer
