@@ -202,16 +202,24 @@
     color: #D99A5B;
     /* Was a flat #C1443A cartoon-red drop shadow -- read as a sticker
        pasted over Training Done's photoreal stone archway, especially
-       next to the carved-stone plaque just below it. Warm copper with a
-       dark umber shadow instead, echoing the worn-bronze rivets on that
-       same plaque and the room's own basalt-and-gold materials.
+       next to the carved-stone plaque just below it. Warm copper,
+       echoing the worn-bronze rivets on that same plaque and the room's
+       own basalt-and-gold materials.
        Text-shadow can't fake true bevel -- that's what the baked labels
-       exist for -- but this reads closer to that than a flat colour
-       swap alone would. Picked from three options Rone reviewed
-       (brighter gold/oxblood, pale parchment/charcoal, this one). */
+       exist for -- but a stepped stack of offset layers, each a shade
+       darker than the last, reads as a genuine extruded block rather
+       than a flat drop-shadow: closer to carved relief than one shadow
+       colour swap could get on its own. Picked from three depths Rone
+       reviewed (a shorter stack, this deeper one, and a version with a
+       light-catching edge on the upper-left). */
     text-shadow:
-      0 2px 0 #5C2E12,
-      0 5px 10px rgba(15,9,4,0.65);
+      1px 1px 0 #8B4F26,
+      2px 2px 0 #7A4420,
+      3px 3px 0 #6B3B1C,
+      4px 4px 0 #5C2E12,
+      5px 5px 0 #4A2812,
+      6px 6px 0 #3A1F0D,
+      7px 7px 12px rgba(10,6,3,0.65);
     margin: 0 0 8px;
     letter-spacing: 1px;
   }
