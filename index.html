@@ -226,6 +226,17 @@
     margin: 0 0 8px;
     letter-spacing: 1px;
   }
+  /* Baked over the CSS treatment above, Training Done only -- the intro
+     screen's "Dine-O Dash" reuses the same #overlay h1 and keeps the
+     text-shadow version. text-indent hides the real text the same way
+     button.plaque does, off-screen rather than invisible, so it still reads
+     to a screen reader and "find on page". */
+  #overlay.training-done h1 {
+    width: clamp(280px, 45vw, 490px); max-width: 100%;
+    aspect-ratio: 7.711;
+    background: url('assets/ui/training-done-heading.webp') no-repeat center / contain;
+    text-indent: -9999px; overflow: hidden; white-space: nowrap;
+  }
   #overlay p { max-width: 440px; line-height: 1.5; font-size: 15px; opacity: 0.9; margin: 6px 0 20px; }
   /* The personal-best line sits tighter to the summary above it than a normal
      paragraph gap. Placeholder styling: this becomes the mock's stone panel
