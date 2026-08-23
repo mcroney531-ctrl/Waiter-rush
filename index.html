@@ -275,6 +275,21 @@
   .plaque.skip { aspect-ratio: 2.222; background-image: url('assets/ui/skip-training.webp'); }
   .plaque.run-shift { aspect-ratio: 3.286; background-image: url('assets/ui/run-shift.webp'); }
   .plaque.change-waiter { aspect-ratio: 2.846; background-image: url('assets/ui/change-waiter.webp'); }
+  /* The Training Done screen's sole CTA, so sized like landingStart's own
+     hero button rather than a row-mate scaled down to fit siblings. */
+  .plaque.start-shift {
+    aspect-ratio: 5.072; background-image: url('assets/ui/start-shift.webp');
+    /* Width-driven, not height-driven like the other plaques -- at 5:1 this
+       one overflows a narrow phone viewport long before a height clamp
+       would back off, and setting both an explicit height and a max-width
+       stops the browser from re-deriving height from the capped width, so
+       the box silently stops matching its own image's aspect ratio. Sizing
+       off width sidesteps that: aspect-ratio always computes height cleanly
+       from whatever width results, and max-width remains a real backstop
+       rather than a value that only sometimes applies. */
+    width: clamp(300px, 37vw, 480px);
+    max-width: 100%;
+  }
 
   /* The shift-over screen gets its own backdrop rather than sharing
      #landing/#avatarPicker's -- the desk scene was built for this screen
@@ -3223,7 +3238,7 @@
     overlay.innerHTML = `
       <h1>Training Done</h1>
       <p>You know the floor now. The real shift ramps up — orders arrive faster the longer you last, tables lose patience quicker, and every table that walks costs one of three lives. Tips scale with how long the guest waited, so speed is worth real money.</p>
-      <button class="cta" id="startBtn">Start the Shift</button>
+      <button class="plaque start-shift" id="startBtn" type="button">Start the Shift</button>
     `;
     overlay.classList.remove('hidden');
     playMusic('menu');
