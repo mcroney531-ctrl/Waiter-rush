@@ -4129,6 +4129,18 @@
     if (t.state === 'waiting'){
       // patience bar
       const barW = 52;
+      // Below WARN_AT the table is already dinging and hinting at the
+      // player audibly -- the meter was the one channel that stayed flat
+      // through all of it, and a nearly-empty bar with plain small text is
+      // the least visible thing on a busy floor at exactly the moment it
+      // matters most. A quick pulse ties the visual to the same threshold
+      // the sound already uses, faster than the CLEAR pad's pulse since
+      // this is counting down against a real loss, not just a standing
+      // invitation to act.
+      const critical = t.patience <= WARN_AT && t.patience > 0;
+      const pulse = critical ? 0.7 + 0.3 * Math.sin(elapsed / 130) : 1;
+      ctx.save();
+      ctx.globalAlpha = pulse;
       ctx.fillStyle = 'rgba(0,0,0,0.2)';
       ctx.fillRect(-barW/2, -4, barW, 8);
       const col = t.patience > 0.5 ? COLORS.happy : (t.patience > 0.25 ? COLORS.mustard : COLORS.angry);
@@ -4147,10 +4159,18 @@
                     : secs.toFixed(1);
         ctx.textAlign = 'left';
         ctx.font = '16px Galindo, sans-serif';
+        // A dark stroke behind the number keeps it legible over whatever
+        // happens to be on the floor underneath -- previously flat-filled
+        // with no outline at all, so a red "11" over a mid-tone patch of
+        // floor could wash out well before it should.
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(20,14,8,0.85)';
+        ctx.strokeText(label, barW/2 + 7, 4);
         ctx.fillStyle = col;
         ctx.fillText(label, barW/2 + 7, 4);
         ctx.textAlign = 'center';
       }
+      ctx.restore();
     } else if (t.state === 'happy'){
       ctx.font = '22px serif';
       ctx.fillStyle = COLORS.happy;
