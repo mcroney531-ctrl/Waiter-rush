@@ -220,6 +220,18 @@ def main():
     rgb = a.astype(np.float64)
     if args.mode == 'flat':
         rgb = unmultiply(rgb, [int(v) for v in args.bg.split(',')], alpha)
+    elif args.mode == 'vignette':
+        # key_vignette's alpha is a hard 0/1 mask, and the softening below
+        # blurs it into a fractional edge -- but the RGB under that edge is
+        # still whatever backdrop tone was actually there (a checker tile,
+        # the vignette's own colour), never blended toward black the way a
+        # true soft edge would be. Composited at low alpha over a dark game
+        # background that shows through as a pale halo tracing every letter
+        # -- invisible against a near-black test swatch, obvious against the
+        # real (lighter, textured) backdrop. Blackening the background side
+        # before the blur means the blur only ever softens toward black, so
+        # a residual sliver of alpha contributes darkness instead of a tint.
+        rgb = np.where(alpha[..., None] < 0.5, 0, rgb)
 
     out = Image.fromarray(rgb.round().clip(0, 255).astype(np.uint8), 'RGB').convert('RGBA')
     am = Image.fromarray((alpha * 255).astype(np.uint8))
