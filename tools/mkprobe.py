@@ -44,7 +44,7 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     get floaters(){return floaters;}, set hintCooldown(v){hintCooldown=v;},
     SIGN:SIGN, moneyMetrics:(t,px)=>{ctx.save(); ctx.font=px+'px Galindo, sans-serif';
       const w=moneyMetrics(t,px); ctx.restore(); return w;},
-    setCap(n){carryCapacity=n;}, forceTicket(side){
+    setCap(n){carryCapacity=n;}, spawnTicket(id){return spawnTicket(id);}, forceTicket(side){
       const t = tables.find(t => t.state === 'idle' && sideOfTable(t) === side) || tables[0];
       tickets.push({id:ticketIdCounter++, tableId:t.id, icon:'pizza', side:side,
                     spawnTime:performance.now()});
@@ -95,7 +95,7 @@ for field in ('tables', 'carried', 'tickets', 'player', 'score', 'cleared',
               'lives', 'tier', 'tierArt', 'tierNotice',
               'deliveries', 'mode', 'flow', 'streak', 'cap', 'wrong', 'tut',
               'steps', 'PASSES', 'BUS', 'setRoster', 'setChar', 'setTier', 'roster',
-              'floaters', 'hintCooldown', 'setCap', 'forceTicket', 'sheetOn',
+              'floaters', 'hintCooldown', 'setCap', 'spawnTicket', 'forceTicket', 'sheetOn',
               'SIGN', 'moneyMetrics', 'drainRate', 'spawnInterval', 'eatMs', 'queueCap', 'music', 'musicErrorStreak', 'musicSet', 'musicTrack',
               'muted', 'rushMusic', 'rushMusicPlaying', 'forceTierNotice',
               'finishTutorial',

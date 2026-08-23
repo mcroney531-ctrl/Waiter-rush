@@ -62,23 +62,42 @@ const check = (name, ok, detail) => {
   const counts = () => p.evaluate(() => ({ ...window.__sfx }));
 
   // ---- footsteps track distance, not time ----
+  // The shift's first order can land inside this 2s window on its own timer,
+  // and the order bell it now rings is 2 oscillators + 1 burst on top of
+  // whatever footsteps made -- so the raw counts are footsteps plus however
+  // many tickets actually spawned, not footsteps alone.
   await reset();
+  const tixBefore = await p.evaluate(() => window.__dbg.tickets.length);
   await p.keyboard.down('ArrowLeft');
   await p.waitForTimeout(2000);
   await p.keyboard.up('ArrowLeft');
   await p.waitForTimeout(120);
   const walked = await counts();
+  const tixAfter = await p.evaluate(() => window.__dbg.tickets.length);
+  const spawnedDuringWalk = Math.max(0, tixAfter - tixBefore);
+  const stepOsc = walked.osc - spawnedDuringWalk * 2;
+  const stepBuf = walked.buf - spawnedDuringWalk;
   // 550px/s over a 34px stride is ~5.2 half-cycles a second; the player hits the
   // wall partway through, so the floor is what matters, not an exact figure.
-  check('walking makes footsteps', walked.osc >= 4 && walked.osc <= 14,
-        `${walked.osc} steps in 2s`);
-  check('each step is thump + scuff', walked.buf === walked.osc,
-        `${walked.buf} bursts / ${walked.osc} oscillators`);
+  check('walking makes footsteps', stepOsc >= 4 && stepOsc <= 14,
+        `${stepOsc} steps in 2s${spawnedDuringWalk ? ` (${spawnedDuringWalk} order bell excluded)` : ''}`);
+  check('each step is thump + scuff', stepBuf === stepOsc,
+        `${stepBuf} bursts / ${stepOsc} oscillators`);
 
   await reset();
   await p.waitForTimeout(900);
   const idle = await counts();
   check('standing still is silent', idle.osc === 0 && idle.buf === 0);
+
+  // ---- a ticket landing at the counter rings once ----
+  // One ding() (2 oscillators: fundamental + detuned partial) plus one burst()
+  // (1 buffer source) for the bell strike.
+  await reset();
+  await p.evaluate(() => window.__dbg.spawnTicket());
+  await p.waitForTimeout(60);
+  const spawned = await counts();
+  check('a new ticket rings the order bell', spawned.osc === 2 && spawned.buf === 1,
+        `${spawned.osc} osc / ${spawned.buf} buf`);
 
   // ---- the tip sound scales with the tip ----
   await reset();

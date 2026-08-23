@@ -127,8 +127,8 @@ await p.evaluate(() => { const d = window.__dbg; d.player.x = 480; d.player.y = 
 await p.waitForTimeout(150);
 
 // ---- the lives row ----
-// Three carved stones that drain as tables walk. Two states off one asset, so
-// the risk is not a missing image but a `lost` class that changes nothing --
+// Three carved stones that light up as tables walk. Two states off one asset,
+// so the risk is not a missing image but a `lost` class that changes nothing --
 // which looks like a life you did not lose.
 check('the stone icon loaded', await p.evaluate(async () => {
   const url = getComputedStyle(document.querySelector('.life'))
@@ -154,8 +154,8 @@ r = await row();
 check('losing tables spends stones from the left',
       r[0].lost && r[1].lost && !r[2].lost,
       r.map(s => s.lost ? 'x' : 'o').join(''));
-check('a spent stone actually looks spent',
-      r[0].filter !== r[2].filter && +r[0].opacity < +r[2].opacity,
+check('a spent stone actually lights up',
+      r[0].filter !== r[2].filter && +r[0].opacity > +r[2].opacity,
       `${r[0].opacity} vs ${r[2].opacity}`);
 check('but it stays in the row', r[0].r.width === r[2].r.width && r[0].r.width > 0,
       `${r[0].r.width}px`);

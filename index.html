@@ -131,12 +131,15 @@
   .life {
     width: 30px; height: 30px;
     background: url('assets/tables-lost.png') no-repeat center / contain;
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.55));
+    filter: grayscale(1) brightness(0.38);
+    opacity: 0.45;
   }
-  /* One asset, two states. A spent stone is the same carving drained of
-     colour and light rather than a second image to keep in sync — and it stays
-     visible, so the row still reads as three even when two are gone. */
-  .life.lost { filter: grayscale(1) brightness(0.38); opacity: 0.45; }
+  /* One asset, two states. An unspent stone sits drained of colour and light
+     until the table it stands for is actually lost — losing it is what lights
+     the carving back up full, rather than the other way round, so the row
+     reads as an escalating tally of losses instead of a countdown of lives
+     left. */
+  .life.lost { filter: drop-shadow(0 2px 2px rgba(0,0,0,0.55)); opacity: 1; }
 
   #controls-mobile {
     /* safe-area keeps the pad clear of the home indicator on notched phones */
@@ -1276,6 +1279,12 @@
   const RUSH_OVER_MS = 2600;
   let rushOver = 0, rushTips = 0, rushOverTips = 0;
 
+  // True for the whole life of a rush banner -- telegraph, active, and the
+  // RUSH OVER exit beat -- regardless of whether art or the text fallback is
+  // what's actually drawing it. The promotion splash checks this so it never
+  // has to care which rush phase is up, only that one is.
+  const rushBannerActive = () => (rushArmedAt && !rushActive) || rushActive || rushOver > 0;
+
   const rollRushTarget = () =>
     Math.round(lerp(RUSH_FAST_MIN, RUSH_FAST_MAX, Math.random()));
 
@@ -1320,10 +1329,11 @@
       rushOverTips = rushTips;
       rushTips = 0;
       endRushMusic();
-      // A promotion earned mid-rush waited for the floor to calm down rather
-      // than fighting the rush banner for the same strip of screen.
-      if (promoPending){ promoPending = false; showPromotion(); }
     }
+    // A promotion earned mid-rush -- or already on screen when one armed --
+    // waits out every rush phase, including the RUSH OVER exit beat, rather
+    // than fighting any of them for the same strip of screen.
+    if (promoPending && !rushBannerActive()){ promoPending = false; showPromotion(); }
   }
 
   // Money is held in whole cents so a shift's total never drifts the way a
@@ -1571,6 +1581,7 @@
   const PICKER_KNOCK = 0.11;   // stepping left/right through the waiter picker
   const RUSH_ALARM   = 0.12;   // rush telegraph and landing
   const PROMO_FANFARE = 0.14;  // the promotion splash
+  const ORDER_BELL   = 0.08;   // a ticket landing at the counter
   // How low patience gets before the table is announced, and the shortest gap
   // between announcements. Eight tables can cross the line together; without
   // the gap that is eight overlapping copies of the same sound.
@@ -1900,6 +1911,17 @@
     if (lit || frac >= TIP_BIG) ding(t + 0.17, 2637, TIP_BELL * 0.8, 0.42); // E7
   }
 
+  // A ticket landing at the counter — the kitchen bell you'd tap to call an
+  // order up. Fires on every spawn, same frequency as sfxPickup below, so it
+  // stays a single quick tap rather than a tune: a dry bandpass strike for
+  // the bell's metal, one soft ring underneath.
+  function sfxOrderUp(){
+    if (!ac || muted) return;
+    const t = ac.currentTime;
+    burst(t, 3400, 1.8, ORDER_BELL * 0.6, 0.04, 'bandpass');
+    ding(t, 1567.98, ORDER_BELL, 0.16, 'triangle');   // G6
+  }
+
   // Lifting a ticket off the pass. This fires on every single order, so it is
   // the one sound that most needs to stay out of the way — a short dry click
   // and a hint of pitch, nothing that rings.
@@ -2201,20 +2223,24 @@
   // player picked or it reads as someone else's banner.
   let handsFreeArt = { img: null };
 
-  // The promotion splash is 190px tall and lands in the same strip, which
-  // leaves no momentBanner slot clear above it -- slot 3 is off the top of the
-  // canvas -- and it is drawn after the capacity notice, so anything the
-  // capacity notice draws ends up underneath it. Rather than cramp one of them,
-  // the capacity notice waits: its countdown is frozen while a splash is up and
-  // starts when the splash clears. It is only 4.5s, and nothing is lost by
-  // waiting, because the second hand is already unlocked either way.
+  // The illustrated promotion splash is 190px tall and lands in the same
+  // strip, leaving no momentBanner slot clear above it -- slot 3 is off the
+  // top of the canvas -- and it is drawn after the capacity notice, so
+  // anything the capacity notice draws ends up underneath it. Its text
+  // fallback is only a 44px strip, but that still sits inside the capacity
+  // notice's own illustrated splash whenever that one has art and tierNotice's
+  // does not -- one character's roster can have art for one tier and not
+  // another, so this is not a hypothetical pairing either. Rather than cramp
+  // either banner or special-case which pair of art states collide, the
+  // capacity notice waits for any tier notice at all: its countdown freezes
+  // while one is up and starts once it clears. It is only 4.5s, and nothing
+  // is lost by waiting, because the second hand is already unlocked either way.
   //
   // Deliberately not applied to the rush banners. A rush runs 20-45s, and going
   // that long carrying two orders without being told you can is worse than the
   // text strip, which draws its own opaque panel over the rush art and stays
   // readable -- which is what it already did before this art existed.
-  const promoSplashUp = () =>
-    tierNotice > 0 && !!(promoArt[tierIndex + 1] && promoArt[tierIndex + 1].img);
+  const promoNoticeUp = () => tierNotice > 0;
 
   function loadHandsFreeArt(id){
     const slot = { img: null };
@@ -2320,7 +2346,7 @@
       // covering "RUSH IS COMING" with a celebration would bury the one
       // warning the player needs. The outfit still changes immediately; it
       // is only the fanfare and the banner that wait.
-      if (rushArmedAt || rushActive) promoPending = true;
+      if (rushBannerActive()) promoPending = true;
       else showPromotion();
     }
   }
@@ -2800,6 +2826,7 @@
     t.ticketId = ticket.id;
     t.patience = 1;
     t.warned = false;
+    sfxOrderUp();
   }
 
   // ---------- Input ----------
@@ -3411,8 +3438,11 @@
     }
 
     if (rushOver > 0) rushOver -= dt;
-    if (capacityNotice > 0 && !promoSplashUp()) capacityNotice -= dt;
-    if (tierNotice > 0) tierNotice -= dt;
+    if (capacityNotice > 0 && !promoNoticeUp()) capacityNotice -= dt;
+    // Frozen for the same reason the capacity notice freezes for a promo
+    // splash above -- a promotion earned or already showing never fights a
+    // rush banner for the strip, it just picks back up once the strip is free.
+    if (tierNotice > 0 && !rushBannerActive()) tierNotice -= dt;
     if (warnCooldown > 0) warnCooldown -= dt;
     if (hintCooldown > 0) hintCooldown -= dt;
     if (flowFlash > 0) flowFlash -= dt;
@@ -4523,9 +4553,9 @@
       ctx.fillText(line, 0, dh/2 - 12);
       ctx.restore();
     }
-    // Held, not drawn small, while a promotion splash owns the strip -- see
-    // promoSplashUp. The countdown is frozen alongside this, so nothing is lost.
-    if (capacityNotice > 0 && !promoSplashUp()){
+    // Held, not drawn small, while a tier notice owns the strip -- see
+    // promoNoticeUp. The countdown is frozen alongside this, so nothing is lost.
+    if (capacityNotice > 0 && !promoNoticeUp()){
       const noticeAlpha = Math.min(1, capacityNotice / 500);
       if (handsFreeArt.img && !rushBannerUp){
         const img = handsFreeArt.img;
@@ -4562,7 +4592,7 @@
                      'BOTH HANDS FREE', 'you can carry two orders now', 300);
       }
     }
-    if (tierNotice > 0){
+    if (tierNotice > 0 && !rushBannerActive()){
       const noticeAlpha = Math.min(1, tierNotice / 500);
       // A full illustrated splash for the tier just reached, if one exists —
       // falls back to the plain text banner otherwise, same convention as
