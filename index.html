@@ -3723,7 +3723,14 @@
     ctx.restore();
 
     if (dirty){
-      ctx.globalAlpha = standing ? 1 : 0.75;
+      // Pulses the whole time the table sits dirty, not just a static dim --
+      // a table waiting to be bussed is easy to walk past otherwise, and
+      // unlike SET DOWN there's no separate glow drawing attention to it.
+      // Same cadence as the standing corners' shadowBlur pulse just above,
+      // so a table that's both "standing on" and "dirty" doesn't fight
+      // itself with two different rhythms.
+      const pulse = 0.72 + 0.28 * Math.sin(phase / 240);
+      ctx.globalAlpha = (standing ? 1 : 0.75) * pulse;
       if (ready(clearLabelImg)){
         // Sized by height, not SET DOWN's width-fraction trick -- CLEAR's
         // aspect (3.0) is shorter than SET DOWN's (4.0, a longer word spread
