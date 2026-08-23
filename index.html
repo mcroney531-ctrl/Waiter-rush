@@ -3709,10 +3709,20 @@
       ctx.fill();
     }
 
+    // Shared by the corners and the CLEAR label below -- one clock, so a
+    // dirty table's cool pair and its text breathe together rather than
+    // drifting into two rhythms.
+    const pulse = 0.72 + 0.28 * Math.sin(phase / 240);
+
     ctx.save();
     if (standing){
       ctx.shadowColor = 'rgba(255,140,40,0.85)';
-      ctx.shadowBlur = A(14) * (0.72 + 0.28 * Math.sin(phase / 240));
+      ctx.shadowBlur = A(14) * pulse;
+    } else if (dirty){
+      // Idle-dirty gets the same pulse the standing state expresses as
+      // shadowBlur -- the cool pair was previously a flat, easy-to-miss
+      // static image the whole time a table sat waiting to be bussed.
+      ctx.globalAlpha = pulse;
     } else if (hot){
       ctx.globalAlpha = 0.8;
     }
@@ -3726,10 +3736,6 @@
       // Pulses the whole time the table sits dirty, not just a static dim --
       // a table waiting to be bussed is easy to walk past otherwise, and
       // unlike SET DOWN there's no separate glow drawing attention to it.
-      // Same cadence as the standing corners' shadowBlur pulse just above,
-      // so a table that's both "standing on" and "dirty" doesn't fight
-      // itself with two different rhythms.
-      const pulse = 0.72 + 0.28 * Math.sin(phase / 240);
       ctx.globalAlpha = (standing ? 1 : 0.75) * pulse;
       if (ready(clearLabelImg)){
         // Sized by height, not SET DOWN's width-fraction trick -- CLEAR's
