@@ -3998,17 +3998,17 @@
         const slotX = p.side === 'left'
           ? A(GEO.ticketAnchorL) + TICKET.slot/2 + i * TICKET.pitch
           : A(GEO.ticketAnchorR) - TICKET.slot/2 - i * TICKET.pitch;
-        // The plated-food art (foodImg) is 2D holdover sprites -- there is no
-        // GLB counterpart for most of them yet, and mixing that flat art in
-        // on top of a modelled counter made it hard to read the counter
-        // itself. Hidden here until real food props exist to replace it;
-        // the table tag alone still says which order it is. The painted
-        // board is unaffected -- its plates are the room's own art style.
-        const box = USE_3D ? null : foodBox(tk.icon);
+        // The plated-food art used to be hidden on the 3D board -- most
+        // dishes had no real render yet, and mixing 2D holdover sprites in
+        // on top of a modelled counter made it hard to read. All eleven now
+        // go through the same GLB render pipeline the room and characters
+        // do, so foodBox draws here unconditionally; the table tag still
+        // says which order it is either way.
+        const box = foodBox(tk.icon);
         ctx.save();
         if (box){
           ctx.drawImage(box.im, slotX - box.w/2, TICKET.base - box.h, box.w, box.h);
-        } else if (!USE_3D) {
+        } else {
           // art still loading — a plain card keeps the queue readable
           ctx.fillStyle = '#F4EEDB';
           roundRect(ctx, slotX - 30, TICKET.base - 46, 60, 42, 6);
@@ -4018,8 +4018,7 @@
           ctx.fillStyle = COLORS.mustard;
           ctx.font = '10px Galindo, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('NEXT UP', slotX,
-            USE_3D ? TICKET.base - 26 : TICKET.base - (box ? box.h : 46) - 6);
+          ctx.fillText('NEXT UP', slotX, TICKET.base - (box ? box.h : 46) - 6);
         }
         drawTableTag(slotX, TICKET.base - 8, tk.tableId, false);
         ctx.restore();
@@ -4277,10 +4276,9 @@
         const timeSince = performance.now() - item.pickedAt;
         let alpha = nearCounter ? 1 : Math.max(0, 1 - timeSince / 1600);
         if (alpha > 0){
-          // Same call as drawCounter: no 2D plate art on the 3D board, since
-          // it has no GLB counterpart yet. Missed here when the counter was
-          // fixed -- the table tag alone still says what you're carrying.
-          const box = USE_3D ? null : foodBox(item.icon);
+          // Same call as drawCounter, and the same reason it no longer gates
+          // on USE_3D: all eleven dishes now have a real render.
+          const box = foodBox(item.icon);
           ctx.save();
           ctx.globalAlpha = alpha;
           const w = box ? box.w * (n > 1 ? 0.6 : 0.78) : 40;
