@@ -172,6 +172,30 @@ def unmultiply(rgb, key, alpha):
     return out
 
 
+def demagenta(rgb):
+    """Scrub leftover magenta bleed that unmultiply doesn't reach.
+
+    A saturated backdrop can imprint on the art itself during generation --
+    a glossy highlight picking up a pink cast from the magenta lighting it
+    the whole render, not just from being keyed against it. That pixel is
+    fully opaque and far from the key by colour distance, so the key never
+    touches it and unmultiply never runs on it; it just sits there pink.
+
+    Magenta's signature is R and B both above G. Real art in this warm
+    bronze/stone palette runs the other way -- B sits well below G -- so
+    subtracting whichever of (R-G) and (B-G) is smaller, wherever both are
+    positive, only ever touches genuine bleed. It is a smooth subtraction
+    rather than a threshold, so there is no cutoff to tune and no ring left
+    at its edge the way a hard mask would leave one.
+    """
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    excess = np.minimum(np.maximum(r - g, 0), np.maximum(b - g, 0))
+    out = rgb.copy()
+    out[..., 0] -= excess
+    out[..., 2] -= excess
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src')
@@ -219,7 +243,13 @@ def main():
 
     rgb = a.astype(np.float64)
     if args.mode == 'flat':
-        rgb = unmultiply(rgb, [int(v) for v in args.bg.split(',')], alpha)
+        bg_key = [int(v) for v in args.bg.split(',')]
+        rgb = unmultiply(rgb, bg_key, alpha)
+        # Only for a magenta-family key (R and B both above G) -- a grey or
+        # white flat key has no such signature to clean up, and demagenta()
+        # would be a no-op for one anyway.
+        if bg_key[0] > bg_key[1] and bg_key[2] > bg_key[1]:
+            rgb = demagenta(rgb)
     elif args.mode == 'vignette':
         # key_vignette's alpha is a hard 0/1 mask, and the softening below
         # blurs it into a fractional edge -- but the RGB under that edge is
@@ -239,7 +269,26 @@ def main():
         am = am.filter(ImageFilter.GaussianBlur(0.8))
     out.putalpha(am)
 
-    box = am.point(lambda v: 255 if v > 6 else 0).getbbox()
+    # A single stray fleck of colour distant enough from the key to key in --
+    # a compression artefact, a stray non-magenta pixel -- costs nothing on
+    # its own but silently drags the crop box out to wherever it sits, so a
+    # two-pixel speck in a far corner can leave the whole plaque padded with
+    # dead transparent space. Drop any opaque island under this many pixels
+    # before the crop box is measured, not from the alpha itself generally,
+    # since a real plaque can legitimately have small isolated details (a
+    # rivet, a fleck of texture) worth keeping everywhere except here.
+    try:
+        from scipy import ndimage
+        mask = np.asarray(am) > 6
+        labels, n = ndimage.label(mask)
+        sizes = ndimage.sum(mask, labels, range(1, n + 1))
+        small = {i + 1 for i, s in enumerate(sizes) if s < 8}
+        if small:
+            mask = mask & ~np.isin(labels, list(small))
+    except ImportError:
+        mask = np.asarray(am) > 6
+
+    box = Image.fromarray((mask * 255).astype(np.uint8)).getbbox()
     out = out.crop(box)
     out = out.resize((args.width, max(1, round(args.width * out.height / out.width))),
                      Image.LANCZOS)
