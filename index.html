@@ -3002,21 +3002,27 @@
   }
   const inBusZone = () => !!busUnderPlayer();
 
-  // Which pass the player is standing at, or null.
-  function passUnderPlayer(){
+  // Which side of the counter the player is standing at, or null. Used to be
+  // a narrow strip under each pass's own PICK UP arrow -- but the arrow and
+  // its floor-level framing were dropped once the ticket itself became the
+  // cue for where to stand (see drawPickupZone's removal note below), and a
+  // pixel-precise target under a moving cue fought that instead of using it.
+  // Now the whole width of your own half of the counter counts, the same way
+  // a table's side decides which pass its order queues at in the first
+  // place -- only how far you can reach up to it (still per-pass y/h,
+  // shared by both sides) is a real fixed distance.
+  function pickupSideUnderPlayer(){
     const pad = player.size * 0.4;
-    for (const p of PASSES){
-      if (Math.abs(player.x - p.x) <= p.w/2 + pad &&
-          Math.abs(player.y - p.y) <= p.h/2 + pad) return p;
-    }
-    return null;
+    const pass = PASSES[0];
+    if (Math.abs(player.y - pass.y) > pass.h/2 + pad) return null;
+    return player.x < W/2 ? 'left' : 'right';
   }
   const queueFor = side => tickets.filter(tk => tk.side === side);
 
   function tryPickup(){
-    const pass = passUnderPlayer();
-    if (!pass) return;
-    const queue = queueFor(pass.side);
+    const side = pickupSideUnderPlayer();
+    if (!side) return;
+    const queue = queueFor(side);
     if (queue.length === 0) return;
     // The full-hands check moved below the "is there anything here" checks on
     // purpose. Standing at an empty pass with both hands full is not a mistake
@@ -3954,10 +3960,11 @@
   // visibly there is the cue, so the frame+label went first; then even the
   // standing-only glow turned out to repeat the same information the ticket
   // already gives, so that went too. Removed rather than emptied -- nothing
-  // called it after that. The interaction itself (PASSES/passUnderPlayer(),
-  // pickup logic) is untouched; this only ever removed floor-level
-  // advertising. assets/ui/pick-up.webp is unreferenced -- left on disk
-  // rather than deleted, in case this gets revisited.
+  // called it after that. The interaction itself (PASSES, pickup logic) was
+  // untouched at the time; pickupSideUnderPlayer() later widened the pickup
+  // hitbox to the whole half of the counter, but that was a separate change,
+  // not a consequence of this one. assets/ui/pick-up.webp is unreferenced --
+  // left on disk rather than deleted, in case this gets revisited.
 
   // The 3D board's rim-glow highlight: a soft halo that hugs each basin's
   // own silhouette (via dish-return-mask.png) rather than a bounding box.
