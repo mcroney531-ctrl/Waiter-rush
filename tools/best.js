@@ -21,10 +21,14 @@ const check = (n, ok, d) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await p.evaluate(() => localStorage.removeItem('dineo.best'));
 
   // Drive endGame directly with a chosen score, and read what the card says.
-  // .so-best-num/.so-best-cap replaced .big-stat/p.best when the end card
-  // moved onto the baked clipboard art (see index.html's endGame()) -- the
-  // prose paragraph and the amber pill are gone, the six figures now sit in
-  // fixed slots on assets/ui/endcard-board.webp instead.
+  // .so-best-num replaced .big-stat/p.best when the end card moved onto the
+  // baked clipboard art (see index.html's endGame()) -- the prose paragraph
+  // and the amber pill are gone, the six figures now sit in fixed slots on
+  // assets/ui/endcard-board.webp instead. It used to carry a .so-best-cap
+  // underneath ("New best" / "First shift" / "$X to beat"), dropped later
+  // because a second, smaller line under the figure read as cramped rather
+  // than informative -- the box is number-only now, so what's checked here
+  // is which figure it shows, not a caption explaining it.
   const runShift = (cents) => p.evaluate(async (c) => {
     const d = window.__dbg;
     d.score = c;
@@ -33,24 +37,21 @@ const check = (n, ok, d) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
     return {
       stored: localStorage.getItem('dineo.best'),
       bestNum: o.querySelector('.so-best-num')?.textContent,
-      bestCap: o.querySelector('.so-best-cap')?.textContent.trim(),
     };
   }, cents);
 
   const first = await runShift(50000);                    // $500, no prior best
   check('first shift stores a best', first.stored === '50000', first.stored);
-  check('first shift says so rather than quoting a target',
-        /first shift/i.test(first.bestCap || ''), JSON.stringify(first.bestCap));
+  check('first shift shows that shift\'s own score, having nothing else to show',
+        /500\.00/.test(first.bestNum || ''), JSON.stringify(first.bestNum));
 
   const worse = await runShift(20000);                    // $200, under the best
   check('a worse shift does not overwrite', worse.stored === '50000', worse.stored);
-  check('a worse shift reports the gap', /300\.00 to beat/i.test(worse.bestCap || ''),
-        JSON.stringify(worse.bestCap));
+  check('a worse shift still shows the standing best, not the shift just played',
+        /500\.00/.test(worse.bestNum || ''), JSON.stringify(worse.bestNum));
 
   const better = await runShift(80000);                   // $800, a new record
   check('a better shift overwrites', better.stored === '80000', better.stored);
-  check('a better shift announces the record', /new best/i.test(better.bestCap || ''),
-        JSON.stringify(better.bestCap));
   check('a better shift shows the new score as the headline figure',
         /800\.00/.test(better.bestNum || ''), JSON.stringify(better.bestNum));
 

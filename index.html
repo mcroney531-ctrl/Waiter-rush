@@ -371,9 +371,8 @@
     background: url('assets/ui/endcard-board.webp') no-repeat center / contain;
     margin: 0 auto 12px;
   }
-  /* Direct children only -- .so-best has its own nested num/cap divs that
-     need to stay in its flex-column flow, not break out to absolute
-     positioning too (which stacked them on top of each other). */
+  /* Direct children only -- .so-best has its own nested num div that needs
+     to stay in its flex flow, not break out to absolute positioning too. */
   #shiftOverCard > div {
     position: absolute; text-align: center; font-family: 'Galindo', sans-serif;
   }
@@ -412,7 +411,12 @@
     background: rgba(20,16,10,0.6); border-radius: 4px;
     overflow: hidden;
   }
-  /* Minimums low enough to actually shrink in a short landscape window --
+  /* Number only now -- no "New best" / "First shift" / "$X to beat" caption
+     line underneath. Whatever the figure means was already said once, in
+     TODAY'S TOTAL or the delta itself; a second, smaller line repeating a
+     verdict was making the whole box read as cramped rather than adding
+     information, particularly next to a wide figure on a short phone.
+     Minimums low enough to actually shrink in a short landscape window --
      2.1vh floors out at 12px well before the box (26.4% of a card that is
      itself capped by 56vh) is wide enough for it, and a single unbreakable
      token like a dollar figure just overflows past the box edge into
@@ -421,12 +425,8 @@
      lower floor -- clips instead of bleeding into the label. Checked at
      844x390 specifically, the shortest realistic viewport this hits. */
   #shiftOverCard .so-best-num {
-    font-size: clamp(8px, 2.1vh, 17px); font-weight: 700;
+    font-size: clamp(9px, 2.5vh, 19px); font-weight: 700;
     max-width: 100%; white-space: nowrap;
-  }
-  #shiftOverCard .so-best-cap {
-    font-size: clamp(6px, 1.3vh, 10px); opacity: 0.85; margin-top: 2px;
-    letter-spacing: 0.3px; text-transform: uppercase;
   }
 
   #shiftOverActions {
@@ -3537,11 +3537,6 @@
         <div class="so-stat so-stat-3">${money(tipsEarned)}</div>
         <div class="so-best">
           <div class="so-best-num">${beatIt ? money(score) : money(best)}</div>
-          <div class="so-best-cap">${
-            beatIt ? 'New best'
-            : prevBest === 0 ? 'First shift'
-            : money(toBeat) + ' to beat'
-          }</div>
         </div>
       </div>
       <div id="shiftOverActions">
