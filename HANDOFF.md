@@ -45,6 +45,10 @@ git branch -a | grep manager
 
 ### In progress: The Manager, a tutorial mascot
 
+**Correction, 2026-08-24: this shipped.** Everything below describes the mockup phase and is stale — a later session finished it for real, on `main`, not on the `wip/manager-mascot-mockup` branch this section points to. `index.html` now has a real `MANAGER_ART` object keyed `'step<N>-<moment>'` with baked art for all six tutorial steps (13 images total, all present under `assets/ui/manager-*.webp`), and `drawTutorialBanner()` survives only as the fallback for a step/moment with no art. The open questions this section lists (which pose, the second character's role, the cutout fringe, the five unshortened steps) were all resolved somewhere along the way; none of it is tracked in a handoff document, so check `git log -- index.html art-source/refs/ui/PROMPTS.md` if the reasoning behind a specific choice matters. The `wip/manager-mascot-mockup` branch itself was never merged and is superseded, not a second copy of what shipped.
+
+Original mockup-phase writeup follows, kept for history:
+
 Rone's idea: the tutorial is currently a text-only bottom banner (`drawTutorialBanner()`) with no speaker. What if a character — "The Manager" — delivers it instead, in a parchment speech bubble positioned in the pocket of open floor above table 4 (the same spot `PICK UP`'s frame used to occupy, before it got removed entirely — see below). Conceit: he's training the player.
 
 **Full writeup, including both source character sheets and the open questions, is in `art-source/refs/ui/PROMPTS.md` section 6.** Short version:
