@@ -1406,6 +1406,15 @@
   let spawnInterval = SPAWN_START_MS; // ms, shrinks over time
   let elapsed = 0;
   let running = false;
+  // Separate from `running`: this tracks whether a requestAnimationFrame
+  // chain is actually in flight, so beginRun() can tell "already looping"
+  // apart from "should be looping". Without it, two Start clicks close
+  // enough together (a fast double-click, an eager double-tap on "Run It
+  // Back") each schedule their own recursive rAF chain -- running=true
+  // either way, so neither notices the other, and both keep re-scheduling
+  // themselves forever. Every extra accidental click permanently adds
+  // another zombie chain updating and rendering the same frame.
+  let loopActive = false;
   let ticketIdCounter = 1;
 
   const TOUCH = window.matchMedia('(pointer: coarse)').matches;
@@ -1602,7 +1611,13 @@
   let ac = null;
   let master = null;
   let noiseBuf = null;
-  let muted = localStorage.getItem('dineo.muted') === '1';
+  // Guarded like the best-score and character-pick reads below -- storage
+  // access can throw outright (private-mode Safari, a locked-down iframe),
+  // and this one runs at top-level script scope, so an unguarded throw here
+  // used to take the whole game down before anything else could run.
+  let muted = false;
+  try { muted = localStorage.getItem('dineo.muted') === '1'; }
+  catch (e) { /* private mode or storage blocked: default unmuted */ }
 
   function initAudio(){
     if (ac) return;
@@ -1838,7 +1853,8 @@
 
   function setMuted(v){
     muted = !!v;
-    localStorage.setItem('dineo.muted', muted ? '1' : '0');
+    try { localStorage.setItem('dineo.muted', muted ? '1' : '0'); }
+    catch (e) { /* private mode or storage blocked: still usable this session */ }
     if (master) master.gain.setTargetAtTime(muted ? 0 : SFX_MASTER, ac.currentTime, 0.02);
     // The mute button owns the music too. Unmuting back onto a menu screen
     // should bring the track back, not leave the button lying about what it did.
@@ -4901,7 +4917,7 @@
 
   // ---------- Loop ----------
   function loop(t){
-    if (!running) return;
+    if (!running){ loopActive = false; return; }
     if (!lastTime) lastTime = t;
     const dt = Math.min(50, t - lastTime);
     lastTime = t;
@@ -4944,7 +4960,11 @@
     document.getElementById('skipBtn').classList.toggle('hidden', nextMode !== 'tutorial');
     running = true;
     lastTime = 0;
-    requestAnimationFrame(loop);
+    // Only ever schedules the first link in the chain -- loop() re-schedules
+    // itself every frame from here on, so a beginRun() that lands while one
+    // is already active (see loopActive's own note) just resets game state
+    // and lets the existing chain keep running, instead of starting a second.
+    if (!loopActive){ loopActive = true; requestAnimationFrame(loop); }
   }
 
   function startGame(){ beginRun('game'); }
