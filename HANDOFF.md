@@ -344,7 +344,7 @@ Thumbnails are the sprite sheets themselves, scaled down and offset to one cell 
 
 **This replaced the DiceBear/Open Peeps avatar builder, which is gone entirely** — along with `vendor/`, its 448 KB of vendored renderer and art, its six-step flow, the lazy module import and every failure path that came with it. The game now ships no third-party art at all and makes no external requests except two Google Fonts.
 
-The drawn paper-doll body survives as the fallback when no sheet loads, but it no longer depends on any of that: it draws its own head. It is only reachable if a sprite PNG fails outright.
+**A run never starts without the chosen character's tier-1 sheet loaded and decoded.** The drawn paper-doll body that used to stand in when no sheet had arrived is deleted. It was reachable on every slow load, not only on a failed one: the picker handed straight into the tutorial and the doll walked the floor until the PNG landed, measured at 8–13 s on a throttled 4 Mbps link, and one frame even on a warm cache. Start now waits on `charReady()` ("Getting your waiter ready…" after 350 ms), a hard failure keeps the player in the picker with a retry, and the picker preloads the tier-1 sheet of whoever is on the card. Sheets are cached per character and a late load can only ever write into its own character's entry. `tools/charload.js` holds all of this to one invariant, checked every frame: the sheet on screen is the committed character's own tier-1 sheet. See `e241a69` for the measurements.
 
 ## Unfinished and unverified — start here
 
@@ -446,7 +446,7 @@ Ranked against a live deadline, a painted style nothing off-the-shelf matches, a
 
 ### What is already built for this
 
-`playerSheet` in `index.html` — null by default, drawn body runs. Set it and frames take over. It carries cell size, scale, anchor, a row per facing (any facing can mirror another) and frame ranges for walk and idle. The walk frame comes from the same distance-driven phase the drawn body uses, so swapping art changes only the art. A missing sheet falls back rather than leaving the player invisible. A rank/accessory layer is a second sheet on the same frame index.
+*(Historical — this section predates the sprites. The drawn body it describes has since been deleted; see the character select section.)* `playerSheet` in `index.html` carries cell size, scale, anchor, a row per facing (any facing can mirror another) and frame ranges for walk and idle. The walk frame comes from a distance-driven phase, so the cycle stays in step with the floor at any speed. A rank/accessory layer is a second sheet on the same frame index.
 
 ## The board is `assets/board.jpg`, and it carries no UI
 
@@ -572,7 +572,7 @@ Promotion is on money earned this shift: `TIER_UP_C = [0, 7500, 20000, 40000]`, 
 
 Three behaviours worth knowing, all covered by `tiers.js`:
 
-- **All tiers preload at startup.** A promotion that waited on a download would drop to the placeholder body at the exact moment the game is drawing attention to the character.
+- **Tier 1 gates the run; the other tiers load right behind it.** Tier 1 is requested first (`fetchpriority=high`) and the run waits on it. Tiers 2–4 start the moment it lands, so each is in memory minutes before it can be earned. A promotion whose sheet has not arrived keeps the current outfit and does not announce; the new outfit swaps in silently when its sheet lands.
 - **A tier with missing art is skipped silently** — no banner, the player keeps what they had, and the next real tier still fires. So tiers can land one at a time.
 - **Promotion is one step per score change**, so a single fat delivery cannot skip a tier nobody got to see.
 

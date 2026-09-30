@@ -764,8 +764,6 @@
     counterTop: '#3d8783',
     tableWood: '#8a5a3b',
     tableTop: '#c99a6b',
-    player: '#C1443A',
-    playerDark: '#8f2e26',
     text: '#2B2620',
     angry: '#B33A3A',
     happy: '#4C8C5C',
@@ -1463,8 +1461,8 @@
     }));
     tickets = [];
     // size stays the collision radius it has always been — the body is drawn
-    // around it, so none of the tuned geometry moves. facing/walk/moving drive
-    // the paper-doll animation only.
+    // around it, so none of the tuned geometry moves. facing/walk/moving pick
+    // the sprite's row and frame only.
     player = { x: W/2, y: H - 90, size: 26, speed: PLAYER_SPEED,
                facing: 'down', walk: 0, moving: false };
     keys = {};
@@ -1566,38 +1564,18 @@
     }
   }
 
-  // The uniform palette for the drawn fallback body. Real sprites carry their
-  // own colours; this is only reached when no sheet loads at all.
-  const UNIFORM_COLOURS = ['#2f6f6b','#c1443a','#e0a72e','#3c4f5c','#262e33'];
-
-  // ---------- Player body (placeholder art) ----------
-  // Drawn in code rather than from a sprite sheet so the movement can be judged
-  // before any art is commissioned. The shapes are throwaway; the timing,
-  // proportions and facing logic are the parts worth reviewing, and they carry
-  // over unchanged when real frames replace the primitives.
-  const STRIDE_PX  = 34;      // distance covered per radian of the cycle
-  const BODY_TROUSER = '#3a3128';
-  const BODY_SHOE    = '#241d16';
-  const BODY_APRON   = '#F4EEDB';
-  const SKIN_FALLBACK = '#edb98a';
-
-  // All offsets are from the player origin, which is still the collision centre.
-  // The figure stands on `ground` — the same point the old token's shadow sat
-  // on — and grows upward from there, so the character got taller without the
-  // hitbox moving a pixel.
+  // ---------- Player body geometry ----------
+  // What survives of the drawn placeholder body that preceded the sprite
+  // sheets. Everything around the character was placed against it -- the
+  // contact shadow, the carried-plate stack, the hint arrows, the promotion
+  // glow -- and the sheets were anchored to stand on the same `ground`, so
+  // these two numbers are the contract, not decoration.
+  //
+  // Offsets are from the player origin, which is the collision centre.
+  const STRIDE_PX  = 34;      // floor distance per radian of the walk cycle; picks the sheet's frame
   const BODY = {
-    ground:   18,     // soles, near where the old token's shadow sat
-    hip:      -12,    // 30px of leg
-    shoulder: -46,    // 34px of torso
-    headR:    16,
-    get headY(){ return this.shoulder - this.headR - 2; },
-    get topY(){  return this.headY - this.headR; },
-    shoulderW: 12,
-    hipW:      9,
-    thigh:     16,
-    shin:      15,
-    upperArm:  13,
-    foreArm:   12
+    ground: 18,               // where the soles meet the floor
+    topY:   -80               // top of the old figure's head; what floats above the character clears this
   };
 
   // ---------- Sound ----------
@@ -2127,8 +2105,8 @@
   //     dirs       a row per facing, or mirror another facing
   //     walk/idle  first column and how many, per state
   //
-  // With no sheet loaded the drawn placeholder body runs instead, so the game
-  // is never broken by not having art yet.
+  // A run never starts without the character's tier-1 sheet decoded -- see
+  // charReady -- so everything below may assume a sheet is there.
   //
   // ---------- The roster ----------
   // Every sheet render_sprites.mjs produces has the same layout, so the only
@@ -2304,7 +2282,7 @@
 
   // A dropped image request used to be permanent. The character is the one
   // asset with no graceful degradation -- a missing banner falls back to text,
-  // a missing sprite sheet leaves a headless placeholder walking the floor --
+  // but a missing sprite sheet means no run at all (see charReady) --
   // and 41 requests totalling 16.6 MB fire before the shift starts, against a
   // browser's six-per-host cap. One of them losing that race is not rare, and
   // it is likeliest right after a push, when nothing is warm in the CDN yet.
@@ -2487,9 +2465,9 @@
     const flip = !!dir.mirror;
     const row = flip ? ((S.dirs[dir.mirror] || {}).row || 0) : (dir.row || 0);
 
-    // Walking is driven by distance through the same phase the drawn body uses,
-    // so the two render identically in time and swapping one for the other
-    // changes only the art. Standing falls back to a clock.
+    // Walking is driven by distance rather than a clock, so the cycle stays in
+    // step with the floor at any speed, including the wrong-table slowdown,
+    // where a time-driven cycle skates. Standing falls back to a clock.
     //
     // Standing picks a per-row frame rather than always frame 0. There is no
     // separate idle animation -- "standing" is just the walk cycle held on one
@@ -2559,142 +2537,6 @@
     ctx.imageSmoothingEnabled = S.smooth !== false;
     ctx.drawImage(im, col * S.frameW, row * S.frameH, S.frameW, S.frameH, dx, dy, dw, dh);
     ctx.restore();
-  }
-
-  function limb(x1, y1, x2, y2, w, colour){
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = w;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
-
-  // One jointed limb: hip/shoulder -> knee/elbow -> foot/hand, posed by two
-  // angles measured from straight down. Two segments rather than one is the
-  // whole difference between a walk and a pair of scissors opening.
-  function jointed(ox, oy, a1, a2, l1, l2, w1, w2, colour, endColour, endR){
-    const kx = ox + Math.sin(a1) * l1, ky = oy + Math.cos(a1) * l1;
-    const ex = kx + Math.sin(a2) * l2, ey = ky + Math.cos(a2) * l2;
-    limb(ox, oy, kx, ky, w1, colour);
-    limb(kx, ky, ex, ey, w2, colour);
-    if (endR){
-      ctx.fillStyle = endColour;
-      ctx.beginPath(); ctx.arc(ex, ey, endR, 0, Math.PI*2); ctx.fill();
-    }
-    return { x: ex, y: ey };
-  }
-
-  function drawBody(){
-    if (sheetReady()){ drawSheetBody(); return; }
-    const face  = player.facing;
-    const side  = face === 'left' || face === 'right';
-    const f     = face === 'left' ? -1 : 1;      // horizontal sign for side poses
-    const s     = Math.sin(player.walk);
-    const bob   = -Math.abs(s) * 2.4;            // the body lifts at mid-stride
-    const uni   = UNIFORM_COLOURS[0];
-    const skin  = SKIN_FALLBACK;
-    const uniBack  = shade(uni, -22);
-    const legBack  = shade(BODY_TROUSER, -12);
-    const shoeBack = shade(BODY_SHOE, -10);
-    const B     = BODY;
-
-    ctx.save();
-    ctx.translate(0, bob);
-
-    const torsoTop = B.shoulder, torsoH = B.hip - B.shoulder;
-    const halfW = side ? B.hipW : B.shoulderW;
-    const armY  = torsoTop + 6;
-
-    // A leg for one side of the body. dir -1 is the far leg, drawn behind and
-    // a shade darker; that is all the depth a flat character needs.
-    const leg = (dir) => {
-      const back = dir < 0;
-      if (side){
-        const ph = s * dir;                       // -1..1 through the stride
-        const a1 = f * ph * 0.62;                 // thigh swings fore and aft
-        const a2 = a1 - Math.max(0, -ph) * 0.85;  // knee folds on the back swing
-        const foot = jointed(f * 1.5, B.hip, a1, a2, B.thigh, B.shin, 9.5, 8,
-                             back ? legBack : BODY_TROUSER);
-        limb(foot.x, foot.y, foot.x + f * 6, foot.y, 6.5, back ? shoeBack : BODY_SHOE);
-      } else {
-        // Wider stance and a shade of difference, or the two trouser legs merge
-        // into one dark block and the step stops reading at all head-on.
-        const ph = s * dir;
-        const legX = dir * 7;
-        const lift = Math.max(0, ph) * 4.5;
-        limb(legX * 0.6, B.hip, legX, B.ground - lift, 8.5,
-             back ? legBack : BODY_TROUSER);
-        limb(legX - 3.5, B.ground - lift, legX + 3.5, B.ground - lift, 6.5,
-             back ? shoeBack : BODY_SHOE);
-      }
-    };
-
-    const arm = (dir) => {
-      const back = dir < 0;
-      if (side){
-        const ph = -s * dir;                      // arms lead the opposite leg
-        const a1 = f * ph * 0.55;
-        const a2 = a1 + f * 0.45 + Math.max(0, ph) * 0.3;
-        jointed(f * 2, armY, a1, a2, B.upperArm, B.foreArm, 7.5, 6.5,
-                back ? uniBack : uni, back ? shade(skin, -14) : skin, 3.8);
-      } else {
-        const ph = -s * dir;
-        const shX = dir * (B.shoulderW - 2);
-        const a1 = dir * (0.18 + ph * 0.12);
-        const a2 = a1 + dir * 0.22;
-        jointed(shX, armY, a1, a2, B.upperArm, B.foreArm, 7.5, 6.5, uni, skin, 3.8);
-      }
-    };
-
-    // Draw order is the depth: far limbs, then the torso over their tops, then
-    // the near limbs in front of it.
-    leg(-1);
-    arm(-1);
-
-    ctx.fillStyle = uni;
-    roundRect(ctx, -halfW, torsoTop, halfW * 2, torsoH + 5, 7);
-    ctx.fill();
-
-    // Apron below the waist only, and only on the front. Losing it when you
-    // turn your back is the clearest free signal that facing is working.
-    if (face !== 'up'){
-      ctx.save();
-      ctx.beginPath();
-      roundRect(ctx, -halfW, torsoTop, halfW * 2, torsoH + 5, 7);
-      ctx.clip();
-      ctx.fillStyle = BODY_APRON;
-      const aw = side ? halfW * 1.1 : halfW * 1.5;
-      const ax = side ? f * (halfW - aw/2 + 1) : 0;
-      roundRect(ctx, ax - aw/2, torsoTop + torsoH * 0.5, aw, torsoH, 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    leg(1);
-    arm(1);
-
-    // --- head. Drawn rather than composited: this body is only ever reached
-    // when no sprite sheet loaded at all, so it cannot depend on loading art.
-    ctx.save();
-    ctx.translate(0, B.headY);
-    ctx.fillStyle = COLORS.player;
-    ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 0, B.headR, 0, Math.PI*2);
-    ctx.strokeStyle = COLORS.playerDark; ctx.lineWidth = 3; ctx.stroke();
-    ctx.restore();
-
-    ctx.restore();
-  }
-
-  // Nudge a hex colour toward black or white, for the limb on the far side of
-  // the body. Cheap depth without a second palette.
-  function shade(hex, amt){
-    const n = parseInt(hex.slice(1), 16);
-    const cl = v => Math.max(0, Math.min(255, v + amt));
-    return '#' + [cl(n >> 16 & 255), cl(n >> 8 & 255), cl(n & 255)]
-      .map(v => v.toString(16).padStart(2, '0')).join('');
   }
 
   // ---------- Character select ----------
@@ -2825,7 +2667,7 @@
 
       // A dedicated tier portrait reads far better at this size than a
       // cropped walk-cycle frame -- the same trade the hero card already
-      // makes over the drawn body. Not every character has one yet, so a
+      // makes. Not every character has one yet, so a
       // missing file falls back to the sprite-sheet crop rather than
       // leaving the step blank.
       const img = document.createElement('img');
@@ -2941,9 +2783,9 @@
     // needs. The detour still needs a way back that changes nothing.
     document.getElementById('avatarCancel').textContent = 'Cancel';
     document.getElementById('avatarCancel').classList.toggle('hidden', pickerFromLanding);
-    // The only way this fails now is a sheet that will not load, and that is
-    // already handled: the game falls back to the drawn body. Say so rather
-    // than leaving an empty screen.
+    // Only an empty roster shows the warning on open. A sheet that will not
+    // load is caught when Start is pressed (commitAvatar), which shows the
+    // same line rather than starting a run with nothing to draw.
     const ok = CAST.length > 0;
     document.getElementById('avatarWarn').classList.toggle('hidden', ok);
     for (const id of ['avatarRandom', 'avatarPrev', 'avatarNext'])
@@ -4445,15 +4287,11 @@
     // floating. Only the shadow moves; the character, the hitbox and every
     // pad distance stay exactly where they were.
     //
-    // Sprite path only. The drawn fallback body really does have its soles on
-    // BODY.ground, so it wants no correction, and nudging it would introduce
-    // the same gap the other way round.
-    //
     // 4 rather than a per-sheet number because the anchors are measured, not
     // chosen, and carry the same measurement noise ROOM-RENDER.md flags on the
     // calibration character (192-210px against a 208 target). A soft pool that
     // is roughly right on every sheet beats an exact number on one of twenty.
-    const soleY = sheetReady() ? BODY.ground - 4 : BODY.ground;
+    const soleY = BODY.ground - 4;
     // The vertical fix above was the whole story on a narrow-legged frame,
     // but tyrone's own idle-down pose stands with its feet planted ~53px
     // apart (measured off the rendered sprite, canvas pixels) -- hands on
@@ -4504,7 +4342,9 @@
     ctx.ellipse(0, soleY, player.size*1.05, player.size*0.13, 0, 0, Math.PI*2);
     ctx.fill();
 
-    drawBody();
+    // Nothing before the character gate has resolved, which is before any run
+    // is showing -- see charReady.
+    if (sheetReady()) drawSheetBody();
     ctx.restore();
 
     // Everything in your hands, laid out side by side. Each item fades on its

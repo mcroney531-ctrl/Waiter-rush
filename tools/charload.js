@@ -11,8 +11,8 @@
 //   committed character's tier-1 sheet.
 //
 // That is deliberately stronger than "the placeholder body never showed".
-// Once the placeholder is deleted, a regression would draw *nothing* rather
-// than a doll, and a check on sheetOn alone would pass it. Checking the
+// The placeholder has since been deleted, so a regression now draws *nothing*
+// rather than a doll, and a check on sheetOn alone would pass it. Checking the
 // sheet's identity also catches the two subtler failures a carousel preloader
 // makes possible: a previously browsed character's late image landing on the
 // floor, and a higher tier's sheet standing in for a missing tier 1.

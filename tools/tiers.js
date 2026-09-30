@@ -151,11 +151,9 @@ const check = (name, got, want) => {
   await setScore(20000);
   check('recovers at the next real tier', await p.evaluate(() => window.__dbg.tier), 2);
 
-  // ---- no art at all falls back to the drawn body ----
-  await p.evaluate(() => window.__dbg.setRoster('tyrone',
-    [{ src: 'assets/sprites/NOPE.png', scale: 0.751, anchorX: 0.542, anchorY: 0.901 }]));
-  await p.waitForTimeout(900);
-  check('no art -> placeholder body', await p.evaluate(() => window.__dbg.sheetOn), false);
+  // (There used to be a "no art at all -> drawn placeholder body" case here.
+  // The placeholder is gone: a character with no loadable tier 1 never gets a
+  // run, which the dropCase checks above and tools/charload.js both cover.)
 
   console.log(fail.length ? `\n${fail.length} FAILED: ${fail.join(', ')}` : '\nall checks passed');
   await br.close();
