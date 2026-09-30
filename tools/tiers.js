@@ -111,7 +111,9 @@ const check = (name, got, want) => {
     await pg.click('#avatarDone');
     await pg.waitForTimeout(16000);        // past the whole 400/1200/3500/9000 ladder
     const out = await pg.evaluate(() => ({ sheetOn: window.__dbg.sheetOn,
-                                           tierArt: window.__dbg.tierArt }));
+                                           tierArt: window.__dbg.tierArt,
+                                           running: window.__dbg.running,
+                                           warned: !document.getElementById('avatarWarn').classList.contains('hidden') }));
     await pg.close();
     return out;
   };
@@ -120,16 +122,16 @@ const check = (name, got, want) => {
   check('a sheet that drops twice is retried', twice.tierArt, [true, true, true, true]);
   check('and the character is drawn', twice.sheetOn, true);
 
-  // The sharp one: three usable sheets in memory and the game drew a
-  // placeholder anyway, because applyTier only ever searched downward and
-  // there is nothing below tier 1.
+  // Tier 1 unreachable used to start the run on tier 2 -- better than the
+  // placeholder, but still an outfit the player had not earned. The run is
+  // now gated on tier 1 specifically, so it does not start at all, and the
+  // picker says why. tools/charload.js covers the retry that follows.
   const gone = await dropCase('assets/sprites/.*-t1\\.png', 99);
-  check('tier 1 unreachable leaves the others loaded', gone.tierArt, [false, true, true, true]);
-  check('and the character is still drawn', gone.sheetOn, true);
+  check('tier 1 unreachable does not start the run', gone.running, false);
+  check('and the picker says why', gone.warned, true);
 
-  // No sheet at all is the one case that legitimately has nothing to draw.
   const none = await dropCase('assets/sprites/.*\\.png', 999);
-  check('no sheet at all falls back to the placeholder', none.sheetOn, false);
+  check('no sheet at all does not start the run either', none.running, false);
 
   // ---- reset drops back ----
   await p.evaluate(() => { document.getElementById('startBtn').click(); });

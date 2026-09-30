@@ -39,7 +39,7 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
     endGame(){return endGame();}, finishTutorial(){return finishTutorial();},
     get lives(){return lives;}, set lives(v){lives=v; updateHUD();},
     get tier(){return tierIndex;}, get tierArt(){return tierArt.map(t=>!!t.img);},
-    get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; loadCharacter(id);},
+    get tierNotice(){return tierNotice;}, setRoster(id,tiers){ROSTER[id]={name:id,tiers:tiers}; charCache.delete(id); tierArt=[]; loadCharacter(id);},
     setChar(id){loadCharacter(id);}, setTier(n){applyTier(n);}, get roster(){return Object.keys(ROSTER);},
     get floaters(){return floaters;}, set hintCooldown(v){hintCooldown=v;},
     SIGN:SIGN, moneyMetrics:(t,px)=>{ctx.save(); ctx.font=px+'px Galindo, sans-serif';
@@ -50,6 +50,9 @@ DBG = """  Object.defineProperty(window,'__dbg',{get(){return {
                     spawnTime:performance.now()});
       t.state='waiting'; t.patience=1; t.warned=false; },
     get sheetOn(){return sheetReady();},
+    get running(){return running;}, get charId(){return charId;},
+    get sheetSrc(){return playerSheetImg ? playerSheetImg.src : null;},
+    get tierSrcs(){return tierArt.map(s => s.cfg.src);}, t1src(id){return ROSTER[id].tiers[0].src;},
     get drainRate(){return drainRate;}, get spawnInterval(){return spawnInterval;},
     get eatMs(){return eatMs();}, get queueCap(){return queueCapPerSide();},
     get music(){return music;}, get musicErrorStreak(){return musicErrorStreak;},

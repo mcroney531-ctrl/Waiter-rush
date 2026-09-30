@@ -611,6 +611,19 @@
     max-width: 460px; text-align: center; font-size: 13px;
     color: #E0A72E; line-height: 1.45; margin: 12px 0 0;
   }
+  /* Only while a Start press is waiting on the sheet. Shown late, so a warm
+     cache -- where the wait is a fraction of a frame -- never flashes it. */
+  #avatarLoading {
+    display: none; max-width: 460px; text-align: center; font-size: 13px;
+    letter-spacing: 0.6px; opacity: 0.75; margin: 12px 0 0;
+  }
+  #avatarPicker.loading #avatarLoading {
+    display: block; animation: avatarLoadingIn 200ms ease 350ms both;
+  }
+  @keyframes avatarLoadingIn { from { opacity: 0; } to { opacity: 0.75; } }
+  button.plaque.loading { cursor: progress; animation: plaqueBusy 1.1s ease-in-out 350ms infinite; }
+  @keyframes plaqueBusy { 50% { filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)) brightness(0.8); } }
+  @media (prefers-reduced-motion: reduce) { button.plaque.loading { animation: none; opacity: 0.8; } }
   #avatarActions {
     display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
     align-items: center;
@@ -697,7 +710,8 @@
     </div>
     <p id="avatarCounter"></p>
     <div id="avatarLadder"></div>
-    <p id="avatarWarn" class="hidden">Couldn't load the character art — you'll keep the classic waiter. Everything else works as normal.</p>
+    <p id="avatarLoading" role="status">Getting your waiter ready…</p>
+    <p id="avatarWarn" class="hidden" role="alert">Couldn't load your waiter. Check your connection and press Start to try again.</p>
     <div id="avatarActions">
       <button class="plaque start" id="avatarDone" type="button">Start training</button>
       <button class="plaque random" id="avatarRandom" type="button">Random</button>
@@ -2301,9 +2315,12 @@
   // where it was only late.
   const ART_RETRY_MS = [400, 1200, 3500, 9000];   // ~14s of patience, then quiet
 
-  function loadArt(src, done){
+  function loadArt(src, done, priority){
     const attempt = n => {
       const im = new Image();
+      // Only the sheet a run is waiting on asks for this. Everything else on
+      // the page leaves the browser to its own ordering.
+      if (priority) im.fetchPriority = priority;
       im.onload  = () => done(im);
       im.onerror = () => {
         if (n >= ART_RETRY_MS.length){ done(null); return; }
@@ -2325,44 +2342,105 @@
     return Object.assign({}, SHEET_BASE, entry);
   }
 
-  // Every tier is loaded up front rather than on promotion. A tier-up that had
-  // to wait on a download would drop to the placeholder body for a few frames
-  // at the exact moment the game is drawing attention to the character.
-  function loadCharacter(id){
-    charId = ROSTER[id] ? id : Object.keys(ROSTER)[0];
-    const tiers = (ROSTER[charId] && ROSTER[charId].tiers) || [];
-    tierArt = tiers.map(entry => {
-      const slot = { cfg: tierConfig(entry), img: null };
-      // Retried rather than given up on -- see loadArt. Giving up silently is
-      // what left a headless placeholder walking the floor for a whole session.
-      loadArt(entry.src, im => { slot.img = im; if (im) applyTier(tierIndex); });
-      return slot;
+  // ---------- Character loading ----------
+  // A run never starts until the committed character's own tier-1 sheet is
+  // loaded and decoded -- see charReady and commitAvatar. That gate is the
+  // whole fix for the placeholder body showing on a cold load: the game used
+  // to hand straight from the picker into the tutorial and draw the stand-in
+  // until the PNG arrived, which measured 8-13s on a throttled 4 Mbps link.
+  //
+  // Sheets are cached per character, and every load writes only into its own
+  // character's entry. That matters because the picker now preloads whoever
+  // the carousel lands on, so loads for several characters overlap and finish
+  // in any order. A late sheet for someone the player browsed past lands in
+  // that character's cache and nowhere else: only the entry currently in
+  // tierArt ever touches playerSheet.
+  const charCache = new Map();     // id -> { id, slots: [{ cfg, img, state, done }] }
+
+  function charEntry(id){
+    let e = charCache.get(id);
+    if (!e){
+      const tiers = (ROSTER[id] && ROSTER[id].tiers) || [];
+      e = { id, slots: tiers.map(t => ({ cfg: tierConfig(t), img: null, state: 'idle', done: null })) };
+      charCache.set(id, e);
+    }
+    return e;
+  }
+
+  // Resolves true once the slot's image is decoded, false if every retry
+  // failed. Idempotent: a slot already loading or loaded hands back the same
+  // promise rather than issuing a second request.
+  function loadSlot(e, i){
+    const slot = e.slots[i];
+    if (!slot) return Promise.resolve(false);
+    if (slot.done) return slot.done;
+    slot.state = 'loading';
+    slot.done = new Promise(resolve => {
+      loadArt(slot.cfg.src, im => {
+        const settle = ok => {
+          // An entry dropped from the cache (the test handle swaps rosters)
+          // is stale in its entirety; nothing it finishes may land anywhere.
+          if (charCache.get(e.id) !== e){ resolve(false); return; }
+          slot.img = ok ? im : null;
+          slot.state = ok ? 'ok' : 'failed';
+          if (tierArt === e.slots) applyTier(tierIndex);
+          resolve(ok);
+        };
+        if (!im){ settle(false); return; }
+        // decode() so the first frame of the run never stalls on it. A
+        // rejection after a successful load is not a reason to lock someone
+        // out -- the image is there and drawImage will decode it itself.
+        if (im.decode) im.decode().then(() => settle(true), () => settle(true));
+        else settle(true);
+      }, i === 0 ? 'high' : undefined);
     });
+    return slot.done;
+  }
+
+  // The gate. Tier 1 specifically: a higher tier standing in would start the
+  // run in an outfit the player has not earned. Asking again after a failure
+  // is the retry, so pressing Start a second time really does try again.
+  function charReady(id){
+    const e = charEntry(id);
+    const s = e.slots[0];
+    if (!s) return Promise.resolve(false);
+    if (s.state === 'failed'){ s.state = 'idle'; s.done = null; }
+    return loadSlot(e, 0);
+  }
+
+  // Makes a character the one on the floor. Callers gate on charReady first;
+  // this does not wait. Tier 1 is requested first and the other three only
+  // once it lands, so the one sheet a run needs never splits the connection
+  // with outfits that are minutes away. Every tier is still loaded long before
+  // it is earned -- a promotion that waited on a download would stall at the
+  // exact moment the game is drawing attention to the character.
+  function loadCharacter(id){
+    id = ROSTER[id] ? id : Object.keys(ROSTER)[0];
+    const e = charEntry(id);
+    const same = id === charId && tierArt === e.slots;
+    charId = id;
+    tierArt = e.slots;
     applyTier(0);
+    loadSlot(e, 0).then(() => e.slots.forEach((_, i) => { if (i) loadSlot(e, i); }));
+    // Re-committing the same character keeps what is already loaded, rather
+    // than throwing it away and re-requesting it.
+    if (same) return;
     loadPromoArt(charId);
     loadHandsFreeArt(charId);
   }
 
   // Shows the requested tier, or the best one below it that actually loaded.
-  // Nothing loaded at all leaves playerSheet null and the drawn body runs.
+  // Never reaches upward: the gate guarantees tier 1 before any run, so the
+  // search below always finds something once a run is live. Before the gate
+  // resolves there is nothing to draw, which is correct -- no run is showing.
   function applyTier(want){
     tierIndex = Math.max(0, Math.min(want, tierArt.length - 1));
-    const use = i => {
-      playerSheet = tierArt[i].cfg;
-      playerSheetImg = tierArt[i].img;
-    };
     for (let i = tierIndex; i >= 0; i--){
-      if (tierArt[i] && tierArt[i].img){ use(i); return; }
-    }
-    // Nothing at or below this tier. Reaching upward shows kit the player has
-    // not earned yet, which is why it is the last thing tried rather than part
-    // of the search above -- but it is only reached when the alternative is no
-    // character at all. A tier-1 sheet that failed while tiers 2-4 loaded used
-    // to leave a headless placeholder walking a floor with three usable sheets
-    // sitting in memory; slightly-wrong kit beats that every time. The player
-    // drops back to the correct sheet at their next promotion.
-    for (let i = tierIndex + 1; i < tierArt.length; i++){
-      if (tierArt[i] && tierArt[i].img){ use(i); return; }
+      if (tierArt[i] && tierArt[i].img){
+        playerSheet = tierArt[i].cfg;
+        playerSheetImg = tierArt[i].img;
+        return;
+      }
     }
     playerSheet = null;
     playerSheetImg = null;
@@ -2693,6 +2771,11 @@
 
   function renderPicker(dir){
     const c = ROSTER[pickedChar];
+    // Start the gated sheet the moment a character is on the card. Seconds
+    // spent looking at the portrait are seconds of download the Start press
+    // no longer has to wait for. Tier 1 only: preloading every outfit of
+    // every character browsed past would be ~2 MB a step.
+    charReady(pickedChar);
     const card = document.getElementById('avatarCard');
     card.innerHTML = '';
 
@@ -2772,6 +2855,8 @@
   // Wraps, so the roster is a loop rather than a list with dead ends at both
   // ends — five characters is short enough that hitting a wall feels broken.
   function stepChar(delta){
+    cancelCommit();
+    document.getElementById('avatarWarn').classList.add('hidden');
     const i = CAST.indexOf(pickedChar);
     pickedChar = CAST[(i + delta + CAST.length) % CAST.length];
     renderPicker(delta > 0 ? 'next' : 'prev');
@@ -2794,9 +2879,42 @@
     pickedChar = charId;
   }
 
-  function commitAvatar(){
-    charId = pickedChar;
-    loadCharacter(charId);
+  // Commits the pick only once its tier-1 sheet is decoded. While that is in
+  // flight the button reads as busy and ignores repeat presses; stepping the
+  // carousel or cancelling abandons the wait (commitGen), so a load that
+  // finishes after the player has moved on can never start a run for the
+  // character they moved away from.
+  let commitGen = 0;
+  let commitPending = false;
+
+  function setCommitPending(on){
+    commitPending = on;
+    const done = document.getElementById('avatarDone');
+    done.classList.toggle('loading', on);
+    document.getElementById('avatarPicker').classList.toggle('loading', on);
+    done.setAttribute('aria-busy', on ? 'true' : 'false');
+  }
+
+  function cancelCommit(){
+    commitGen++;
+    setCommitPending(false);
+  }
+
+  async function commitAvatar(){
+    if (commitPending) return;
+    const id = pickedChar, gen = ++commitGen;
+    document.getElementById('avatarWarn').classList.add('hidden');
+    setCommitPending(true);
+    const ok = await charReady(id);
+    if (gen !== commitGen) return;               // abandoned while it loaded
+    setCommitPending(false);
+    if (!ok){
+      // Every retry failed. Stay here and say so -- starting the run anyway
+      // would put a player on the floor with no character to draw.
+      document.getElementById('avatarWarn').classList.remove('hidden');
+      return;
+    }
+    loadCharacter(id);
     try { localStorage.setItem(CHAR_STORE, charId); }
     catch (e) { /* private mode — still usable this session */ }
     closePicker();
@@ -2808,6 +2926,7 @@
   let pickerFromLanding = false;
 
   function openPicker(fromLanding){
+    cancelCommit();
     pickerFromLanding = !!fromLanding;
     pickedChar = charId;
     // The primary button says two different things depending on how you got
@@ -2838,6 +2957,7 @@
   // via the title screen — picking the waiter *is* the opening now, and a
   // second "press start" between it and the first lesson was a dead beat.
   function closePicker(){
+    cancelCommit();
     document.getElementById('avatarPicker').classList.add('hidden');
     if (pickerFromLanding){
       pickerFromLanding = false;
@@ -4975,8 +5095,18 @@
     if (!loopActive){ loopActive = true; requestAnimationFrame(loop); }
   }
 
-  function startGame(){ beginRun('game'); }
-  function startTutorial(){ beginRun('tutorial'); }
+  // Every way into a run comes through here, so the character gate holds for
+  // Run It Back and Skip training as well as the picker. In practice the
+  // picker has always passed the gate first and this resolves in the same
+  // tick; it is the backstop, not the main path. If it somehow cannot load,
+  // the picker is where the player can see why and try again.
+  function whenCharReady(fn){
+    const e = charEntry(charId);
+    if (e.slots[0] && e.slots[0].state === 'ok'){ fn(); return; }
+    charReady(charId).then(ok => { if (ok){ loadCharacter(charId); fn(); } else openPicker(false); });
+  }
+  function startGame(){ whenCharReady(() => beginRun('game')); }
+  function startTutorial(){ whenCharReady(() => beginRun('tutorial')); }
 
   document.getElementById('startBtn').addEventListener('click', startGame);
   document.getElementById('trainBtn').addEventListener('click', startTutorial);
@@ -5024,10 +5154,11 @@
   if (document.fonts && document.fonts.load) document.fonts.load('20px Galindo');
 
   loadSavedAvatar();
-  // Kick off the sprite load for every tier at once. Until the images arrive —
-  // and permanently, if they never do — the drawn placeholder body renders
-  // instead, so a missing sheet is a downgrade rather than an invisible player.
-  loadCharacter(charId);
+  // Only the tier-1 sheet of whoever the picker will open on. The rest of that
+  // character's outfits wait for the commit: if the player picks someone else,
+  // three sheets for the wrong dinosaur would be competing with the one sheet
+  // the run is actually waiting on.
+  charReady(charId);
 
   // initial static preview render
   resetGame();
